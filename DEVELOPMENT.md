@@ -24,7 +24,13 @@ xcodebuild -scheme GimDiff -destination 'platform=macOS' test -only-testing:GimD
 xcodebuild -scheme GimDiff -destination 'platform=macOS' test -only-testing:GimDiffTests/GitCommandTests
 ```
 
-Both commands must finish clean — no errors and no new warnings — before a change is
+The `gimdiff` command-line tool is a second target in the same project:
+
+```sh
+xcodebuild -scheme gimdiff -destination 'platform=macOS' build
+```
+
+All three commands must finish clean — no errors and no new warnings — before a change is
 considered done.
 
 ### If a test run leaves the app wedged
@@ -58,6 +64,8 @@ GimDiff/
 ├── Infrastructure/  Process runner, filesystem, clipboard
 ├── UI/              Sidebar, tree, viewers, canvas, colour pickers
 └── Extensions/      Foundation and SwiftUI helpers
+
+GimCLI/              Argument parsing and subcommands for the `gimdiff` tool
 ```
 
 Dependencies point inward: `UI` and `App` depend on `Engine`; `Infrastructure` implements
@@ -99,6 +107,10 @@ gimdiff://open?path=/path/to/snapshots
 gimdiff://compare?reference=/path/a.png&failure=/path/b.png
 ```
 
+Each action and each parameter also answers to the synonyms listed at the top of
+`GimDiffURLCommand` — `open-project`, `baseline`, `candidate` — so the vocabulary the CLI
+and the ingestion service use does not have to be translated at the boundary.
+
 Parsing lives in `Engine/Ingestion/GimDiffURLCommand.swift` and is fully unit tested; the
 `App` layer only forwards the URL. Try it against a debug build with:
 
@@ -110,6 +122,29 @@ open 'gimdiff://open?path=/path/to/snapshots'
 (`GENERATE_INFOPLIST_FILE = YES`). It is excluded from Copy Bundle Resources through a
 `PBXFileSystemSynchronizedBuildFileExceptionSet`; keep that exception if you add files
 that should not ship as resources.
+
+## Command-line tool
+
+`gimdiff` is a `com.apple.product-type.tool` target. `GimCLI/` holds only argument parsing
+and the subcommands; everything they do is `Engine/` and `Infrastructure/` code, compiled
+into the tool from the same folders the app compiles them from.
+
+```
+gimdiff scan <project-path> [--json]
+gimdiff diff <candidate> <baseline> [--out <mask.png>] [--json]
+gimdiff parse-clipboard [--input "<log text>"] [--json]
+gimdiff <project-path>                 # hands the path to the running app
+gimdiff <candidate> <baseline>         # hands one comparison to the running app
+```
+
+Exit codes are part of the contract, because a build script needs to tell a difference from
+a failure: `0` nothing to report, `1` the images or the project differ, `2` the command
+could not run, `64` the arguments were not usable.
+
+The launcher never spawns the app. It builds a `gimdiff://` URL and passes it to
+`NSWorkspace` with `configuration.activates = true`, so LaunchServices routes it to the copy
+already running and `AppDelegate` retargets the one window. That is what keeps the
+single-window mandate intact from a terminal.
 
 ## Git safety
 
@@ -137,6 +172,10 @@ or alongside the implementation. `GimDiffTests` mirrors the app's layer layout
 (`GimDiffTests/Engine`, `GimDiffTests/Infrastructure`).
 
 - Unit tests use **Swift Testing** (`@Suite`, `@Test`, `#expect`, `#require`).
+- Image fixtures are checked in under `GimDiffTests/Fixtures/Images/` and reached through
+  `ImageFixtures`, which locates them with `#filePath` rather than through `Bundle`. Project
+  *trees*, by contrast, are still built at run time by `ProjectFixture` — see the note there
+  for why they cannot be committed.
 - UI tests use **XCTest**, because XCUIApplication has no Swift Testing equivalent.
 - Avoid the `#URL` macro: it needs macOS 15, and the deployment target is 14.0. Use
   `try #require(URL(string:))`.
@@ -146,15 +185,23 @@ or alongside the implementation. `GimDiffTests` mirrors the app's layer layout
 ## Project file
 
 The project uses Xcode 16+ synchronized folders (`PBXFileSystemSynchronizedRootGroup`), so
-adding a Swift file to `GimDiff/` or `GimDiffTests/` on disk is enough — the project file
-needs no edit and no new file reference.
+adding a Swift file to `GimDiff/`, `GimDiffTests/`, or `GimCLI/` on disk is enough — the
+project file needs no edit and no new file reference.
+
+One exception, and it is the one that bites: the `GimDiff/` folder is synchronized into
+**two** targets, the app and `gimdiff`. The tool has no SwiftUI in it, so every app-only
+file is listed by path in the `PBXFileSystemSynchronizedBuildFileExceptionSet` named
+*Exceptions for "GimDiff" folder in "gimdiff" target*. Xcode does not accept a directory
+there, only files. **Adding a file under `GimDiff/App/` or `GimDiff/UI/`, or any other file
+that imports SwiftUI or AppKit, means adding its path to that list** — otherwise the next
+`xcodebuild -scheme gimdiff` build fails on it.
 
 ## Code style
 
 - No trailing whitespace, and no empty line containing indentation. Verify with:
 
   ```sh
-  grep -rn '[[:space:]]\+$' --include='*.swift' GimDiff GimDiffTests GimDiffUITests
+  grep -rn '[[:space:]]\+$' --include='*.swift' GimDiff GimCLI GimDiffTests GimDiffUITests
   ```
 
   That command must print nothing.

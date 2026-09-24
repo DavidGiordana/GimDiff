@@ -27,6 +27,7 @@
 		EAECA039306579A400B5F9FB /* GimDiff.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GimDiff.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EAECA046306579A500B5F9FB /* GimDiffTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GimDiffTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EAECA050306579A500B5F9FB /* GimDiffUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GimDiffUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EAECA0A0306579A500B5F9FB /* gimdiff */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = gimdiff; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -37,6 +38,19 @@
 			);
 			target = EAECA038306579A400B5F9FB /* GimDiff */;
 		};
+		EAECA0A2306579A500B5F9FB /* Exceptions for "GimDiff" folder in "gimdiff" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				App/AppDelegate.swift,
+				App/AppState.swift,
+				App/GimDiffApp.swift,
+				"Extensions/Color+Hex.swift",
+				UI/RootView.swift,
+				UI/Sidebar/SidebarView.swift,
+				UI/Viewers/SnapshotCanvasView.swift,
+			);
+			target = EAECA0A3306579A500B5F9FB /* gimdiff */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -44,6 +58,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				EAECA0700000000100B5F9FB /* Exceptions for "GimDiff" folder in "GimDiff" target */,
+				EAECA0A2306579A500B5F9FB /* Exceptions for "GimDiff" folder in "gimdiff" target */,
 			);
 			path = GimDiff;
 			sourceTree = "<group>";
@@ -56,6 +71,11 @@
 		EAECA053306579A500B5F9FB /* GimDiffUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = GimDiffUITests;
+			sourceTree = "<group>";
+		};
+		EAECA0A1306579A500B5F9FB /* GimCLI */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = GimCLI;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -82,6 +102,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		EAECA0A5306579A500B5F9FB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -91,6 +118,7 @@
 				EAECA03B306579A400B5F9FB /* GimDiff */,
 				EAECA049306579A500B5F9FB /* GimDiffTests */,
 				EAECA053306579A500B5F9FB /* GimDiffUITests */,
+				EAECA0A1306579A500B5F9FB /* GimCLI */,
 				EAECA03A306579A400B5F9FB /* Products */,
 			);
 			sourceTree = "<group>";
@@ -101,6 +129,7 @@
 				EAECA039306579A400B5F9FB /* GimDiff.app */,
 				EAECA046306579A500B5F9FB /* GimDiffTests.xctest */,
 				EAECA050306579A500B5F9FB /* GimDiffUITests.xctest */,
+				EAECA0A0306579A500B5F9FB /* gimdiff */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -176,6 +205,28 @@
 			productReference = EAECA050306579A500B5F9FB /* GimDiffUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		EAECA0A3306579A500B5F9FB /* gimdiff */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EAECA0A8306579A500B5F9FB /* Build configuration list for PBXNativeTarget "gimdiff" */;
+			buildPhases = (
+				EAECA0A4306579A500B5F9FB /* Sources */,
+				EAECA0A5306579A500B5F9FB /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				EAECA03B306579A400B5F9FB /* GimDiff */,
+				EAECA0A1306579A500B5F9FB /* GimCLI */,
+			);
+			name = gimdiff;
+			packageProductDependencies = (
+			);
+			productName = gimdiff;
+			productReference = EAECA0A0306579A500B5F9FB /* gimdiff */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -197,6 +248,9 @@
 						CreatedOnToolsVersion = 26.4;
 						TestTargetID = EAECA038306579A400B5F9FB;
 					};
+					EAECA0A3306579A500B5F9FB = {
+						CreatedOnToolsVersion = 26.4;
+					};
 				};
 			};
 			buildConfigurationList = EAECA034306579A400B5F9FB /* Build configuration list for PBXProject "GimDiff" */;
@@ -216,6 +270,7 @@
 				EAECA038306579A400B5F9FB /* GimDiff */,
 				EAECA045306579A500B5F9FB /* GimDiffTests */,
 				EAECA04F306579A500B5F9FB /* GimDiffUITests */,
+				EAECA0A3306579A500B5F9FB /* gimdiff */,
 			);
 		};
 /* End PBXProject section */
@@ -260,6 +315,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		EAECA04C306579A500B5F9FB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EAECA0A4306579A500B5F9FB /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -546,6 +608,44 @@
 			};
 			name = Release;
 		};
+		EAECA0A6306579A500B5F9FB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4QT4JKT5GR;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_NAME = gimdiff;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		EAECA0A7306579A500B5F9FB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4QT4JKT5GR;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_NAME = gimdiff;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -581,6 +681,15 @@
 			buildConfigurations = (
 				EAECA061306579A500B5F9FB /* Debug */,
 				EAECA062306579A500B5F9FB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		EAECA0A8306579A500B5F9FB /* Build configuration list for PBXNativeTarget "gimdiff" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EAECA0A6306579A500B5F9FB /* Debug */,
+				EAECA0A7306579A500B5F9FB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -89,6 +89,40 @@ struct GimDiffURLCommandTests {
         }
     }
 
+    @Test("The CLI's spelling of the open action is understood", arguments: [
+        "gimdiff://open-project?path=/tmp/Project",
+        "gimdiff://open?project=/tmp/Project",
+        "gimdiff://open?folder=/tmp/Project",
+    ])
+    func acceptsOpenSynonyms(string: String) throws {
+        let command = try GimDiffURLCommand(url: try url(string))
+
+        #expect(command == .open(folder: URL(fileURLWithPath: "/tmp/Project")))
+    }
+
+    @Test("The CLI's spelling of the compare action is understood", arguments: [
+        "gimdiff://compare?baseline=/tmp/a.png&candidate=/tmp/b.png",
+        "gimdiff://diff?reference=/tmp/a.png&failure=/tmp/b.png",
+        "gimdiff://compare?expected=/tmp/a.png&actual=/tmp/b.png",
+    ])
+    func acceptsCompareSynonyms(string: String) throws {
+        let command = try GimDiffURLCommand(url: try url(string))
+
+        #expect(command == .compare(
+            reference: URL(fileURLWithPath: "/tmp/a.png"),
+            failure: URL(fileURLWithPath: "/tmp/b.png")
+        ))
+    }
+
+    @Test("A missing parameter is reported under its preferred spelling")
+    func reportsThePreferredParameterName() throws {
+        let incomplete = try url("gimdiff://compare?candidate=/tmp/b.png")
+
+        #expect(throws: GimDiffError.missingParameter("reference")) {
+            try GimDiffURLCommand(url: incomplete)
+        }
+    }
+
     private func url(_ string: String) throws -> URL {
         try #require(URL(string: string))
     }

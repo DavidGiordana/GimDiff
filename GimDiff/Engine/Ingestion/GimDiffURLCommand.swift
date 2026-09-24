@@ -14,6 +14,11 @@ import Foundation
 ///
 /// - `gimdiff://open?path=/some/snapshot/folder`
 /// - `gimdiff://compare?reference=/path/a.png&failure=/path/b.png`
+///
+/// Each action and each parameter also answers to the vocabulary the rest of GimDiff uses
+/// for the same thing — `open-project` for the first, `baseline` and `candidate` for the
+/// second — so a URL assembled from what the CLI calls its arguments opens the app instead
+/// of being rejected over a synonym.
 enum GimDiffURLCommand: Equatable, Sendable {
     /// Load every snapshot pair found under a folder.
     case open(folder: URL)
@@ -22,6 +27,14 @@ enum GimDiffURLCommand: Equatable, Sendable {
 
     /// The scheme GimDiff is registered to handle.
     static let scheme = "gimdiff"
+
+    /// Hosts that open a folder, and the parameters each reads the folder from.
+    static let openActions = ["open", "open-project"]
+    static let folderParameterNames = ["path", "project", "folder"]
+    /// Hosts that open one comparison.
+    static let compareActions = ["compare", "diff"]
+    static let referenceParameterNames = ["reference", "baseline", "recorded", "expected"]
+    static let failureParameterNames = ["failure", "candidate", "actual", "new"]
 
     /// Parses an incoming URL.
     ///
@@ -37,21 +50,26 @@ enum GimDiffURLCommand: Equatable, Sendable {
             result[item.name] = value
         } ?? [:]
 
-        switch components?.host?.lowercased() {
-        case "open":
-            self = .open(folder: try Self.fileURL(named: "path", in: parameters))
-        case "compare":
+        let action = components?.host?.lowercased()
+        switch action {
+        case let action? where Self.openActions.contains(action):
+            self = .open(folder: try Self.fileURL(named: Self.folderParameterNames, in: parameters))
+        case let action? where Self.compareActions.contains(action):
             self = .compare(
-                reference: try Self.fileURL(named: "reference", in: parameters),
-                failure: try Self.fileURL(named: "failure", in: parameters)
+                reference: try Self.fileURL(named: Self.referenceParameterNames, in: parameters),
+                failure: try Self.fileURL(named: Self.failureParameterNames, in: parameters)
             )
-        case let action:
+        default:
             throw GimDiffError.unsupportedAction(action)
         }
     }
 
-    private static func fileURL(named name: String, in parameters: [String: String]) throws -> URL {
-        guard let path = parameters[name] else { throw GimDiffError.missingParameter(name) }
+    /// The first of `names` the URL carried, reported against the preferred spelling when
+    /// it carried none.
+    private static func fileURL(named names: [String], in parameters: [String: String]) throws -> URL {
+        guard let path = names.lazy.compactMap({ parameters[$0] }).first else {
+            throw GimDiffError.missingParameter(names[0])
+        }
         return URL(fileURLWithPath: (path as NSString).expandingTildeInPath).standardizedFileURL
     }
 }

@@ -22,6 +22,10 @@ enum GimDiffError: Error, Equatable {
     case notARepository(URL)
     /// No snapshot provider recognised the layout of a project folder.
     case unrecognisedProjectLayout(URL)
+    /// A file is missing, or holds no image any installed decoder understands.
+    case unreadableImage(URL)
+    /// A pixel buffer or an encoder could not be created for an image.
+    case imageProcessingFailed(URL)
 }
 
 extension GimDiffError: LocalizedError {
@@ -39,6 +43,10 @@ extension GimDiffError: LocalizedError {
             "“\(url.path)” is not inside a Git repository."
         case let .unrecognisedProjectLayout(url):
             "GimDiff found no snapshots it recognises under “\(url.path)”."
+        case let .unreadableImage(url):
+            "“\(url.path)” could not be read as an image."
+        case let .imageProcessingFailed(url):
+            "“\(url.path)” could not be prepared for comparison."
         }
     }
 }
