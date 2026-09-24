@@ -64,7 +64,7 @@ struct DirectorySnapshotProviderTests {
         try root.write("home.png")
         try root.write("failures/home.png")
         try root.write("failures/notes.txt")
-        let provider = DirectorySnapshotProvider()
+        let provider = DirectorySnapshotProvider(fileSystem: DefaultFilesystemService())
 
         #expect(await provider.canHandle(folder: root.url))
         let pairs = try await provider.pairs(in: root.url)
@@ -76,7 +76,7 @@ struct DirectorySnapshotProviderTests {
     func declinesAnEmptyFolder() async throws {
         let root = try TemporaryDirectory()
         try root.write("README.md")
-        let provider = DirectorySnapshotProvider()
+        let provider = DirectorySnapshotProvider(fileSystem: DefaultFilesystemService())
 
         #expect(await provider.canHandle(folder: root.url) == false)
     }

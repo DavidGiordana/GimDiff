@@ -17,9 +17,9 @@ struct DirectorySnapshotProvider: SnapshotProviding {
 
     let name = "Directory"
 
-    private let fileSystem: FileSystemService
+    private let fileSystem: any FilesystemService
 
-    init(fileSystem: FileSystemService = FileSystemService()) {
+    init(fileSystem: any FilesystemService) {
         self.fileSystem = fileSystem
     }
 

@@ -22,15 +22,17 @@ final class AppState {
     /// The most recent failure, shown as a banner until it is dismissed.
     private(set) var lastError: String?
 
-    private let fileSystem: FileSystemService
+    private let fileSystem: any FilesystemService
     private let provider: any SnapshotProviding
 
+    /// The composition root: `Engine` types name only protocols, so the concrete
+    /// `Infrastructure` services are chosen here and nowhere deeper.
     init(
-        fileSystem: FileSystemService = FileSystemService(),
-        provider: any SnapshotProviding = DirectorySnapshotProvider()
+        fileSystem: any FilesystemService = DefaultFilesystemService(),
+        provider: (any SnapshotProviding)? = nil
     ) {
         self.fileSystem = fileSystem
-        self.provider = provider
+        self.provider = provider ?? DirectorySnapshotProvider(fileSystem: fileSystem)
     }
 
     /// The comparison matching ``selection``, if one is selected.
