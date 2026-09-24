@@ -20,6 +20,8 @@ enum GimDiffError: Error, Equatable {
     case commandFailed(command: String, exitCode: Int32, message: String)
     /// The given location is not inside a Git working tree.
     case notARepository(URL)
+    /// No snapshot provider recognised the layout of a project folder.
+    case unrecognisedProjectLayout(URL)
 }
 
 extension GimDiffError: LocalizedError {
@@ -35,6 +37,8 @@ extension GimDiffError: LocalizedError {
             "“\(command)” failed with status \(exitCode): \(message)"
         case let .notARepository(url):
             "“\(url.path)” is not inside a Git repository."
+        case let .unrecognisedProjectLayout(url):
+            "GimDiff found no snapshots it recognises under “\(url.path)”."
         }
     }
 }

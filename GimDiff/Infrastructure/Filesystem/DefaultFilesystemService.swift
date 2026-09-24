@@ -25,12 +25,19 @@ struct DefaultFilesystemService: FilesystemService {
         return exists && isDirectory.boolValue
     }
 
+    func isPackage(at url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isPackageKey]))?.isPackage ?? false
+    }
+
     func contentsOfDirectory(
         at url: URL,
         includingPropertiesForKeys keys: [URLResourceKey]?
     ) throws -> [URL] {
+        // FileManager refuses to list a symlink even when it points at a directory, and
+        // reports the failure as "no such file". Resolving first is what lets a project
+        // reached through a symlinked path be read at all.
         try fileManager.contentsOfDirectory(
-            at: url,
+            at: url.resolvingSymlinksInPath(),
             includingPropertiesForKeys: keys,
             options: [.skipsHiddenFiles]
         )
@@ -87,7 +94,7 @@ struct DefaultFilesystemService: FilesystemService {
     /// mined for the images inside it.
     func imageFiles(under folder: URL) -> [URL] {
         let enumerator = fileManager.enumerator(
-            at: folder,
+            at: folder.resolvingSymlinksInPath(),
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles, .skipsPackageDescendants]
         )

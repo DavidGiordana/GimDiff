@@ -16,9 +16,17 @@ protocol FilesystemService: Sendable {
     func fileExists(at url: URL) -> Bool
     func isDirectory(at url: URL) -> Bool
 
+    /// Whether `url` is a document package: a directory the Finder presents as one file,
+    /// such as `.xcassets`, `.xcodeproj`, or `.app`.
+    ///
+    /// Snapshot discovery treats a package as opaque. An asset catalog holds thousands of
+    /// images that are not snapshots, and descending into one is both slow and wrong.
+    func isPackage(at url: URL) -> Bool
+
     /// Immediate children of `url`, not recursing into subdirectories.
     ///
-    /// Hidden entries are skipped.
+    /// Hidden entries are skipped. A `url` that is a symlink to a directory lists the
+    /// directory it points at, so children come back under their resolved paths.
     func contentsOfDirectory(
         at url: URL,
         includingPropertiesForKeys keys: [URLResourceKey]?

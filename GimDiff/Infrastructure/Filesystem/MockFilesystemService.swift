@@ -20,6 +20,7 @@ final class MockFilesystemService: FilesystemService, @unchecked Sendable {
     private let lock = NSLock()
     private var storedFiles: [String: Data] = [:]
     private var storedDirectories: Set<String> = ["/"]
+    private var storedPackages: Set<String> = []
     private var storedTrashedPaths: [String] = []
 
     init(files: [URL: Data] = [:], directories: [URL] = []) {
@@ -62,6 +63,18 @@ final class MockFilesystemService: FilesystemService, @unchecked Sendable {
         lock.withLock { registerDirectory(Self.key(for: url)) }
     }
 
+    /// Marks a directory as a document package, the way an `.xcassets` folder is on disk.
+    ///
+    /// Nothing is a package until a test says so: the real service reads a flag off the
+    /// volume, and there is nothing here to read it from.
+    func markAsPackage(at url: URL) {
+        lock.withLock {
+            let key = Self.key(for: url)
+            registerDirectory(key)
+            storedPackages.insert(key)
+        }
+    }
+
     /// Contents of `url` as text, for assertions that read better than raw `Data`.
     func contents(of url: URL) -> String? {
         lock.withLock { storedFiles[Self.key(for: url)] }.map { String(decoding: $0, as: UTF8.self) }
@@ -78,6 +91,10 @@ final class MockFilesystemService: FilesystemService, @unchecked Sendable {
 
     func isDirectory(at url: URL) -> Bool {
         lock.withLock { storedDirectories.contains(Self.key(for: url)) }
+    }
+
+    func isPackage(at url: URL) -> Bool {
+        lock.withLock { storedPackages.contains(Self.key(for: url)) }
     }
 
     func contentsOfDirectory(

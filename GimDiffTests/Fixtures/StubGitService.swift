@@ -1,0 +1,41 @@
+//
+//  StubGitService.swift
+//  GimDiffTests
+//
+//  Created by David Giordana.
+//  Copyright © 2026 David Giordana. All rights reserved.
+//
+
+import Foundation
+@testable import GimDiff
+
+/// A `GitService` double that answers from canned values instead of spawning git.
+struct StubGitService: GitService {
+    /// Root returned for any folder, or `nil` to act as though nothing is under version control.
+    var repositoryRoot: URL?
+    /// Statuses returned by ``status(repositoryRoot:)``.
+    var statuses: [URL: GitFileStatus] = [:]
+    /// When true, reading status fails the way an unreadable repository would.
+    var statusFails = false
+
+    func findRepositoryRoot(for folderURL: URL) async -> URL? {
+        repositoryRoot
+    }
+
+    func status(repositoryRoot: URL) async throws -> [URL: GitFileStatus] {
+        if statusFails { throw GimDiffError.notARepository(repositoryRoot) }
+        return statuses
+    }
+
+    func extractCommittedVersion(
+        ofFileAt relativePath: String,
+        repositoryRoot: URL,
+        gitRef: String
+    ) async throws -> URL {
+        throw GimDiffError.commandFailed(
+            command: "git show",
+            exitCode: 128,
+            message: "StubGitService does not extract files"
+        )
+    }
+}

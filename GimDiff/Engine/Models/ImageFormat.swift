@@ -37,6 +37,16 @@ enum ImageFormat: Sendable, Hashable {
         self.init(fileExtension: url.pathExtension)
     }
 
+    /// Whether GimDiff recognises the format, rather than having kept an unfamiliar
+    /// extension verbatim.
+    ///
+    /// Snapshot discovery filters on this, so the set of extensions it collects and the
+    /// set this enum models can never drift apart.
+    var isRecognized: Bool {
+        if case .unknown = self { return false }
+        return true
+    }
+
     /// Extension GimDiff writes when it creates a file in this format.
     var fileExtension: String {
         switch self {
