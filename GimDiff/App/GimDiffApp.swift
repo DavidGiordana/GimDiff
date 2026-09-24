@@ -21,11 +21,22 @@ struct GimDiffApp: App {
         Window("GimDiff", id: Self.mainWindowID) {
             RootView()
                 .environment(appDelegate.state)
-                .frame(minWidth: 900, minHeight: 600)
+                .frame(
+                    minWidth: 900,
+                    maxWidth: .infinity,
+                    minHeight: 500,
+                    maxHeight: .infinity
+                )
+                // Deep links land here and retarget the window that is already open; the
+                // scene is a `Window`, so there is nothing for the system to duplicate.
+                .onOpenURL { url in
+                    appDelegate.state.handle(url)
+                }
         }
         .defaultSize(width: 1_280, height: 800)
+        .windowToolbarStyle(.unified(showsTitle: true))
         .commands {
-            CommandGroup(replacing: .newItem) {}
+            AppCommands(state: appDelegate.state)
         }
     }
 }

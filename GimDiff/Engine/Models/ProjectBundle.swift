@@ -14,7 +14,9 @@ struct ProjectBundle: Sendable, Equatable {
     let rootURL: URL
     /// Root of the working tree containing it, absent when it is not in one.
     let gitRootURL: URL?
-    let suites: [SnapshotSuite]
+    /// Mutable so a deletion can prune one subtree in place. Dropping a snapshot must not
+    /// cost a second walk of the project just to learn what the caller already knows.
+    var suites: [SnapshotSuite]
 
     init(rootURL: URL, gitRootURL: URL? = nil, suites: [SnapshotSuite] = []) {
         self.rootURL = rootURL

@@ -92,10 +92,74 @@ GimDiff is a single-instance utility.
 
 - The scene is `Window("GimDiff", id: "main-window")` — never `WindowGroup`.
 - `File ▸ New` is removed via `CommandGroup(replacing: .newItem) {}`.
-- `AppDelegate` handles `applicationShouldHandleReopen(_:hasVisibleWindows:)` and
-  `application(_:open:)` by raising the existing window rather than opening another.
+- `AppDelegate` handles `applicationShouldHandleReopen(_:hasVisibleWindows:)`,
+  `application(_:open:)`, and `application(_:openFiles:)` by raising the existing window
+  rather than opening another.
 
 `GimDiffUITests` asserts this: launching and reopening must leave exactly one window.
+
+### Sidebar: the flattened visible tree
+
+The sidebar is a flat `List` over `AppState.visibleRows`, never an `OutlineGroup`. Suites
+and their snapshots are interleaved into one array of `TreeRowItem`, so the whole tree is
+one level as far as `List` is concerned.
+
+That is deliberate. `OutlineGroup` owns the hierarchy, and owning it costs two things
+GimDiff needs: the arrow keys stop crossing levels once a row is a disclosure group, and
+deleting a node rebuilds the group's identity so the selection is dropped rather than moved
+to the neighbouring row. Flattening puts selection, arrow keys, and deletion in `AppState`
+where all three can agree.
+
+Consequences worth knowing before changing any of it:
+
+- A suite's snapshots follow it in the array when the suite is expanded **or** when a search
+  query is active. `TreeRowItem.suite` carries that effective state, while
+  `expandedSuiteIDs` holds only what the user opened.
+- Row identifiers are namespaced (`suite:<id>`, `snapshot:<suiteID>:<id>`) so the same image
+  discovered under two suites stays two selectable rows.
+- Deletion recomputes the replacement selection from the rows *as they still stand*, before
+  pruning. Reverse the order and the neighbour is no longer identifiable, which is what
+  leaves the tree with no selection and the keyboard with nothing to move.
+- A deletion prunes `currentProject.suites` in memory. The scan that found the snapshot
+  walked the whole project; nothing about removing one file needs that repeated.
+
+### Keyboard routing: ⌘ keys are menu items, bare keys are not
+
+This split is not a style choice, and getting it wrong fails silently.
+
+AppKit offers a ⌘-modified key to `performKeyEquivalent(with:)` — the menu bar — and never
+to the focused view's `keyDown(with:)`, which is what SwiftUI's `onKeyPress` observes. So:
+
+- **⌘ shortcuts go in `AppCommands`.** `⌘↩` and `⌘⌫` live in the *Snapshot* menu. Putting
+  them in the sidebar's `onKeyPress` compiles, matches nothing, and does nothing.
+- **Bare keys go in `SnapshotTreeView.handle(_:)`.** `→`, `←`, Space, `↩`, and `/` are read
+  there, where nothing sees them unless the rows have focus. A menu item bound to a bare
+  Space or `↩` would fire while the user was typing in the search field.
+
+Two more traps in the same area:
+
+- `⌘V` is a single command that offers the key to the focused text field first
+  (`WorkspaceService.forwardPasteToFocusedField()`) and ingests the clipboard only when
+  nothing takes it. A second menu item bound to `⌘V` would shadow the search field's paste,
+  because the menu bar is consulted before the first responder.
+- `⎋` in the search field is read with `onKeyPress(.escape)`, not `onExitCommand`. A focused
+  `TextField` turns `⎋` into its own `cancelOperation(_:)` and never forwards it.
+
+### Sidebar focus
+
+`SnapshotTreeView` claims focus when the window becomes key, from `onAppear` and from
+`onChange(of: controlActiveState)`, and defers the assignment by one turn of the main actor.
+
+All three parts are load-bearing. A `@FocusState` assignment made before the window is key
+is discarded, and assigning inside the update that *made* it key is still too early — the
+focus system has not engaged. Either mistake ships an app that launches with a selected row
+the arrow keys cannot move until the tree is clicked once. `defaultFocus` does not work here
+either. `GimDiffUITests/KeyboardNavigationUITests` is the regression guard: it drives the
+tree with nothing but keys, so a focus regression fails there rather than reaching a user.
+
+A non-flag launch argument is read by AppKit as a file to open, and one that names no file
+suppresses the window entirely. The UI tests therefore reset state with a defaults override
+(`-GimDiffResetState YES`), not a bare word.
 
 ### URL scheme
 
@@ -169,7 +233,12 @@ read as a flag.
 
 Every engine feature and every provider needs unit tests in `GimDiffTests`, written before
 or alongside the implementation. `GimDiffTests` mirrors the app's layer layout
-(`GimDiffTests/Engine`, `GimDiffTests/Infrastructure`).
+(`GimDiffTests/Engine`, `GimDiffTests/Infrastructure`, `GimDiffTests/App`).
+
+`AppState` is tested like any other type. `AppStateFixture` hands it a bundle directly
+through `AppState.load(_:)` so the tree, the arrow keys, and deletion are tested without a
+disk scan; `ProjectOpeningTests` covers the scanning path against a real `ProjectFixture`
+and awaits `AppState.currentScan`.
 
 - Unit tests use **Swift Testing** (`@Suite`, `@Test`, `#expect`, `#require`).
 - Image fixtures are checked in under `GimDiffTests/Fixtures/Images/` and reached through
@@ -180,7 +249,10 @@ or alongside the implementation. `GimDiffTests` mirrors the app's layer layout
 - Avoid the `#URL` macro: it needs macOS 15, and the deployment target is 14.0. Use
   `try #require(URL(string:))`.
 - Do not assert against the menu bar from UI tests; menu interaction is unreliable in the
-  test runner.
+  test runner. Typing a menu item's *shortcut* with `typeKey(_:modifiers:)` is fine, and is
+  how `KeyboardNavigationUITests` exercises `⌘⌫`, `⌘↩`, `⌘F`, and `⌘1`/`⌘0`.
+- A UI test that depends on an empty state must launch with `-GimDiffResetState YES`, or a
+  project opened by hand on the developer's own machine decides what the assertion sees.
 
 ## Project file
 

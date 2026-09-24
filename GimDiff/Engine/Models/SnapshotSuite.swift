@@ -37,6 +37,12 @@ struct SnapshotSuite: Identifiable, Sendable, Hashable {
         self.providerId = providerId
     }
 
+    /// Whether the provider could not locate the test source that records this suite.
+    ///
+    /// Surfaced as a warning in the sidebar: a suite with no source file is usually a
+    /// folder of snapshots left behind by a test that has since been renamed or deleted.
+    var isMissingSourceCode: Bool { sourceCodeURL == nil }
+
     /// Whether any snapshot in the suite differs from what the repository has committed.
     var hasGitDiff: Bool { snapshots.contains(where: \.hasGitDiff) }
 

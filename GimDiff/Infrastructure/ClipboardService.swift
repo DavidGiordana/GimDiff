@@ -17,6 +17,17 @@ struct ClipboardService {
         self.pasteboard = pasteboard
     }
 
+    /// Text currently on the pasteboard, typically a copied test failure log.
+    func string() -> String? {
+        pasteboard.string(forType: .string)
+    }
+
+    /// File URLs on the pasteboard, as copying in the Finder leaves behind.
+    func fileURLs() -> [URL] {
+        let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+        return pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL] ?? []
+    }
+
     func copy(_ string: String) {
         pasteboard.clearContents()
         pasteboard.setString(string, forType: .string)
