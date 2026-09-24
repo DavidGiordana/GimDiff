@@ -30,6 +30,9 @@ final class GimDiffUITests: XCTestCase {
         XCTAssertEqual(app.windows.count, 1)
     }
 
+    /// Doubles as the guard on the sidebar being visible at launch: its empty state is only
+    /// in the accessibility tree while the sidebar column is showing, so a regression that
+    /// collapses it fails here rather than shipping an app with no visible navigation.
     func testSidebarExplainsTheEmptyState() {
         let app = launchApp()
 

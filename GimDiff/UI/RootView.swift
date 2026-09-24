@@ -12,10 +12,16 @@ import SwiftUI
 struct RootView: View {
     @Environment(AppState.self) private var state
 
+    // Pinned to `.all` rather than left to SwiftUI. Given only a detail column that asks
+    // for room, `NavigationSplitView` opens with the sidebar collapsed — and the sidebar is
+    // GimDiff's only navigation, so the app would launch with no way to reach a snapshot
+    // but the toolbar's reveal button.
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+
     var body: some View {
         @Bindable var state = state
 
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260)
         } detail: {
