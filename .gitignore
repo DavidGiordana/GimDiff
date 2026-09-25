@@ -28,3 +28,6 @@ playground.xcworkspace
 # Injected by CI / tooling
 *.xcscmblueprint
 *.xccheckout
+
+# Local CodeGraph index
+.codegraph/
