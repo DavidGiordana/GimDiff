@@ -17,6 +17,11 @@ enum SnapshotOrigin: Equatable, Sendable {
     /// Overwriting one of these would change nothing anybody could see afterwards, so the
     /// promotion actions refuse a pane that carries it.
     case committedVersion
+    /// A copy of one side of a GitHub pull request, downloaded for review.
+    ///
+    /// Both sides of such a comparison carry it: neither file is the one in the pull
+    /// request, so neither is anything a promotion could meaningfully overwrite.
+    case pullRequest
 }
 
 /// One side of what the canvas is showing.
@@ -47,6 +52,8 @@ struct SnapshotPane: Identifiable, Equatable, Sendable {
     /// when both carry the same file name.
     var roleSubtitle: String {
         switch (role, origin) {
+        case (.candidate, .pullRequest): "Pull Request Head"
+        case (.baseline, .pullRequest): "Base Branch"
         case (.candidate, _): "Current"
         case (.baseline, .committedVersion): "Committed in Git"
         case (.baseline, .workingTree): "Recorded on Disk"
@@ -73,6 +80,12 @@ enum SnapshotPreview: Equatable, Sendable {
         title: String,
         baselineOrigin: SnapshotOrigin
     )
+    /// The one side a pull request has of a snapshot it adds or deletes: the head of an
+    /// added snapshot, or the base of a deleted one.
+    ///
+    /// Kept apart from ``single(_:)`` because that case is always the candidate on disk,
+    /// and a deleted snapshot's only image is neither.
+    case pullRequestSide(SnapshotItem, role: SnapshotPane.Role)
 
     /// Identifier of the discovered snapshot this preview came from, when it came from one.
     ///
@@ -82,6 +95,7 @@ enum SnapshotPreview: Equatable, Sendable {
         switch self {
         case let .single(snapshot): snapshot.id
         case let .comparison(_, snapshotID, _, _): snapshotID
+        case let .pullRequestSide(snapshot, _): snapshot.id
         }
     }
 
@@ -90,6 +104,7 @@ enum SnapshotPreview: Equatable, Sendable {
         switch self {
         case let .single(snapshot): snapshot.displayName
         case let .comparison(_, _, title, _): title
+        case let .pullRequestSide(snapshot, _): snapshot.displayName
         }
     }
 
@@ -108,9 +123,15 @@ enum SnapshotPreview: Equatable, Sendable {
         switch self {
         case let .single(snapshot):
             [SnapshotPane(role: .candidate, fileURL: snapshot.fileURL, origin: .workingTree)]
+        case let .pullRequestSide(snapshot, role):
+            [SnapshotPane(role: role, fileURL: snapshot.fileURL, origin: .pullRequest)]
         case let .comparison(pair, _, _, baselineOrigin):
             [
-                SnapshotPane(role: .candidate, fileURL: pair.failure.url, origin: .workingTree),
+                SnapshotPane(
+                    role: .candidate,
+                    fileURL: pair.failure.url,
+                    origin: baselineOrigin == .pullRequest ? .pullRequest : .workingTree
+                ),
                 SnapshotPane(role: .baseline, fileURL: pair.reference.url, origin: baselineOrigin),
             ]
         }

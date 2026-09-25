@@ -64,6 +64,25 @@ final class AppState {
     private(set) var filterFocusRequests = 0
     private(set) var treeFocusRequests = 0
 
+    // MARK: - Pull request review
+
+    /// The pull request the sidebar is showing in place of a project, if any.
+    private(set) var pullRequestSession: PRReviewSession?
+    /// Whether the Open PR sheet is up.
+    ///
+    /// Every route into a review — the menu, a paste, a `gimdiff://open-pr` URL — goes
+    /// through the sheet, so a fetch that takes a while has one place to show progress and
+    /// a failure has one place to be read.
+    var isPullRequestSheetPresented = false
+    /// What the sheet's field holds: a link, `owner/repo#123`, or a number.
+    var pullRequestInput = ""
+    private(set) var isFetchingPullRequest = false
+    /// Why the last fetch failed, shown in the sheet rather than on the window's banner.
+    private(set) var pullRequestError: String?
+    /// The project the review replaced, put back when the review closes.
+    private var projectBeforePullRequest: ProjectBundle?
+    private var pullRequestTask: Task<Void, Never>?
+
     let filesystem: any FilesystemService
     let gitService: any GitService
     let imageDiff: any ImageDiffService
@@ -71,6 +90,8 @@ final class AppState {
     private let ingestion: any IngestionService
     private let clipboard: ClipboardService
     private let workspace: WorkspaceService
+    private let pullRequests: any GitHubPRService
+    private let pullRequestResolver: GitHubPRReferenceResolver
     private let defaults: UserDefaults
     private var scanTask: Task<Void, Never>?
     private var gitDiffTask: Task<Void, Never>?
@@ -86,6 +107,7 @@ final class AppState {
         ingestion: any IngestionService = DefaultIngestionService(),
         clipboard: ClipboardService = ClipboardService(),
         workspace: WorkspaceService = WorkspaceService(),
+        pullRequests: (any GitHubPRService)? = nil,
         defaults: UserDefaults = .standard
     ) {
         let git = gitService ?? DefaultGitService(filesystem: filesystem)
@@ -96,6 +118,12 @@ final class AppState {
         self.ingestion = ingestion
         self.clipboard = clipboard
         self.workspace = workspace
+        self.pullRequests = pullRequests ?? DefaultGitHubPRService(
+            http: URLSessionHTTPClient(),
+            tokens: GitHubTokenResolver(),
+            filesystem: filesystem
+        )
+        pullRequestResolver = GitHubPRReferenceResolver(gitService: git)
         self.defaults = defaults
         recentProjects = Self.loadRecentProjects(from: defaults)
     }
@@ -115,6 +143,8 @@ final class AppState {
                 openProject(at: folder)
             case let .compare(reference, failure):
                 showComparison(reference: reference, failure: failure)
+            case let .openPullRequest(input):
+                openPullRequest(input)
             }
         } catch {
             lastError = error.localizedDescription
@@ -157,6 +187,10 @@ final class AppState {
             return
         }
 
+        // Opening a project is a way out of a review as much as closing it is; the project
+        // the review replaced is not coming back, because the user just chose another.
+        abandonPullRequestReview()
+
         // A newer open supersedes the one in flight: scanning a large repository takes long
         // enough that two overlapping scans would race to publish their results.
         scanTask?.cancel()
@@ -183,7 +217,14 @@ final class AppState {
     }
 
     /// Rescans the open project, picking up snapshots a test run has written since.
+    ///
+    /// Under review, the pull request is fetched again instead: new commits are what would
+    /// have changed, and there is no folder of GimDiff's own worth rescanning.
     func reload() {
+        if let session = pullRequestSession {
+            openPullRequest(session.reference.webURL.absoluteString)
+            return
+        }
         guard let root = currentProject?.rootURL else { return }
         openProject(at: root)
     }
@@ -193,6 +234,7 @@ final class AppState {
     /// The folder stays in ``recentProjects``, so closing is a way back to the list rather
     /// than a way to forget where the project was.
     func closeProject() {
+        abandonPullRequestReview()
         scanTask?.cancel()
         closePreview()
         currentProject = nil
@@ -414,13 +456,20 @@ final class AppState {
     }
 
     /// Return: opens the test source that records the selected suite.
+    ///
+    /// Does nothing under pull request review, where no suite has a source file on disk
+    /// and the key would only ever produce an error.
     func openTestSource() {
-        guard let suite = selectedRow.flatMap(suite(for:)) else { return }
+        guard !isReviewingPullRequest, let suite = selectedRow.flatMap(suite(for:)) else { return }
         openTestSource(for: suite)
     }
 
     /// Command-Return: reveals the selected snapshot, or its suite's folder, in the Finder.
+    ///
+    /// Not under pull request review: the files there are scratch copies GimDiff deletes
+    /// when the review ends, and a Finder window onto them invites keeping one.
     func revealSelectionInFinder() {
+        guard !isReviewingPullRequest else { return }
         switch selectedRow {
         case let .snapshot(snapshot, _):
             workspace.revealInFinder(snapshot.fileURL)
@@ -461,6 +510,12 @@ final class AppState {
     /// before drawing anything would make every selection feel slow.
     func showSnapshot(_ snapshot: SnapshotItem, withGitDiff: Bool) {
         gitDiffTask?.cancel()
+
+        if let change = pullRequestSession?.changes[snapshot.id] {
+            showPullRequestChange(change, of: snapshot, withBaseline: withGitDiff)
+            return
+        }
+
         setPreview(.single(snapshot))
 
         guard withGitDiff,
@@ -485,6 +540,37 @@ final class AppState {
                 title: snapshot.displayName,
                 baselineOrigin: .committedVersion
             ))
+        }
+    }
+
+    /// Shows what a pull request did to one snapshot.
+    ///
+    /// Both versions were downloaded with the session, so the comparison is ready at once
+    /// and git has nothing to add. A snapshot the pull request adds or deletes has only one
+    /// version, which is shown on its own under the side it belongs to.
+    private func showPullRequestChange(
+        _ change: PRSnapshotChange,
+        of snapshot: SnapshotItem,
+        withBaseline: Bool
+    ) {
+        switch (change.candidateURL, change.baselineURL) {
+        case let (candidate?, baseline?) where withBaseline:
+            setPreview(.comparison(
+                SnapshotPair(reference: baseline, failure: candidate),
+                snapshotID: snapshot.id,
+                title: snapshot.displayName,
+                baselineOrigin: .pullRequest
+            ))
+        case let (candidate?, _):
+            var head = snapshot
+            head.fileURL = candidate
+            setPreview(.pullRequestSide(head, role: .candidate))
+        case let (nil, baseline?):
+            var base = snapshot
+            base.fileURL = baseline
+            setPreview(.pullRequestSide(base, role: .baseline))
+        case (nil, nil):
+            setPreview(nil)
         }
     }
 
@@ -581,6 +667,13 @@ final class AppState {
             return
         }
 
+        // A pull request link is checked for first: it is never a failure log, while a
+        // message carrying a link can mention a path in passing.
+        if let text = clipboard.string(), let reference = ingestion.parsePullRequest(text) {
+            openPullRequest(reference.webURL.absoluteString)
+            return
+        }
+
         guard let text = clipboard.string(), let payload = ingestion.parseClipboardText(text) else {
             lastError = "The clipboard holds no snapshot path GimDiff recognises."
             return
@@ -670,6 +763,7 @@ final class AppState {
     }
 
     func delete(snapshot: SnapshotItem, in suiteID: String) {
+        guard !refusesDeletionUnderReview() else { return }
         let rowID = TreeRowItem.snapshotRowID(snapshot.id, parentSuiteID: suiteID)
         let replacement = selection(surviving: [rowID])
 
@@ -684,6 +778,7 @@ final class AppState {
     }
 
     func delete(suite: SnapshotSuite) {
+        guard !refusesDeletionUnderReview() else { return }
         var removedRowIDs: Set<String> = [TreeRowItem.suiteRowID(suite.id)]
         for snapshot in suite.snapshots {
             removedRowIDs.insert(TreeRowItem.snapshotRowID(snapshot.id, parentSuiteID: suite.id))
@@ -696,6 +791,16 @@ final class AppState {
         expandedSuiteIDs.remove(suite.id)
 
         finishDeletion(replacement: replacement, removedSnapshotIDs: Set(suite.snapshots.map(\.id)))
+    }
+
+    /// Refuses a deletion while a pull request is under review, saying why.
+    ///
+    /// The rows are downloaded copies: trashing one would remove nothing from the pull
+    /// request and only make the review lie about what it changes.
+    private func refusesDeletionUnderReview() -> Bool {
+        guard isReviewingPullRequest else { return false }
+        lastError = "Snapshots in a pull request review are read-only; there is nothing on disk to delete."
+        return true
     }
 
     private func trash(_ url: URL) -> Bool {
@@ -729,6 +834,143 @@ final class AppState {
             return below.id
         }
         return rows[..<first].last(where: { !removedRowIDs.contains($0.id) })?.id
+    }
+
+    // MARK: - Pull request review
+
+    /// Whether the sidebar is showing a pull request rather than a project on disk.
+    var isReviewingPullRequest: Bool { pullRequestSession != nil }
+
+    /// What the pull request under review does to a snapshot, or `nil` outside a review.
+    func pullRequestChange(forSnapshotID id: String?) -> PRSnapshotChange? {
+        guard let id else { return nil }
+        return pullRequestSession?.changes[id]
+    }
+
+    /// ⌘⇧O: raises the Open PR sheet, filled in from the clipboard when it holds a link.
+    func presentPullRequestSheet() {
+        if !isFetchingPullRequest {
+            pullRequestError = nil
+            if pullRequestInput.isEmpty,
+               let text = clipboard.string(),
+               let reference = ingestion.parsePullRequest(text) {
+                pullRequestInput = reference.webURL.absoluteString
+            }
+        }
+        isPullRequestSheetPresented = true
+    }
+
+    /// Puts the sheet away, abandoning a fetch still in flight.
+    func dismissPullRequestSheet() {
+        pullRequestTask?.cancel()
+        pullRequestTask = nil
+        isFetchingPullRequest = false
+        pullRequestError = nil
+        isPullRequestSheetPresented = false
+    }
+
+    /// Fetches the pull request `input` names and, once its snapshots are downloaded,
+    /// shows them in place of the open project.
+    func openPullRequest(_ input: String) {
+        pullRequestInput = input
+        pullRequestError = nil
+        isPullRequestSheetPresented = true
+
+        pullRequestTask?.cancel()
+        isFetchingPullRequest = true
+
+        let root = currentProject?.gitRootURL
+        let preferred = pullRequestSession?.reference.repository
+        pullRequestTask = Task { [pullRequests, pullRequestResolver] in
+            do {
+                let reference = try await pullRequestResolver.reference(
+                    for: input,
+                    repositoryRoot: root,
+                    preferredRepository: preferred
+                )
+                let session = try await pullRequests.fetchPRSession(reference: reference)
+                guard !Task.isCancelled else {
+                    discardFiles(of: session)
+                    return
+                }
+                beginPullRequestReview(session)
+            } catch {
+                // A cancelled download reports itself as a `URLError`, not as a
+                // `CancellationError`, so the task is asked rather than the error.
+                guard !Task.isCancelled else { return }
+                isFetchingPullRequest = false
+                pullRequestError = error.localizedDescription
+            }
+        }
+    }
+
+    /// The fetch in flight, if any, so a caller can wait for it.
+    var currentPullRequestFetch: Task<Void, Never>? { pullRequestTask }
+
+    /// Ends the review, deleting what it downloaded, and puts back the project it replaced.
+    func closePullRequestReview() {
+        guard pullRequestSession != nil else { return }
+        let previous = projectBeforePullRequest
+        abandonPullRequestReview()
+        clearFilters()
+
+        guard let previous else {
+            closeProject()
+            return
+        }
+        load(previous)
+        // The project sat unwatched for the length of the review; its files may have moved.
+        refreshGitStatus()
+    }
+
+    /// Deletes the downloaded snapshots of the review in progress, for the app to call on
+    /// its way out.
+    func discardPullRequestFiles() {
+        pullRequestTask?.cancel()
+        guard let session = pullRequestSession else { return }
+        discardFiles(of: session)
+    }
+
+    private func beginPullRequestReview(_ session: PRReviewSession) {
+        if let current = pullRequestSession {
+            // A second review replaces the first, but the project behind both stays the one
+            // to go back to.
+            discardFiles(of: current)
+        } else {
+            projectBeforePullRequest = currentProject
+        }
+
+        scanTask?.cancel()
+        clearFilters()
+        pullRequestSession = session
+        load(ProjectBundle(rootURL: session.tempDirectoryURL, suites: session.suites))
+        // A pull request is read to see what it changed, so every change starts on show.
+        expandedSuiteIDs = Set(session.suites.map(\.id))
+        selectedRowID = visibleRows.first?.id
+
+        isFetchingPullRequest = false
+        isPullRequestSheetPresented = false
+        pullRequestInput = ""
+    }
+
+    /// Leaves the review without restoring anything, for a caller about to replace it.
+    private func abandonPullRequestReview() {
+        pullRequestTask?.cancel()
+        pullRequestTask = nil
+        isFetchingPullRequest = false
+        guard let session = pullRequestSession else { return }
+        discardFiles(of: session)
+        pullRequestSession = nil
+        projectBeforePullRequest = nil
+    }
+
+    private func discardFiles(of session: PRReviewSession) {
+        guard filesystem.fileExists(at: session.tempDirectoryURL) else { return }
+        do {
+            try filesystem.removeItem(at: session.tempDirectoryURL)
+        } catch {
+            lastError = error.localizedDescription
+        }
     }
 
     // MARK: - Paths

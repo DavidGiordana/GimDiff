@@ -77,6 +77,10 @@ struct DefaultFilesystemService: FilesystemService {
         try fileManager.trashItem(at: url, resultingItemURL: nil)
     }
 
+    func removeItem(at url: URL) throws {
+        try fileManager.removeItem(at: url)
+    }
+
     func createTemporaryFile(prefix: String, extension fileExtension: String) -> URL {
         let directory = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent(Self.temporaryDirectoryName, isDirectory: true)

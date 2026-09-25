@@ -36,6 +36,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
     }
 
+    /// A pull request's downloaded snapshots are the session's alone; nothing reopens them.
+    func applicationWillTerminate(_ notification: Notification) {
+        state.discardPullRequestFiles()
+    }
+
     /// Nothing outlives the window, so closing it quits rather than leaving a menu bar behind.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true

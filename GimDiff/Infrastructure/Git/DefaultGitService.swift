@@ -91,6 +91,18 @@ struct DefaultGitService: GitService {
         return Self.parseStatus(result.standardOutput, repositoryRoot: repositoryRoot)
     }
 
+    func remoteURL(named name: String, repositoryRoot: URL) async throws -> String {
+        let result = try await runner.run(GitCommand.remoteURL(named: name, in: repositoryRoot))
+        guard result.isSuccess, !result.trimmedOutput.isEmpty else {
+            throw GimDiffError.commandFailed(
+                command: "git remote get-url",
+                exitCode: result.exitCode,
+                message: result.standardError.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        }
+        return result.trimmedOutput
+    }
+
     func extractCommittedVersion(
         ofFileAt relativePath: String,
         repositoryRoot: URL,

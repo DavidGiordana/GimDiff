@@ -10,10 +10,11 @@ import Foundation
 
 /// An instruction delivered to the app through the `gimdiff://` URL scheme.
 ///
-/// Two shapes are understood:
+/// Three shapes are understood:
 ///
 /// - `gimdiff://open?path=/some/snapshot/folder`
 /// - `gimdiff://compare?reference=/path/a.png&failure=/path/b.png`
+/// - `gimdiff://open-pr?url=https://github.com/owner/repo/pull/123`
 ///
 /// Each action and each parameter also answers to the vocabulary the rest of GimDiff uses
 /// for the same thing — `open-project` for the first, `baseline` and `candidate` for the
@@ -28,6 +29,11 @@ enum GimDiffURLCommand: Equatable, Sendable {
     case open(folder: URL)
     /// Load a single explicit comparison.
     case compare(reference: URL, failure: URL)
+    /// Review the snapshots a GitHub pull request changes.
+    ///
+    /// Carried as the text it arrived as rather than parsed here: a bare number is a valid
+    /// request, and only the app knows which repository the open project belongs to.
+    case openPullRequest(String)
 
     /// The scheme GimDiff is registered to handle.
     static let scheme = "gimdiff"
@@ -39,6 +45,9 @@ enum GimDiffURLCommand: Equatable, Sendable {
     static let compareActions = ["compare", "diff"]
     static let referenceParameterNames = ["reference", "baseline", "recorded", "expected"]
     static let failureParameterNames = ["failure", "candidate", "actual", "new"]
+    /// Hosts that open a pull request review.
+    static let pullRequestActions = ["open-pr", "pr", "pull-request", "review-pr"]
+    static let pullRequestParameterNames = ["url", "pr", "reference", "number"]
 
     /// Parses an incoming URL.
     ///
@@ -58,6 +67,11 @@ enum GimDiffURLCommand: Equatable, Sendable {
         switch action {
         case let action? where Self.compareActions.contains(action):
             self = try Self.comparison(in: parameters)
+        case let action? where Self.pullRequestActions.contains(action):
+            guard let reference = Self.value(named: Self.pullRequestParameterNames, in: parameters) else {
+                throw GimDiffError.missingParameter(Self.pullRequestParameterNames[0])
+            }
+            self = .openPullRequest(reference)
         case let action? where Self.openActions.contains(action):
             // A folder parameter settles it. Without one, a named candidate means the URL
             // is carrying a pair, and anything else is an `open` missing its path — which

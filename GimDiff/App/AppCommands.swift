@@ -27,6 +27,11 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("o", modifiers: .command)
 
+            Button("Open Pull Request…") {
+                state.presentPullRequestSheet()
+            }
+            .keyboardShortcut("o", modifiers: [.command, .shift])
+
             // ⌘R refreshes the canvas rather than the project. A snapshot is looked at far
             // more often than a folder is rescanned, and rereading two images is the cheap
             // half of the pair, so the bare shortcut goes to the one used every minute.
@@ -43,8 +48,14 @@ struct AppCommands: Commands {
             // Deliberately unshortcut'd: every spelling near ⌘W is already the window's, and
             // closing the project is not closing the window. The sidebar header carries the
             // button this mirrors.
-            Button("Close Project") {
-                state.closeProject()
+            if state.isReviewingPullRequest {
+                Button("Close Pull Request Review") {
+                    state.closePullRequestReview()
+                }
+            } else {
+                Button("Close Project") {
+                    state.closeProject()
+                }
             }
         }
 
@@ -91,6 +102,7 @@ struct AppCommands: Commands {
                 state.revealSelectionInFinder()
             }
             .keyboardShortcut(.return, modifiers: .command)
+            .disabled(state.isReviewingPullRequest)
 
             Divider()
 

@@ -141,6 +141,28 @@ struct ClipboardIngestionTests {
     }
 }
 
+@Suite("Pull request link ingestion")
+struct PullRequestIngestionTests {
+    private let service = DefaultIngestionService()
+
+    @Test("Finds a pull request link in pasted text")
+    func findsPullRequestLink() {
+        let text = "Snapshots moved again: https://github.com/octo/app/pull/7 — can you check?"
+
+        #expect(service.parsePullRequest(text) == GitHubPRReference(owner: "octo", repo: "app", pullNumber: 7))
+    }
+
+    @Test("A failure log is not a pull request")
+    func ignoresFailureLog() {
+        let log = """
+        Recorded: file:///Users/david/Dev/Demo/__Snapshots__/homeScreen.png
+        Failure:  file:///var/folders/9c/T/homeScreen.png
+        """
+
+        #expect(service.parsePullRequest(log) == nil)
+    }
+}
+
 @Suite("gimdiff:// ingestion")
 struct URLSchemeIngestionTests {
     private let service = DefaultIngestionService()

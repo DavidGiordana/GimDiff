@@ -38,10 +38,18 @@ extension AppState {
             return
         }
 
-        setPreview(.single(SnapshotItem(
-            name: survivor.fileURL.deletingPathExtension().lastPathComponent,
-            fileURL: survivor.fileURL
-        )))
+        let name = survivor.fileURL.deletingPathExtension().lastPathComponent
+
+        // A downloaded side stays a downloaded side: dropping its partner does not make it a
+        // file on disk the user may act on. It keeps the snapshot's identifier too, so the
+        // canvas can still say what the pull request did to it.
+        guard survivor.origin != .pullRequest else {
+            let item = SnapshotItem(id: preview?.snapshotID, name: name, fileURL: survivor.fileURL)
+            setPreview(.pullRequestSide(item, role: survivor.role))
+            return
+        }
+
+        setPreview(.single(SnapshotItem(name: name, fileURL: survivor.fileURL)))
     }
 
     // MARK: - Promotion
@@ -55,6 +63,9 @@ extension AppState {
         guard let baseline = preview?.baseline else {
             return "There is no baseline on screen to overwrite."
         }
+        guard baseline.origin != .pullRequest else {
+            return Self.pullRequestPromotionObstacle
+        }
         guard baseline.isWritable else {
             return """
             The baseline on screen was read out of \(Self.comparisonGitRef) and exists only \
@@ -67,11 +78,21 @@ extension AppState {
 
     var canPromoteCandidate: Bool { candidatePromotionObstacle == nil }
 
+    /// Why neither side of a pull request comparison can be written to.
+    static let pullRequestPromotionObstacle = """
+        Both images were downloaded from a GitHub pull request for review. Accept or revert \
+        the change on its branch; there is no file on disk here to overwrite.
+        """
+
     /// Whether the candidate on disk can be put back to what the baseline holds.
     ///
     /// True for a committed baseline as well as a recorded one: the candidate is always the
-    /// working file, and that is the side this writes to.
-    var canRevertToBaseline: Bool { preview?.baseline != nil }
+    /// working file, and that is the side this writes to — except under pull request
+    /// review, where the candidate is a downloaded copy as well.
+    var canRevertToBaseline: Bool {
+        guard let candidate = preview?.candidate, preview?.baseline != nil else { return false }
+        return candidate.isWritable
+    }
 
     /// Accepts the candidate: copies it over the baseline on disk.
     func promoteCandidateToBaseline() {
@@ -89,6 +110,10 @@ extension AppState {
     /// Discards the candidate: copies the baseline back over it on disk.
     func revertCandidateToBaseline() {
         guard let candidate = preview?.candidate, let baseline = preview?.baseline else { return }
+        guard candidate.isWritable else {
+            report(Self.pullRequestPromotionObstacle)
+            return
+        }
         guard copy(contentsOf: baseline.fileURL, over: candidate.fileURL) else { return }
         finishFileAction()
     }

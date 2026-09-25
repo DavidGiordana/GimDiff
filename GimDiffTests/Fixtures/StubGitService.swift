@@ -17,6 +17,8 @@ struct StubGitService: GitService {
     var statuses: [URL: GitFileStatus] = [:]
     /// When true, reading status fails the way an unreadable repository would.
     var statusFails = false
+    /// URL returned for every remote, or `nil` to act as though the repository has none.
+    var remoteURL: String?
 
     func findRepositoryRoot(for folderURL: URL) async -> URL? {
         repositoryRoot
@@ -37,5 +39,16 @@ struct StubGitService: GitService {
             exitCode: 128,
             message: "StubGitService does not extract files"
         )
+    }
+
+    func remoteURL(named name: String, repositoryRoot: URL) async throws -> String {
+        guard let remoteURL else {
+            throw GimDiffError.commandFailed(
+                command: "git remote get-url",
+                exitCode: 2,
+                message: "error: No such remote '\(name)'"
+            )
+        }
+        return remoteURL
     }
 }

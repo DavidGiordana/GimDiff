@@ -22,6 +22,7 @@ final class MockFilesystemService: FilesystemService, @unchecked Sendable {
     private var storedDirectories: Set<String> = ["/"]
     private var storedPackages: Set<String> = []
     private var storedTrashedPaths: [String] = []
+    private var storedRemovedPaths: [String] = []
 
     init(files: [URL: Data] = [:], directories: [URL] = []) {
         for directory in directories {
@@ -44,6 +45,11 @@ final class MockFilesystemService: FilesystemService, @unchecked Sendable {
     /// Paths handed to ``trashFile(at:)``, in call order.
     var trashedPaths: [String] {
         lock.withLock { storedTrashedPaths }
+    }
+
+    /// Paths handed to ``removeItem(at:)``, in call order.
+    var removedPaths: [String] {
+        lock.withLock { storedRemovedPaths }
     }
 
     /// Seeds a file without going through ``writeFile(at:data:)``.
@@ -165,6 +171,19 @@ final class MockFilesystemService: FilesystemService, @unchecked Sendable {
             storedFiles[key] = nil
             storedDirectories.remove(key)
             storedTrashedPaths.append(key)
+        }
+    }
+
+    func removeItem(at url: URL) throws {
+        try lock.withLock {
+            let key = Self.key(for: url)
+            guard storedFiles[key] != nil || storedDirectories.contains(key) else {
+                throw Self.noSuchFile(url)
+            }
+            let prefix = key + "/"
+            storedFiles = storedFiles.filter { $0.key != key && !$0.key.hasPrefix(prefix) }
+            storedDirectories = storedDirectories.filter { $0 != key && !$0.hasPrefix(prefix) }
+            storedRemovedPaths.append(key)
         }
     }
 

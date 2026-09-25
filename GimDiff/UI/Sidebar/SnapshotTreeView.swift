@@ -25,11 +25,17 @@ struct SnapshotTreeView: View {
         let rows = state.visibleRows
 
         VStack(spacing: 0) {
-            if let project = state.currentProject {
+            if let session = state.pullRequestSession {
+                PullRequestHeader(session: session, close: state.closePullRequestReview)
+                    .padding(.horizontal, 10)
+                    .padding(.top, 8)
+            } else if let project = state.currentProject {
                 ProjectHeader(rootURL: project.rootURL, close: state.closeProject)
                     .padding(.horizontal, 10)
                     .padding(.top, 8)
+            }
 
+            if state.currentProject != nil {
                 SnapshotFilterBar(focus: $focus)
                     .padding(.horizontal, 10)
                     .padding(.top, 8)
@@ -42,6 +48,11 @@ struct SnapshotTreeView: View {
                 ProgressView("Scanning…")
                     .controlSize(.small)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let session = state.pullRequestSession, session.suites.isEmpty {
+                SidebarEmptyStateView.noSnapshotChanges(
+                    prNumber: session.prNumber,
+                    close: state.closePullRequestReview
+                )
             } else if state.currentProject?.suites.isEmpty == true {
                 SidebarEmptyStateView.noSnapshotsDiscovered(reload: state.reload)
             } else if rows.isEmpty {
@@ -232,11 +243,15 @@ private struct TreeRowView: View {
 
             Spacer(minLength: 0)
 
-            if suite.hasGitDiff {
+            // Under review every snapshot is a change, so the badge would sit on every suite
+            // and say nothing; each snapshot names its own change instead.
+            if suite.hasGitDiff, !state.isReviewingPullRequest {
                 GitDiffBadge()
             }
 
-            if suite.isMissingSourceCode {
+            // A pull request's suites never have a source file on disk, so the warning would
+            // sit on every row and say nothing.
+            if suite.isMissingSourceCode, !state.isReviewingPullRequest {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
                     .help("GimDiff could not find the test source for this suite")
@@ -256,7 +271,9 @@ private struct TreeRowView: View {
 
             Spacer(minLength: 0)
 
-            if snapshot.hasGitDiff {
+            if let change = state.pullRequestChange(forSnapshotID: snapshot.id) {
+                ChangeKindBadge(kind: change.kind)
+            } else if snapshot.hasGitDiff {
                 GitDiffBadge()
             }
         }

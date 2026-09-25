@@ -196,11 +196,12 @@ round: a snapshot is looked at far more often than a folder is walked again.
 ### URL scheme
 
 `gimdiff://` is registered in `GimDiff/Info.plist` (role `Viewer`, identifier
-`com.davidgiordana.GimDiff`). Two actions are understood:
+`com.davidgiordana.GimDiff`). Three actions are understood:
 
 ```
 gimdiff://open?path=/path/to/snapshots
 gimdiff://compare?reference=/path/a.png&failure=/path/b.png
+gimdiff://open-pr?url=https://github.com/owner/repo/pull/123
 ```
 
 `open` reads as either shape: given a candidate and no folder it is the comparison between
@@ -222,6 +223,35 @@ open 'gimdiff://open?path=/path/to/snapshots'
 `PBXFileSystemSynchronizedBuildFileExceptionSet`; keep that exception if you add files
 that should not ship as resources.
 
+## Pull request review
+
+GimDiff can review the snapshots a GitHub pull request changes without checking it out.
+`Engine/GitHub/` reads the pull request through the REST API and downloads both versions
+of every changed image under `Snapshots/` or `__Snapshots__/` into a scratch folder; the
+review then stands in for the open project until it is closed.
+
+- **Authentication is borrowed, never stored.** `GitHubTokenResolver` runs
+  `/usr/bin/env PATH=… gh auth token --hostname github.com`. The `PATH` assignment matters:
+  an app launched from the Finder inherits launchd's search path, which has no Homebrew in
+  it. Only `github.com` is supported.
+- **Files come from the contents API, with an LFS fallback.** Snapshot folders are often
+  stored with Git LFS, and for those the contents API answers with the pointer file. A blob
+  starting with the LFS pointer line is fetched again from `media.githubusercontent.com`.
+- **Every route goes through the Open PR sheet** — ⌘⇧O, the toolbar, a pasted link (⌘V),
+  `gimdiff://open-pr`, and `gimdiff pr`. The sheet stays up while the fetch runs, so
+  progress and failures (`gh` missing, not logged in, no access) are shown beside the field.
+- **The review is read-only.** Both panes carry the `pullRequest` origin, so the promotion
+  actions refuse them and the pane headers hide their arrows; deletion is refused too.
+  Actions that open a file elsewhere — Preview, the Finder, the test source — are hidden:
+  the files are scratch copies that disappear with the review.
+- **Every snapshot names its change.** `ChangeKindBadge` shows Added, Modified, Deleted, or
+  Renamed on each sidebar row and on the canvas. An added or deleted snapshot has one
+  version only, shown as `SnapshotPreview.pullRequestSide` under the side it belongs to —
+  never as `.single`, which always means the candidate on disk.
+- **The scratch folder is deleted, not trashed**, through `FilesystemService.removeItem(at:)`,
+  when the review closes, when a project replaces it, and when the app terminates. Closing
+  a review puts back the project it replaced.
+
 ## Command-line tool
 
 `gimdiff` is a `com.apple.product-type.tool` target. `GimCLI/` holds only argument parsing
@@ -232,6 +262,7 @@ into the tool from the same folders the app compiles them from.
 gimdiff scan <project-path> [--json]
 gimdiff diff <candidate> <baseline> [--out <mask.png>] [--json]
 gimdiff parse-clipboard [--input "<log text>"] [--json]
+gimdiff pr <url-or-number>             # hands a GitHub pull request to the running app
 gimdiff <project-path>                 # hands the path to the running app
 gimdiff <candidate> <baseline>         # hands one comparison to the running app
 ```

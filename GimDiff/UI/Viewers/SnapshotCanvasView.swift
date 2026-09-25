@@ -67,10 +67,10 @@ struct SnapshotCanvasView: View {
         case nil:
             CanvasEmptyStateView()
 
-        case let .single(snapshot):
-            pane(
-                SnapshotPane(role: .candidate, fileURL: snapshot.fileURL, origin: .workingTree)
-            )
+        case .single, .pullRequestSide:
+            if let only = preview?.panes.first {
+                pane(only)
+            }
 
         case .comparison:
             comparison
@@ -196,6 +196,12 @@ struct SnapshotPaneHeader: View {
 
             RoleBadge(pane: pane)
 
+            // Once per preview rather than once per pane: both panes are the same change.
+            if let change = state.pullRequestChange(forSnapshotID: state.preview?.snapshotID),
+               pane.id == state.preview?.panes.first?.id {
+                ChangeKindBadge(kind: change.kind)
+            }
+
             Text(pane.fileURL.lastPathComponent)
                 .font(.caption)
                 .lineLimit(1)
@@ -215,8 +221,12 @@ struct SnapshotPaneHeader: View {
     @ViewBuilder
     private var actions: some View {
         // The promotion lives on the candidate and the revert on the baseline, because each
-        // one reads as an arrow pointing at the file it overwrites.
+        // one reads as an arrow pointing at the file it overwrites. Under pull request review
+        // neither arrow has a file to point at, so both are gone rather than disabled.
         switch pane.role {
+        case _ where state.isReviewingPullRequest:
+            EmptyView()
+
         case .candidate:
             Button {
                 state.promoteCandidateToBaseline()
@@ -240,30 +250,35 @@ struct SnapshotPaneHeader: View {
             .accessibilityLabel("Revert to Baseline")
         }
 
-        Button {
-            state.openInPreviewApp(pane.fileURL)
-        } label: {
-            Image(systemName: "doc")
-        }
-        .buttonStyle(.borderless)
-        .help("Open Image in Preview")
+        // Every action below opens a file on disk somewhere else. Under pull request review
+        // the files are scratch copies deleted when the review ends, and there is no test
+        // source to open, so the header offers none of them.
+        if !state.isReviewingPullRequest {
+            Button {
+                state.openInPreviewApp(pane.fileURL)
+            } label: {
+                Image(systemName: "doc")
+            }
+            .buttonStyle(.borderless)
+            .help("Open Image in Preview")
 
-        Button {
-            state.revealInFinder(pane.fileURL)
-        } label: {
-            Image(systemName: "folder")
-        }
-        .buttonStyle(.borderless)
-        .help("Reveal in Finder")
+            Button {
+                state.revealInFinder(pane.fileURL)
+            } label: {
+                Image(systemName: "folder")
+            }
+            .buttonStyle(.borderless)
+            .help("Reveal in Finder")
 
-        Button {
-            state.openTestSourceForPreview()
-        } label: {
-            Image(systemName: "ellipsis.curlybraces")
+            Button {
+                state.openTestSourceForPreview()
+            } label: {
+                Image(systemName: "ellipsis.curlybraces")
+            }
+            .buttonStyle(.borderless)
+            .disabled(state.previewSuite == nil)
+            .help("Open Test Source in Xcode")
         }
-        .buttonStyle(.borderless)
-        .disabled(state.previewSuite == nil)
-        .help("Open Test Source in Xcode")
     }
 }
 

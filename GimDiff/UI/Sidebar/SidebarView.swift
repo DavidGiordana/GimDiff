@@ -24,6 +24,27 @@ struct SidebarView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
+                    state.presentPullRequestSheet()
+                } label: {
+                    // The pull glyph is a single thin stroke, which at toolbar size reads as
+                    // a stray mark beside the filled icons around it. Weight, scale, and the
+                    // accent colour give it the presence the other buttons get from their shape.
+                    Label {
+                        Text("Open PR")
+                    } icon: {
+                        Image(systemName: "arrow.triangle.pull")
+                            .fontWeight(.bold)
+                            .imageScale(.large)
+                            .foregroundStyle(.tint)
+                    }
+                }
+                // Titled as well as iconed: no SF Symbol says "pull request" on its own.
+                .labelStyle(.titleAndIcon)
+                .help("Review GitHub PR - ⌘⇧O")
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                Button {
                     state.reload()
                 } label: {
                     Label("Reload", systemImage: "arrow.clockwise")

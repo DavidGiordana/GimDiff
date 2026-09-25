@@ -120,6 +120,24 @@ struct MockFilesystemServiceTests {
         #expect(filesystem.trashedPaths == ["/repo/Snapshots/home.png"])
     }
 
+    @Test("Removing a folder deletes everything beneath it and records the path")
+    func removeDeletesFolder() throws {
+        let filesystem = MockFilesystemService()
+        let folder = root.appendingPathComponent("Session")
+        let file = folder.appendingPathComponent("head/home.png")
+        let sibling = root.appendingPathComponent("SessionOther/home.png")
+        filesystem.stub(file, contents: "snapshot")
+        filesystem.stub(sibling, contents: "snapshot")
+
+        try filesystem.removeItem(at: folder)
+
+        #expect(!filesystem.fileExists(at: file))
+        #expect(!filesystem.fileExists(at: folder))
+        #expect(filesystem.fileExists(at: sibling))
+        #expect(filesystem.removedPaths == ["/repo/Snapshots/Session"])
+        #expect(filesystem.trashedPaths.isEmpty)
+    }
+
     @Test("The default walk finds images in nested folders and ignores everything else")
     func findsNestedImages() throws {
         let filesystem = MockFilesystemService()
@@ -183,6 +201,17 @@ struct DefaultFilesystemServiceTests {
         #expect(filesystem.isDirectory(at: root.url.appendingPathComponent("nested")))
         #expect(!filesystem.isDirectory(at: file))
         #expect(try filesystem.readFile(at: file) == Data("snapshot".utf8))
+    }
+
+    @Test("Removing a folder deletes it outright")
+    func removesFolder() throws {
+        let root = try TemporaryDirectory()
+        let folder = root.url.appendingPathComponent("Session")
+        try filesystem.writeFile(at: folder.appendingPathComponent("head/home.png"), data: Data("png".utf8))
+
+        try filesystem.removeItem(at: folder)
+
+        #expect(!filesystem.fileExists(at: folder))
     }
 
     @Test("Listing a folder skips hidden entries")

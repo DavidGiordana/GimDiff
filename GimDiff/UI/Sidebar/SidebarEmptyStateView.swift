@@ -15,6 +15,7 @@ import SwiftUI
 /// resolves it: rescan, or drop the filters.
 struct SidebarEmptyStateView: View {
     let systemImage: String
+    var tint: Color?
     let title: String
     let message: String
     let actionTitle: String
@@ -27,6 +28,7 @@ struct SidebarEmptyStateView: View {
         // appears to move the search field into the middle of the sidebar.
         EmptyStateView(
             systemImage: systemImage,
+            tint: tint,
             title: title,
             message: message,
             actionTitle: actionTitle,
@@ -49,6 +51,21 @@ extension SidebarEmptyStateView {
         )
     }
 
+    /// A pull request is under review, and none of the files it changes is a snapshot.
+    ///
+    /// Good news rather than an error, which is why it is drawn in green: the pull request
+    /// cannot have broken a snapshot it does not touch.
+    static func noSnapshotChanges(prNumber: Int, close: @escaping () -> Void) -> SidebarEmptyStateView {
+        SidebarEmptyStateView(
+            systemImage: "checkmark.circle.fill",
+            tint: .green,
+            title: "No Snapshot Changes",
+            message: "PR #\(prNumber) contains no modified snapshot image files.",
+            actionTitle: "Close Review",
+            action: close
+        )
+    }
+
     /// The project holds snapshots, but the search text or the filter chips hide all of them.
     static func noMatches(clearFilters: @escaping () -> Void) -> SidebarEmptyStateView {
         SidebarEmptyStateView(
@@ -63,6 +80,10 @@ extension SidebarEmptyStateView {
 
 #Preview("No snapshots") {
     SidebarEmptyStateView.noSnapshotsDiscovered {}
+}
+
+#Preview("No snapshot changes") {
+    SidebarEmptyStateView.noSnapshotChanges(prNumber: 123) {}
 }
 
 #Preview("No matches") {

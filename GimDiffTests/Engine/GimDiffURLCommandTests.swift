@@ -145,6 +145,31 @@ struct GimDiffURLCommandTests {
         }
     }
 
+    @Test("Reads a pull request review under any of its action names", arguments: [
+        "open-pr", "pr", "pull-request", "review-pr",
+    ])
+    func parsesPullRequestAction(_ action: String) throws {
+        let command = try GimDiffURLCommand(
+            url: try url("gimdiff://\(action)?url=https%3A%2F%2Fgithub.com%2Focto%2Fapp%2Fpull%2F7")
+        )
+
+        #expect(command == .openPullRequest("https://github.com/octo/app/pull/7"))
+    }
+
+    @Test("A pull request review keeps a bare number for the app to resolve")
+    func keepsBarePullRequestNumber() throws {
+        let command = try GimDiffURLCommand(url: try url("gimdiff://open-pr?pr=42"))
+
+        #expect(command == .openPullRequest("42"))
+    }
+
+    @Test("A pull request review with nothing to review is reported as missing its url")
+    func reportsMissingPullRequest() {
+        #expect(throws: GimDiffError.missingParameter("url")) {
+            try GimDiffURLCommand(url: try url("gimdiff://open-pr"))
+        }
+    }
+
     private func url(_ string: String) throws -> URL {
         try #require(URL(string: string))
     }

@@ -29,4 +29,7 @@ protocol GitService: Sendable {
         repositoryRoot: URL,
         gitRef: String
     ) async throws -> URL
+
+    /// The URL the remote called `name` fetches from, such as `git@github.com:owner/repo.git`.
+    func remoteURL(named name: String, repositoryRoot: URL) async throws -> String
 }

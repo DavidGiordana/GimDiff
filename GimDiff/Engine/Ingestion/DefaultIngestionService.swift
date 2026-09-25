@@ -64,6 +64,12 @@ struct DefaultIngestionService: IngestionService {
         )
     }
 
+    // MARK: - Pull requests
+
+    func parsePullRequest(_ text: String) -> GitHubPRReference? {
+        GitHubPRURLParser.reference(in: text)
+    }
+
     // MARK: - URL scheme
 
     func parseURLScheme(_ url: URL) -> IngestionPayload? {

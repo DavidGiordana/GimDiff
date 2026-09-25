@@ -46,4 +46,21 @@ struct SnapshotItem: Identifiable, Sendable, Hashable {
         guard let variantIndex else { return name }
         return "\(name) (\(variantIndex))"
     }
+
+    /// Splits `<testMethod>.<counter>.png` into the method name and its counter.
+    ///
+    /// A file with no trailing counter keeps its whole name and reports no index, which is
+    /// what a test recording a single snapshot produces.
+    static func decomposeName(of fileURL: URL) -> (name: String, variantIndex: Int?) {
+        let stem = fileURL.deletingPathExtension().lastPathComponent
+        let components = stem.split(separator: ".", omittingEmptySubsequences: false)
+
+        guard components.count > 1,
+              let last = components.last,
+              let variantIndex = Int(last),
+              !last.isEmpty
+        else { return (stem, nil) }
+
+        return (components.dropLast().joined(separator: "."), variantIndex)
+    }
 }

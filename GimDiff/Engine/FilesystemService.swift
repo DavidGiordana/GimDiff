@@ -49,6 +49,14 @@ protocol FilesystemService: Sendable {
     /// Moves `url` to the user's Trash so a deletion stays recoverable.
     func trashFile(at url: URL) throws
 
+    /// Deletes `url` outright, folder and all.
+    ///
+    /// Reserved for GimDiff's own scratch files, such as a pull request's downloaded
+    /// snapshots. Those are copies nobody asked to keep, and sending them to the Trash would
+    /// leave a folder there for every review. Anything the user owns goes through
+    /// ``trashFile(at:)``.
+    func removeItem(at url: URL) throws
+
     /// A unique, not-yet-existing URL inside a scratch directory that does exist.
     ///
     /// Callers write to the returned location; the enclosing directory is guaranteed, the

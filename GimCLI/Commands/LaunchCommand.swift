@@ -76,7 +76,7 @@ enum LaunchCommand {
     }
 
     /// Hands the URL to LaunchServices with activation requested.
-    private static func open(_ url: URL) async throws {
+    static func open(_ url: URL) async throws {
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
 

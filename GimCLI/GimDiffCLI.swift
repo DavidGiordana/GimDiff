@@ -24,6 +24,7 @@ enum GimDiffCLI {
       \(ScanCommand.name.padded)\(ScanCommand.summary)
       \(DiffCommand.name.padded)\(DiffCommand.summary)
       \(ParseClipboardCommand.name.padded)\(ParseClipboardCommand.summary)
+      \(PullRequestCommand.name.padded)\(PullRequestCommand.summary)
 
     Given paths and no subcommand, gimdiff opens them in the running GimDiff window.
 
@@ -84,6 +85,14 @@ enum GimDiffCLI {
                 valueOptions: ParseClipboardCommand.valueOptions,
                 console: console,
                 body: ParseClipboardCommand.run
+            )
+        case PullRequestCommand.name:
+            await run(
+                Array(tokens.dropFirst()),
+                usage: PullRequestCommand.usage,
+                valueOptions: PullRequestCommand.valueOptions,
+                console: console,
+                body: PullRequestCommand.run
             )
         default:
             // Anything else is read as a path. An unknown *option* is not: it is a typo, and

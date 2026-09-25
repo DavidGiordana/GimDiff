@@ -38,6 +38,20 @@ struct RootView: View {
                 ErrorBanner(message: message, dismiss: state.dismissError)
             }
         }
+        .sheet(isPresented: pullRequestSheet) {
+            OpenPRSheetView()
+        }
+    }
+
+    /// The Open PR sheet's visibility, routed so a dismissal by the system also abandons
+    /// the fetch the sheet was showing.
+    private var pullRequestSheet: Binding<Bool> {
+        Binding(
+            get: { state.isPullRequestSheetPresented },
+            set: { isPresented in
+                if !isPresented { state.dismissPullRequestSheet() }
+            }
+        )
     }
 
     /// Bridges the sidebar's own visibility to the ⌘1 and ⌘0 commands.

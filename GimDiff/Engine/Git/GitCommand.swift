@@ -26,6 +26,11 @@ enum GitCommand {
         command(["rev-parse", "--abbrev-ref", "HEAD"], in: directory)
     }
 
+    /// Prints the URL the remote called `name` fetches from.
+    static func remoteURL(named name: String, in directory: URL) -> Command {
+        command(["remote", "get-url", "--", name], in: directory)
+    }
+
     /// Lists modified and untracked paths, one `XY path` record per line.
     ///
     /// `core.quotePath` is disabled so snapshot names containing non-ASCII characters come
