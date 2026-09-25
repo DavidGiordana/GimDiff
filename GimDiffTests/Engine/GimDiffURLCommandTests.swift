@@ -114,6 +114,28 @@ struct GimDiffURLCommandTests {
         ))
     }
 
+    @Test("An open action that names a pair rather than a folder is read as a comparison", arguments: [
+        "gimdiff://open?candidate=/tmp/b.png&baseline=/tmp/a.png",
+        "gimdiff://open-project?candidate=/tmp/b.png&reference=/tmp/a.png",
+    ])
+    func readsAPairOutOfAnOpenAction(string: String) throws {
+        let command = try GimDiffURLCommand(url: try url(string))
+
+        #expect(command == .compare(
+            reference: URL(fileURLWithPath: "/tmp/a.png"),
+            failure: URL(fileURLWithPath: "/tmp/b.png")
+        ))
+    }
+
+    @Test("An open action carrying a folder stays an open even beside a stray candidate")
+    func prefersTheFolderWhenBothAreNamed() throws {
+        let command = try GimDiffURLCommand(
+            url: try url("gimdiff://open?path=/tmp/Project&candidate=/tmp/b.png")
+        )
+
+        #expect(command == .open(folder: URL(fileURLWithPath: "/tmp/Project")))
+    }
+
     @Test("A missing parameter is reported under its preferred spelling")
     func reportsThePreferredParameterName() throws {
         let incomplete = try url("gimdiff://compare?candidate=/tmp/b.png")

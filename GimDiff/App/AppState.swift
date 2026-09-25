@@ -45,6 +45,15 @@ final class AppState {
     private(set) var preview: SnapshotPreview?
     var diffMode: DiffMode = .sideBySide
     var isSidebarVisible = true
+    /// Pixel comparison of the two panes, recomputed whenever the diff mask is on.
+    private(set) var diffReport: ImageDiffReport?
+    /// Whether that comparison is in flight, so the footer can say so rather than go blank.
+    private(set) var isComputingDiff = false
+    /// Bumped to make the canvas read its images off disk again.
+    ///
+    /// A counter rather than a flag because the file name never changes: nothing about the
+    /// URL tells a view that the bytes behind it were rewritten by a test run.
+    private(set) var imageReloadToken = 0
     /// The most recent failure, shown as a banner until it is dismissed.
     private(set) var lastError: String?
 
@@ -55,8 +64,9 @@ final class AppState {
     private(set) var filterFocusRequests = 0
     private(set) var treeFocusRequests = 0
 
-    private let filesystem: any FilesystemService
-    private let gitService: any GitService
+    let filesystem: any FilesystemService
+    let gitService: any GitService
+    let imageDiff: any ImageDiffService
     private let scanner: ProjectScanner
     private let ingestion: any IngestionService
     private let clipboard: ClipboardService
@@ -64,10 +74,14 @@ final class AppState {
     private let defaults: UserDefaults
     private var scanTask: Task<Void, Never>?
     private var gitDiffTask: Task<Void, Never>?
+    /// Held so a second diff request supersedes the first rather than racing it.
+    var diffTask: Task<Void, Never>?
+    var gitStatusTask: Task<Void, Never>?
 
     init(
         filesystem: any FilesystemService = DefaultFilesystemService(),
         gitService: (any GitService)? = nil,
+        imageDiff: (any ImageDiffService)? = nil,
         scanner: ProjectScanner? = nil,
         ingestion: any IngestionService = DefaultIngestionService(),
         clipboard: ClipboardService = ClipboardService(),
@@ -77,6 +91,7 @@ final class AppState {
         let git = gitService ?? DefaultGitService(filesystem: filesystem)
         self.filesystem = filesystem
         self.gitService = git
+        self.imageDiff = imageDiff ?? DefaultImageDiffService(filesystem: filesystem)
         self.scanner = scanner ?? ProjectScanner(filesystem: filesystem, gitService: git)
         self.ingestion = ingestion
         self.clipboard = clipboard
@@ -111,7 +126,7 @@ final class AppState {
         if filesystem.isDirectory(at: url) {
             openProject(at: url)
         } else if url.isImageFile {
-            preview = .single(Self.looseSnapshot(at: url))
+            setPreview(.single(Self.looseSnapshot(at: url)))
         } else {
             lastError = "“\(url.lastPathComponent)” is neither a folder nor an image GimDiff can open."
         }
@@ -209,7 +224,7 @@ final class AppState {
     func load(_ bundle: ProjectBundle) {
         currentProject = bundle
         isLoading = false
-        preview = nil
+        setPreview(nil)
         // A project with one suite is a suite, so there is nothing to be gained by making
         // the user open it. Several suites start closed, which is the useful overview.
         expandedSuiteIDs = bundle.suites.count == 1 ? Set(bundle.suites.map(\.id)) : []
@@ -417,7 +432,7 @@ final class AppState {
     /// before drawing anything would make every selection feel slow.
     func showSnapshot(_ snapshot: SnapshotItem, withGitDiff: Bool) {
         gitDiffTask?.cancel()
-        preview = .single(snapshot)
+        setPreview(.single(snapshot))
 
         guard withGitDiff,
               snapshot.gitStatus == .modified,
@@ -435,27 +450,98 @@ final class AppState {
             ) else { return }
 
             guard !Task.isCancelled, preview?.snapshotID == snapshot.id else { return }
-            preview = .comparison(
+            setPreview(.comparison(
                 SnapshotPair(reference: committed, failure: snapshot.fileURL),
                 snapshotID: snapshot.id,
-                title: snapshot.displayName
-            )
+                title: snapshot.displayName,
+                baselineOrigin: .committedVersion
+            ))
         }
     }
 
     /// Shows two loose images side by side, from a drop, the clipboard, or a URL.
     func showComparison(reference: URL, failure: URL) {
         gitDiffTask?.cancel()
-        preview = .comparison(
+        setPreview(.comparison(
             SnapshotPair(reference: reference, failure: failure),
             snapshotID: nil,
-            title: failure.deletingPathExtension().lastPathComponent
-        )
+            title: failure.deletingPathExtension().lastPathComponent,
+            baselineOrigin: .workingTree
+        ))
     }
 
     func closePreview() {
         gitDiffTask?.cancel()
-        preview = nil
+        setPreview(nil)
+    }
+
+    // MARK: - Mutation seams
+
+    /// Replaces what the canvas is showing, dropping anything measured about the last pair.
+    ///
+    /// Every route into ``preview`` runs through here, including the ones in
+    /// `AppState+FileActions`: a report left over from the previous pair would otherwise
+    /// keep describing it under the new one's images.
+    ///
+    /// ``diffMode`` deliberately survives. Stepping through a folder of snapshots in curtain
+    /// mode should stay in curtain mode; the canvas falls back to a single pane on its own
+    /// when the new preview has only one image.
+    func setPreview(_ newValue: SnapshotPreview?) {
+        diffTask?.cancel()
+        preview = newValue
+        diffReport = nil
+        isComputingDiff = false
+    }
+
+    /// Publishes the result of a pixel comparison, or that one is under way.
+    func setDiffReport(_ report: ImageDiffReport?, isComputing: Bool = false) {
+        diffReport = report
+        isComputingDiff = isComputing
+    }
+
+    /// Makes every view holding a decoded image read it off disk again.
+    func invalidateLoadedImages() {
+        imageReloadToken += 1
+    }
+
+    func report(_ error: any Error) {
+        lastError = error.localizedDescription
+    }
+
+    func report(_ message: String) {
+        lastError = message
+    }
+
+    // MARK: - Git status
+
+    /// Re-reads Git's view of the open project and re-annotates every snapshot.
+    ///
+    /// Cheaper than a rescan and enough after a promotion: the files are where they were,
+    /// it is only their standing against `HEAD` that changed.
+    func refreshGitStatus() {
+        guard let gitRoot = currentProject?.gitRootURL else { return }
+
+        gitStatusTask?.cancel()
+        gitStatusTask = Task { [gitService] in
+            // A repository that cannot be read leaves the last annotation in place rather
+            // than blanking the sidebar's badges over a transient failure.
+            guard let statuses = try? await gitService.status(repositoryRoot: gitRoot),
+                  !Task.isCancelled
+            else { return }
+
+            applyGitStatuses(statuses)
+        }
+    }
+
+    /// The Git status task in flight, if any, so a caller can wait for it.
+    var currentGitStatusRefresh: Task<Void, Never>? { gitStatusTask }
+
+    /// The committed-version extraction in flight, if any, so a caller can wait for it.
+    var currentGitDiff: Task<Void, Never>? { gitDiffTask }
+
+    func applyGitStatuses(_ statuses: [URL: GitFileStatus]) {
+        guard let suites = currentProject?.suites else { return }
+        currentProject?.suites = ProviderRegistry.annotate(suites, with: statuses)
     }
 
     /// Reads a comparison out of whatever is on the pasteboard.
@@ -472,7 +558,7 @@ final class AppState {
         }
 
         guard let baseline = payload.baselineURL else {
-            preview = .single(Self.looseSnapshot(at: payload.candidateURL))
+            setPreview(.single(Self.looseSnapshot(at: payload.candidateURL)))
             return
         }
 

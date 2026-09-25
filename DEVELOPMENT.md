@@ -161,6 +161,38 @@ A non-flag launch argument is read by AppKit as a file to open, and one that nam
 suppresses the window entirely. The UI tests therefore reset state with a defaults override
 (`-GimDiffResetState YES`), not a bare word.
 
+### The canvas: roles, not sides
+
+The detail column talks in ``SnapshotPane`` values, not in left and right. A pane carries a
+**role** (`candidate` or `baseline`) and an **origin** (`workingTree` or `committedVersion`),
+and `SnapshotPreview.panes` always puts the candidate first — every action in a pane header
+reads as an arrow pointing at the file it overwrites, and that only works if the sides keep
+their order.
+
+The origin is load-bearing. A comparison against `HEAD` holds a baseline `git show` wrote to
+a scratch file, so *accepting the candidate has nothing to write to*: the candidate already
+is the file on disk. `promoteCandidateToBaseline()` refuses that case and says why, through
+`candidatePromotionObstacle`. `revertCandidateToBaseline()` works either way, because the
+side it writes to is always the working file.
+
+Both write through a scratch file rather than straight over the destination.
+`FilesystemService.replaceFile(at:with:)` *consumes* what it is handed — that is what makes
+the exchange atomic — so handing it the candidate directly would delete the image the canvas
+is still pointing at.
+
+Two more rules that are easy to undo by accident:
+
+- **`diffMode` is the only thing that decides what is drawn.** The toolbar's Compare and Diff
+  Mask toggles are bindings over `.curtain` and `.difference`, not flags of their own, which
+  is what makes them mutually exclusive without any code saying so.
+- **Images are read by `SnapshotImageLoader`, never by `AsyncImage`.** `AsyncImage` caches on
+  the URL, and GimDiff's whole job is a file whose name stays put while its contents change.
+  `AppState.imageReloadToken` is the counter that says the bytes moved; every view that
+  decodes an image keys its `task(id:)` on it.
+
+`⌘R` refreshes the images on screen and `⇧⌘R` rescans the project, rather than the other way
+round: a snapshot is looked at far more often than a folder is walked again.
+
 ### URL scheme
 
 `gimdiff://` is registered in `GimDiff/Info.plist` (role `Viewer`, identifier
@@ -170,6 +202,9 @@ suppresses the window entirely. The UI tests therefore reset state with a defaul
 gimdiff://open?path=/path/to/snapshots
 gimdiff://compare?reference=/path/a.png&failure=/path/b.png
 ```
+
+`open` reads as either shape: given a candidate and no folder it is the comparison between
+them, so `gimdiff://open?candidate=…&baseline=…` does not have to be spelled `compare`.
 
 Each action and each parameter also answers to the synonyms listed at the top of
 `GimDiffURLCommand` — `open-project`, `baseline`, `candidate` — so the vocabulary the CLI

@@ -139,7 +139,7 @@ struct ProjectOpeningTests {
 
         state.openPaths([reference, failure])
 
-        guard case let .comparison(pair, snapshotID, title) = state.preview else {
+        guard case let .comparison(pair, snapshotID, title, baselineOrigin) = state.preview else {
             Issue.record("Expected a comparison, got \(String(describing: state.preview))")
             return
         }
@@ -147,6 +147,8 @@ struct ProjectOpeningTests {
         #expect(pair.failure.url == failure)
         #expect(snapshotID == nil)
         #expect(title == "failure")
+        // Two loose files are both on disk, so both promotion actions apply to them.
+        #expect(baselineOrigin == .workingTree)
     }
 
     @Test("An empty drop changes nothing")

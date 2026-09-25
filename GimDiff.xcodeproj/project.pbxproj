@@ -44,9 +44,11 @@
 				App/AppCommands.swift,
 				App/AppDelegate.swift,
 				App/AppState.swift,
+				"App/AppState+FileActions.swift",
 				App/GimDiffApp.swift,
 				App/SnapshotPreview.swift,
 				"Extensions/Color+Hex.swift",
+				UI/Components/PopoverColorWell.swift,
 				UI/DetailView.swift,
 				UI/RootView.swift,
 				UI/Sidebar/RecentProjectsView.swift,
@@ -56,7 +58,13 @@
 				UI/Sidebar/SnapshotTreeView.swift,
 				UI/Sidebar/TreeItemContextMenu.swift,
 				UI/Sidebar/TreeRowItem.swift,
+				UI/Toolbar/CanvasToolbarContent.swift,
+				UI/Viewers/DiffMaskView.swift,
+				UI/Viewers/ScrollWheelReader.swift,
 				UI/Viewers/SnapshotCanvasView.swift,
+				UI/Viewers/SnapshotImageLoader.swift,
+				UI/Viewers/SnapshotImageViewer.swift,
+				UI/Viewers/SnapshotSplitSliderView.swift,
 			);
 			target = EAECA0A3306579A500B5F9FB /* gimdiff */;
 		};

@@ -22,10 +22,18 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("o", modifiers: .command)
 
+            // ⌘R refreshes the canvas rather than the project. A snapshot is looked at far
+            // more often than a folder is rescanned, and rereading two images is the cheap
+            // half of the pair, so the bare shortcut goes to the one used every minute.
+            Button("Refresh Images") {
+                state.refreshPreviewImages()
+            }
+            .keyboardShortcut("r", modifiers: .command)
+
             Button("Reload Project") {
                 state.reload()
             }
-            .keyboardShortcut("r", modifiers: .command)
+            .keyboardShortcut("r", modifiers: [.command, .shift])
 
             // Deliberately unshortcut'd: every spelling near ⌘W is already the window's, and
             // closing the project is not closing the window. The sidebar header carries the
@@ -78,6 +86,28 @@ struct AppCommands: Commands {
                 state.revealSelectionInFinder()
             }
             .keyboardShortcut(.return, modifiers: .command)
+
+            Divider()
+
+            Button("Accept Candidate / Overwrite Baseline") {
+                state.promoteCandidateToBaseline()
+            }
+            .keyboardShortcut(.rightArrow, modifiers: .command)
+            .disabled(!state.canPromoteCandidate)
+
+            Button("Revert to Baseline") {
+                state.revertCandidateToBaseline()
+            }
+            .keyboardShortcut(.leftArrow, modifiers: .command)
+            .disabled(!state.canRevertToBaseline)
+
+            Divider()
+
+            Button("Clear Canvas") {
+                state.closePreview()
+            }
+            .keyboardShortcut("l", modifiers: .command)
+            .disabled(state.preview == nil)
 
             Divider()
 

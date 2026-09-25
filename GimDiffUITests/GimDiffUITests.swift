@@ -44,7 +44,7 @@ final class GimDiffUITests: XCTestCase {
     func testDetailPaneExplainsTheEmptyState() {
         let app = launchApp()
 
-        XCTAssertTrue(app.staticTexts["Nothing Selected"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["No Snapshot Selected"].waitForExistence(timeout: 10))
     }
 
     /// Launched with the state reset, so a project opened by hand on the developer's own

@@ -88,12 +88,12 @@ final class ProviderRegistry: Sendable {
     ///
     /// ``SnapshotSuite/hasGitDiff`` reads through to its items, so a suite starts reporting a
     /// difference as soon as one of its snapshots does.
+    /// Every snapshot is re-annotated, including against an empty `statuses`: a refresh run
+    /// after a snapshot was reverted reports nothing about it, and that silence is the news.
     static func annotate(
         _ suites: [SnapshotSuite],
         with statuses: [URL: GitFileStatus]
     ) -> [SnapshotSuite] {
-        guard !statuses.isEmpty else { return suites }
-
         let byPath = Dictionary(
             statuses.map { ($0.key.standardizedFileURL.path, $0.value) },
             uniquingKeysWith: { first, _ in first }
