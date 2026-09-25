@@ -36,7 +36,7 @@ struct GimDiffApp: App {
         .defaultSize(width: 1_280, height: 800)
         .windowToolbarStyle(.unified(showsTitle: true))
         .commands {
-            AppCommands(state: appDelegate.state)
+            AppCommands(state: appDelegate.state, delegate: appDelegate)
         }
     }
 }

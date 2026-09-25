@@ -52,9 +52,13 @@ final class GimDiffUITests: XCTestCase {
     ///
     /// A defaults override rather than a bare word: AppKit reads a non-flag launch argument
     /// as a file to open, and one that names no file leaves the app running with no window.
+    ///
+    /// Window restoration is switched off for the same reason. A window last left in full
+    /// screen is restored into a Space of its own, which only comes forward if the launch
+    /// happens to win activation — so the window "never appears" on some runs and not others.
     private func launchApp() -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-GimDiffResetState", "YES"]
+        app.launchArguments = ["-GimDiffResetState", "YES", "-ApplePersistenceIgnoreState", "YES"]
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 30), "The window never appeared.")
         return app

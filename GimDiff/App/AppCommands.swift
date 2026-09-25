@@ -11,8 +11,13 @@ import SwiftUI
 /// GimDiff's menu bar, and with it every shortcut that has to work whatever is focused.
 struct AppCommands: Commands {
     let state: AppState
+    let delegate: AppDelegate
+
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
+        let _ = registerWindowOpener()
+
         // GimDiff shows one window, so there is nothing for File ▸ New to make.
         CommandGroup(replacing: .newItem) {}
 
@@ -116,5 +121,17 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut(.delete, modifiers: .command)
         }
+    }
+
+    /// Hands `openWindow` to the app delegate, which AppKit calls outside any view.
+    ///
+    /// Done from the menu bar because the point is a launch with no window: when GimDiff is
+    /// started to open a folder, SwiftUI treats it as a document launch and presents no
+    /// scene, so no view exists to read the environment from. The menu bar is built either
+    /// way. A `Commands` of its own would not do: one that contributes no items is never
+    /// evaluated.
+    private func registerWindowOpener() {
+        let openWindow = openWindow
+        delegate.openMainWindow = { openWindow(id: GimDiffApp.mainWindowID) }
     }
 }

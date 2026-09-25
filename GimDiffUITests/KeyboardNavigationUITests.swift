@@ -209,9 +209,15 @@ final class KeyboardNavigationUITests: XCTestCase {
 
     // MARK: - Helpers
 
+    /// Restoration is off so a window left in full screen cannot hide in its own Space; see
+    /// `GimDiffUITests.launchApp()`.
     private func launch() -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-GimDiffResetState", "YES", project.path]
+        app.launchArguments = [
+            "-GimDiffResetState", "YES",
+            "-ApplePersistenceIgnoreState", "YES",
+            project.path,
+        ]
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 30), "The window never appeared.")
         app.activate()

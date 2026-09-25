@@ -20,6 +20,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static let resetStateKey = "GimDiffResetState"
 
     let state: AppState
+    /// Presents the main window when none exists; supplied by the scene's commands.
+    var openMainWindow: (() -> Void)?
 
     override init() {
         let defaults = UserDefaults.standard
@@ -66,8 +68,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    /// Brings the one window forward, creating it if the launch did not.
+    ///
+    /// A cold launch that opens a folder delivers the paths before any window exists, and
+    /// SwiftUI then presents none of its own, so there may be nothing to raise yet. The
+    /// paths arrive before launching has finished; the check waits one turn of the main
+    /// actor so the window is asked for once it has.
     private func raiseMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
-        NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
+        if let window = NSApp.windows.first(where: { $0.canBecomeMain }) {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+        Task { @MainActor in
+            guard !NSApp.windows.contains(where: { $0.canBecomeMain }) else { return }
+            openMainWindow?()
+        }
     }
 }
