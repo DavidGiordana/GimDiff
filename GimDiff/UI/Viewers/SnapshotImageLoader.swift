@@ -17,6 +17,12 @@ import ImageIO
 /// the main actor.
 struct DecodedSnapshotImage: @unchecked Sendable {
     let cgImage: CGImage
+    /// Pixels per point the image was recorded at: 3 for a snapshot taken on a @3x
+    /// simulator, 1 when neither its name nor its DPI says otherwise.
+    ///
+    /// Drawing at this scale rather than the display's is what makes 1:1 mean the size the
+    /// device drew the view, independent of the Mac it is inspected on.
+    var recordedScale: CGFloat = 1
 
     /// Size as stored, in pixels.
     var pixelSize: CGSize {
@@ -52,6 +58,8 @@ enum SnapshotImageLoader {
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
         else { return .unavailable }
 
-        return .loaded(DecodedSnapshotImage(cgImage: image))
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let scale = MetadataReader.scaleFactor(for: url, properties: properties ?? [:])
+        return .loaded(DecodedSnapshotImage(cgImage: image, recordedScale: scale))
     }
 }

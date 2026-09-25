@@ -12,7 +12,7 @@ import SwiftUI
 enum CanvasDisplayMode: String, CaseIterable, Identifiable, Sendable {
     /// Scaled down until the whole image is on screen.
     case fit
-    /// One image pixel per device pixel, scrollable in both directions.
+    /// Drawn at the point size it was recorded at, scrollable in both directions.
     case actualSize
     /// Whatever the pinch and the drag have made of it.
     case free
@@ -105,12 +105,12 @@ struct SnapshotImageViewer<Accessory: View>: View {
                 .padding(12)
 
         case .actualSize:
-            // Sized from the pixel grid rather than resized: at the display's own scale one
-            // stored pixel lands on one device pixel, which is what 1:1 has to mean for a
-            // snapshot recorded at @2x or @3x.
+            // Scaled by the density the snapshot was recorded at, not the display's: no Mac is
+            // @3x, so pixel-for-pixel would draw an iPhone snapshot up to three times the size
+            // the simulator showed it.
             ScrollView([.horizontal, .vertical]) {
                 matted(
-                    Image(decorative: decoded.cgImage, scale: displayScale, orientation: .up)
+                    Image(decorative: decoded.cgImage, scale: decoded.recordedScale, orientation: .up)
                 )
                 .padding(12)
             }
