@@ -57,6 +57,11 @@ struct AppCommands: Commands {
                     state.closeProject()
                 }
             }
+
+            Button("Clear Recent Projects") {
+                state.clearRecentProjects()
+            }
+            .disabled(state.recentProjects.isEmpty)
         }
 
         // Replaced rather than added to: an extra item bound to ⌘V would shadow the filter
@@ -84,6 +89,23 @@ struct AppCommands: Commands {
                 state.collapseSidebar()
             }
             .keyboardShortcut("0", modifiers: .command)
+
+            Divider()
+
+            Toggle("Show Only Modified Snapshots", isOn: binding(\.showGitModifiedOnly))
+            Toggle("Show Only Suites with Warnings", isOn: binding(\.showWarningsOnly))
+
+            Divider()
+
+            // The toolbar's Compare and Diff Mask toggles, spelled out as the one choice they
+            // are: both write ``AppState/diffMode``, so a picker over it is the same control.
+            Picker("Comparison", selection: binding(\.diffMode)) {
+                Text("Side by Side").tag(DiffMode.sideBySide)
+                Text("Compare").tag(DiffMode.curtain)
+                Text("Diff Mask").tag(DiffMode.difference)
+            }
+            .pickerStyle(.inline)
+            .disabled(state.preview?.isComparison != true)
         }
 
         CommandGroup(replacing: .textEditing) {
@@ -91,18 +113,72 @@ struct AppCommands: Commands {
                 state.focusFilter()
             }
             .keyboardShortcut("f", modifiers: .command)
+
+            Button("Clear Filters") {
+                state.clearFilters()
+            }
+            .disabled(!state.isFiltering)
         }
 
         // The ⌘-modified half of the tree's keyboard. AppKit offers a ⌘ shortcut to the
         // menu bar and never to the focused view's `keyDown(with:)`, so these cannot sit
         // beside the arrow keys in the sidebar's `onKeyPress` — and being menu items makes
         // them discoverable, which a bare key is not.
+        //
+        // The tree's bare keys — Space for the preview, ↩ for the test file — have items here
+        // too, but without a shortcut: a menu item bound to a bare key is matched before the
+        // first responder sees it, so it would fire while the user typed in the search box.
         CommandMenu("Snapshot") {
+            Button(state.isShowingSelectedSnapshot ? "Hide Snapshot" : "Show Snapshot") {
+                state.togglePreview()
+            }
+            .disabled(state.selectedSnapshot == nil)
+
+            Button(
+                state.isReviewingPullRequest ? "Compare with Base Branch" : "Show Snapshot with Git Diff"
+            ) {
+                state.showSelectedSnapshot(withGitDiff: true)
+            }
+            .disabled(state.selectedSnapshot == nil)
+
+            Button(
+                state.isReviewingPullRequest
+                    ? "Show Pull Request Version Only"
+                    : "Show Snapshot without Git Diff"
+            ) {
+                state.showSelectedSnapshot(withGitDiff: false)
+            }
+            .disabled(state.selectedSnapshot == nil)
+
+            Divider()
+
+            Button("Copy Name") {
+                state.copySelectedRowName()
+            }
+            .disabled(state.selectedRowName == nil)
+
+            Divider()
+
+            Button("Open Test File in Xcode") {
+                state.openTestSource()
+            }
+            .disabled(state.isReviewingPullRequest || state.selectedSuite?.sourceCodeURL == nil)
+
+            Button("Open in Preview") {
+                state.openSelectedSnapshotInPreviewApp()
+            }
+            .disabled(state.isReviewingPullRequest || state.selectedSnapshot == nil)
+
             Button("Reveal in Finder") {
                 state.revealSelectionInFinder()
             }
             .keyboardShortcut(.return, modifiers: .command)
-            .disabled(state.isReviewingPullRequest)
+            .disabled(state.isReviewingPullRequest || state.selectedRow == nil)
+
+            Button("Open Snapshots Folder") {
+                state.openSnapshotsFolderForSelection()
+            }
+            .disabled(state.isReviewingPullRequest || state.selectedSuite == nil)
 
             Divider()
 
@@ -128,11 +204,20 @@ struct AppCommands: Commands {
 
             Divider()
 
-            Button("Move Snapshot to Trash") {
+            Button(state.selectedSnapshot == nil ? "Move Snapshots Folder to Trash" : "Move Snapshot to Trash") {
                 state.deleteSelection()
             }
             .keyboardShortcut(.delete, modifiers: .command)
         }
+    }
+
+    /// A binding onto one of the state's properties, which `Commands` cannot take with `$`.
+    private func binding<Value>(_ keyPath: ReferenceWritableKeyPath<AppState, Value>) -> Binding<Value> {
+        let state = state
+        return Binding(
+            get: { state[keyPath: keyPath] },
+            set: { state[keyPath: keyPath] = $0 }
+        )
     }
 
     /// Hands `openWindow` to the app delegate, which AppKit calls outside any view.

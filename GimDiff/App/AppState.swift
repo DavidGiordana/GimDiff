@@ -460,7 +460,7 @@ final class AppState {
     /// Does nothing under pull request review, where no suite has a source file on disk
     /// and the key would only ever produce an error.
     func openTestSource() {
-        guard !isReviewingPullRequest, let suite = selectedRow.flatMap(suite(for:)) else { return }
+        guard !isReviewingPullRequest, let suite = selectedSuite else { return }
         openTestSource(for: suite)
     }
 
@@ -736,6 +736,54 @@ final class AppState {
 
     func revealInFinder(_ url: URL) {
         workspace.revealInFinder(url)
+    }
+
+    // MARK: - Menu bar actions on the selection
+
+    /// The snapshot on the selected row, absent when the selection is a suite or nothing.
+    var selectedSnapshot: SnapshotItem? {
+        selectedRow?.snapshot
+    }
+
+    /// The suite the selection belongs to, whether the row is the suite or one of its snapshots.
+    var selectedSuite: SnapshotSuite? {
+        selectedRow.flatMap(suite(for:))
+    }
+
+    /// Whether the canvas already shows the selected snapshot, so Space would close it.
+    var isShowingSelectedSnapshot: Bool {
+        guard let snapshot = selectedSnapshot else { return false }
+        return preview?.snapshotID == snapshot.id
+    }
+
+    /// What Copy Name puts on the clipboard: the suite's name or the snapshot's, as the row reads.
+    var selectedRowName: String? {
+        switch selectedRow {
+        case let .suite(suite, _, _): suite.name
+        case let .snapshot(snapshot, _): snapshot.displayName
+        case nil: nil
+        }
+    }
+
+    func copySelectedRowName() {
+        guard let name = selectedRowName else { return }
+        copyToClipboard(name)
+    }
+
+    func showSelectedSnapshot(withGitDiff: Bool) {
+        guard let snapshot = selectedSnapshot else { return }
+        showSnapshot(snapshot, withGitDiff: withGitDiff)
+    }
+
+    /// Not under pull request review, for the reason ``revealSelectionInFinder()`` gives.
+    func openSelectedSnapshotInPreviewApp() {
+        guard !isReviewingPullRequest, let snapshot = selectedSnapshot else { return }
+        openInPreviewApp(snapshot.fileURL)
+    }
+
+    func openSnapshotsFolderForSelection() {
+        guard !isReviewingPullRequest, let suite = selectedSuite else { return }
+        openSnapshotsFolder(for: suite)
     }
 
     // MARK: - Deletion
