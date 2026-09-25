@@ -74,6 +74,11 @@ final class AppState {
     /// through the sheet, so a fetch that takes a while has one place to show progress and
     /// a failure has one place to be read.
     var isPullRequestSheetPresented = false
+    /// Whether the help sheet is up.
+    ///
+    /// The window holds one sheet at a time, so the Open PR sheet takes precedence: a pull
+    /// request arriving by URL or paste puts the help away rather than waiting behind it.
+    var isHelpPresented = false
     /// What the sheet's field holds: a link, `owner/repo#123`, or a number.
     var pullRequestInput = ""
     private(set) var isFetchingPullRequest = false
@@ -905,7 +910,18 @@ final class AppState {
                 pullRequestInput = reference.webURL.absoluteString
             }
         }
+        isHelpPresented = false
         isPullRequestSheetPresented = true
+    }
+
+    /// ⌘?: raises the help sheet, unless the Open PR sheet already covers the window.
+    func presentHelp() {
+        guard !isPullRequestSheetPresented else { return }
+        isHelpPresented = true
+    }
+
+    func dismissHelp() {
+        isHelpPresented = false
     }
 
     /// Puts the sheet away, abandoning a fetch still in flight.
@@ -922,6 +938,7 @@ final class AppState {
     func openPullRequest(_ input: String) {
         pullRequestInput = input
         pullRequestError = nil
+        isHelpPresented = false
         isPullRequestSheetPresented = true
 
         pullRequestTask?.cancel()

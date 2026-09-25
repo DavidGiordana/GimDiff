@@ -51,6 +51,8 @@
 				UI/Components/EmptyStateView.swift,
 				UI/Components/PopoverColorWell.swift,
 				UI/DetailView.swift,
+				UI/Help/HelpTopic.swift,
+				UI/Help/HelpView.swift,
 				UI/PRReview/ChangeKindBadge.swift,
 				UI/PRReview/OpenPRSheetView.swift,
 				UI/PRReview/PullRequestHeader.swift,

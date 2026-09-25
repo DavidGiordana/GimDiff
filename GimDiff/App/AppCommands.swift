@@ -209,6 +209,15 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut(.delete, modifiers: .command)
         }
+
+        // Replaced so the item opens GimDiff's own help sheet instead of the system's
+        // "Help isn't available" alert. AppKit still adds its menu search field above it.
+        CommandGroup(replacing: .help) {
+            Button("GimDiff Help") {
+                state.presentHelp()
+            }
+            .keyboardShortcut("?", modifiers: .command)
+        }
     }
 
     /// A binding onto one of the state's properties, which `Commands` cannot take with `$`.

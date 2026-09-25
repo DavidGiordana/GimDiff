@@ -41,6 +41,16 @@ struct RootView: View {
         .sheet(isPresented: pullRequestSheet) {
             OpenPRSheetView()
         }
+        .sheet(isPresented: helpSheet) {
+            HelpView()
+        }
+    }
+
+    private var helpSheet: Binding<Bool> {
+        Binding(
+            get: { state.isHelpPresented },
+            set: { if !$0 { state.dismissHelp() } }
+        )
     }
 
     /// The Open PR sheet's visibility, routed so a dismissal by the system also abandons
