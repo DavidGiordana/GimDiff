@@ -54,8 +54,11 @@ final class KeyboardNavigationUITests: XCTestCase {
         app.typeKey(.leftArrow, modifierFlags: [])
         app.typeKey(.leftArrow, modifierFlags: [])
 
-        XCTAssertFalse(app.staticTexts["header"].exists, "← must close the suite again.")
-        XCTAssertTrue(app.staticTexts["AlphaTests"].exists)
+        // Read off the tree alone: stepping into `header` put it on the canvas too, and the
+        // canvas keeps showing its name after the suite closes over it.
+        let tree = app.descendants(matching: .any)["SnapshotTree"]
+        XCTAssertFalse(tree.staticTexts["header"].exists, "← must close the suite again.")
+        XCTAssertTrue(tree.staticTexts["AlphaTests"].exists)
     }
 
     /// ⌘⌫ deletes the selected snapshot and leaves the tree with a selection to move from.
@@ -100,6 +103,23 @@ final class KeyboardNavigationUITests: XCTestCase {
         XCTAssertTrue(
             app.staticTexts["AlphaTests"].waitForExistence(timeout: 5),
             "⌘1 must bring it back."
+        )
+    }
+
+    /// ⌘F reopens a collapsed sidebar and lands in its search box, ready for a query.
+    func testFindReopensTheSidebarIntoTheSearchBox() {
+        let app = launch()
+        XCTAssertTrue(app.staticTexts["AlphaTests"].waitForExistence(timeout: 10))
+
+        app.typeKey("0", modifierFlags: .command)
+        XCTAssertTrue(waitForDisappearance(of: app.staticTexts["AlphaTests"]))
+
+        app.typeKey("f", modifierFlags: .command)
+        app.typeText("toolbar")
+
+        XCTAssertTrue(
+            app.staticTexts["toolbar"].waitForExistence(timeout: 5),
+            "⌘F must bring the sidebar back with the query typed into its search box."
         )
     }
 

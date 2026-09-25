@@ -125,8 +125,12 @@ struct AppStateFixture {
     }
 
     func select(_ description: String) {
-        guard let index = rowDescriptions.firstIndex(of: description) else { return }
-        state.selectedRowID = state.visibleRows[index].id
+        state.selectedRowID = rowID(description)
+    }
+
+    func rowID(_ description: String) -> String? {
+        guard let index = rowDescriptions.firstIndex(of: description) else { return nil }
+        return state.visibleRows[index].id
     }
 
     func suiteID(_ name: String) -> String {

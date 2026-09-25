@@ -334,6 +334,30 @@ final class AppState {
         selectedRowID = visibleRows.first?.id
     }
 
+    /// Moves the selection where the user put it, and shows the snapshot it lands on.
+    ///
+    /// This is the route for ↑, ↓, and clicks, so the canvas follows the tree without a
+    /// Space per row. Selection changes made on the user's behalf — a deletion picking the
+    /// neighbour, ← jumping up to a suite — assign ``selectedRowID`` directly instead, so a
+    /// pane that was just closed is not reopened under them. A suite row leaves the canvas
+    /// alone: there is no single image to show, and blanking the pane on the way past one
+    /// would make stepping between suites flicker.
+    func selectRow(withID id: String?) {
+        selectedRowID = id
+        previewSelectedSnapshot()
+    }
+
+    /// Shows the selected snapshot, unless the canvas is already standing on it.
+    ///
+    /// Re-showing the same snapshot would drop the committed-version comparison back to a
+    /// single image while git extracts it again.
+    private func previewSelectedSnapshot() {
+        guard case let .snapshot(snapshot, _) = selectedRow,
+              preview?.snapshotID != snapshot.id
+        else { return }
+        showSnapshot(snapshot, withGitDiff: true)
+    }
+
     // MARK: - Keyboard navigation
 
     /// Right arrow: opens a closed suite, or steps down into the first child of an open one.
@@ -352,7 +376,7 @@ final class AppState {
         }
 
         guard childCount > 0, rows.indices.contains(index + 1) else { return false }
-        selectedRowID = rows[index + 1].id
+        selectRow(withID: rows[index + 1].id)
         return true
     }
 
@@ -407,7 +431,12 @@ final class AppState {
         }
     }
 
+    /// ⌘F: puts the cursor in the sidebar's search box, opening the sidebar if it is closed.
+    ///
+    /// A search box the user cannot see is not somewhere a query can be typed, so the
+    /// sidebar comes back with the request rather than the key doing nothing.
     func focusFilter() {
+        isSidebarVisible = true
         filterFocusRequests += 1
     }
 

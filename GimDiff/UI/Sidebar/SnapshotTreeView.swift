@@ -22,7 +22,6 @@ struct SnapshotTreeView: View {
     @FocusState private var focus: SidebarFocus?
 
     var body: some View {
-        @Bindable var state = state
         let rows = state.visibleRows
 
         VStack(spacing: 0) {
@@ -48,7 +47,7 @@ struct SnapshotTreeView: View {
             } else if rows.isEmpty {
                 SidebarEmptyStateView.noMatches(clearFilters: state.clearFilters)
             } else {
-                List(rows, selection: $state.selectedRowID) { row in
+                List(rows, selection: userSelection) { row in
                     TreeRowView(item: row)
                         .padding(.leading, row.isSnapshot ? Self.childIndent : 0)
                         .contextMenu {
@@ -56,6 +55,7 @@ struct SnapshotTreeView: View {
                         }
                 }
                 .listStyle(.sidebar)
+                .accessibilityIdentifier("SnapshotTree")
                 .focused($focus, equals: .tree)
                 .onKeyPress(phases: .down, action: handle)
             }
@@ -68,11 +68,39 @@ struct SnapshotTreeView: View {
         // appears, or become key afterwards.
         .onAppear(perform: claimFocusIfIdle)
         .onChange(of: controlActiveState) { claimFocusIfIdle() }
-        .onChange(of: state.filterFocusRequests) { focus = .filter }
+        .onChange(of: state.filterFocusRequests) { claimFilterFocus() }
         .onChange(of: state.treeFocusRequests) { focus = .tree }
         // A freshly scanned project replaces every row, so focus is claimed again rather
         // than left on whatever the last project had.
         .onChange(of: state.currentProject?.rootURL) { focus = .tree }
+    }
+
+    /// The list's selection, routed through ``AppState/selectRow(withID:)`` so that
+    /// ↑, ↓, and clicks show the snapshot they land on.
+    ///
+    /// A binding rather than `onChange(of: selectedRowID)`: the observer would also fire
+    /// for the selection a deletion moves, and reopen the pane that deletion just closed.
+    private var userSelection: Binding<String?> {
+        Binding(
+            get: { state.selectedRowID },
+            set: { state.selectRow(withID: $0) }
+        )
+    }
+
+    /// Moves focus into the search box, retrying while the sidebar is still coming back.
+    ///
+    /// ⌘F on a collapsed sidebar reopens it in the same update, and a `@FocusState`
+    /// assignment to a field that is not on screen yet is dropped without a word. So the
+    /// assignment is repeated for a few frames until the focus system takes it, rather than
+    /// guessing how long the column's animation runs.
+    private func claimFilterFocus() {
+        Task { @MainActor in
+            for _ in 0..<20 {
+                focus = .filter
+                try? await Task.sleep(for: .milliseconds(25))
+                if focus == .filter { return }
+            }
+        }
     }
 
     /// Puts focus on the rows, unless the sidebar already has it somewhere.

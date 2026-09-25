@@ -135,6 +135,40 @@ struct KeyboardNavigationTests {
         #expect(fixture.state.preview == nil)
     }
 
+    @Test("Moving the selection onto a snapshot shows it")
+    func selectingASnapshotPreviewsIt() {
+        let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
+        fixture.expand("AlphaTests")
+        let rowID = fixture.rowID("AlphaTests/footer")
+
+        fixture.state.selectRow(withID: rowID)
+
+        #expect(fixture.selectedRowDescription == "AlphaTests/footer")
+        #expect(fixture.state.preview?.title == "footer")
+    }
+
+    @Test("Moving the selection onto a suite leaves the canvas alone")
+    func selectingASuiteKeepsThePreview() {
+        let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
+        fixture.expand("AlphaTests")
+        fixture.state.selectRow(withID: fixture.rowID("AlphaTests/footer"))
+
+        fixture.state.selectRow(withID: fixture.rowID("BetaTests"))
+
+        #expect(fixture.state.preview?.title == "footer")
+    }
+
+    @Test("Right arrow into a snapshot shows it")
+    func descendingPreviewsTheSnapshot() {
+        let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
+        fixture.expand("BetaTests")
+        fixture.select("BetaTests")
+
+        fixture.state.expandOrDescend()
+
+        #expect(fixture.state.preview?.title == "toolbar")
+    }
+
     @Test("Space on a suite row opens and closes the suite instead")
     func spaceTogglesASuite() {
         let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
@@ -177,6 +211,17 @@ struct KeyboardNavigationTests {
         fixture.state.selectFirstVisibleRow()
 
         #expect(fixture.selectedRowDescription == "BetaTests")
+    }
+
+    @Test("Find brings a collapsed sidebar back, so the search box is there to type in")
+    func findReopensTheSidebar() {
+        let fixture = AppStateFixture()
+        fixture.state.collapseSidebar()
+
+        fixture.state.focusFilter()
+
+        #expect(fixture.state.isSidebarVisible)
+        #expect(fixture.state.filterFocusRequests == 1)
     }
 
     @Test("The sidebar commands drive its visibility")
