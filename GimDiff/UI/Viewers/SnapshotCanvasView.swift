@@ -298,20 +298,11 @@ private struct RoleBadge: View {
 /// Shown when the canvas has nothing to draw.
 struct CanvasEmptyStateView: View {
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "photo.stack")
-                .font(.system(size: 48, weight: .light))
-
-            Text("No Snapshot Selected")
-                .font(.title3.weight(.semibold))
-
-            Text("Select a snapshot test from the sidebar or paste snapshot paths with ⌘V.")
-                .font(.callout)
-                .multilineTextAlignment(.center)
-        }
-        .opacity(0.6)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(40)
+        EmptyStateView(
+            systemImage: "photo.stack",
+            title: "No Snapshot Selected",
+            message: "Select a snapshot test from the sidebar or paste snapshot paths with ⌘V."
+        )
     }
 }
 

@@ -48,6 +48,7 @@
 				App/GimDiffApp.swift,
 				App/SnapshotPreview.swift,
 				"Extensions/Color+Hex.swift",
+				UI/Components/EmptyStateView.swift,
 				UI/Components/PopoverColorWell.swift,
 				UI/DetailView.swift,
 				UI/RootView.swift,

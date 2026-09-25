@@ -21,18 +21,17 @@ struct SidebarEmptyStateView: View {
     let action: () -> Void
 
     var body: some View {
-        ContentUnavailableView {
-            Label(title, systemImage: systemImage)
-        } description: {
-            Text(message)
-        } actions: {
-            Button(actionTitle, action: action)
-        }
-        // Claims the rest of the column, which the `List` it stands in for does by itself.
-        // Without it the sidebar's stack shrinks to fit and is centred vertically, taking
-        // the search field with it — so emptying the tree with a filter appears to move the
-        // search field into the middle of the sidebar.
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // `EmptyStateView` claims the rest of the column, which the `List` it stands in for
+        // does by itself. Without that the sidebar's stack shrinks to fit and is centred
+        // vertically, taking the search field with it — so emptying the tree with a filter
+        // appears to move the search field into the middle of the sidebar.
+        EmptyStateView(
+            systemImage: systemImage,
+            title: title,
+            message: message,
+            actionTitle: actionTitle,
+            action: action
+        )
     }
 }
 

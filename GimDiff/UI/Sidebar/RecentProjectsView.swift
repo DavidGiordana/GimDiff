@@ -14,15 +14,13 @@ struct RecentProjectsView: View {
 
     var body: some View {
         if state.recentProjects.isEmpty {
-            ContentUnavailableView {
-                Label("No Recent Projects", systemImage: "folder.badge.plus")
-            } description: {
-                Text("Open a project folder or drag a folder here")
-            } actions: {
-                Button("Open Project…") {
-                    state.promptForProject()
-                }
-            }
+            EmptyStateView(
+                systemImage: "folder.badge.plus",
+                title: "No Recent Projects",
+                message: "Open a project folder or drag a folder here",
+                actionTitle: "Open Project…",
+                action: state.promptForProject
+            )
         } else {
             VStack(spacing: 0) {
                 List {
