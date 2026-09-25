@@ -73,6 +73,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    /// The standard About panel, with the release stage beside the version and the author
+    /// credited.
+    ///
+    /// The stage lives in its own Info.plist key rather than in `CFBundleShortVersionString`,
+    /// which must stay three plain integers for LaunchServices to compare versions.
+    func showAboutPanel() {
+        let info = Bundle.main.infoDictionary ?? [:]
+        let version = info["CFBundleShortVersionString"] as? String ?? ""
+        let stage = info["GimDiffReleaseStage"] as? String ?? ""
+        let credits = NSAttributedString(
+            string: "Created by David Giordana",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+                .foregroundColor: NSColor.secondaryLabelColor
+            ]
+        )
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationVersion: stage.isEmpty ? version : "\(version) \(stage)",
+            .credits: credits
+        ])
+    }
+
     /// Brings the one window forward, creating it if the launch did not.
     ///
     /// A cold launch that opens a folder delivers the paths before any window exists, and

@@ -18,6 +18,12 @@ struct AppCommands: Commands {
     var body: some Commands {
         let _ = registerWindowOpener()
 
+        CommandGroup(replacing: .appInfo) {
+            Button("About GimDiff") {
+                delegate.showAboutPanel()
+            }
+        }
+
         // GimDiff shows one window, so there is nothing for File ▸ New to make.
         CommandGroup(replacing: .newItem) {}
 

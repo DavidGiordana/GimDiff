@@ -15,5 +15,7 @@
 			</array>
 		</dict>
 	</array>
+	<key>GimDiffReleaseStage</key>
+	<string>Beta 1</string>
 </dict>
 </plist>
