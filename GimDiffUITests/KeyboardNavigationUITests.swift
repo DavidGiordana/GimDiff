@@ -18,12 +18,14 @@ import XCTest
 final class KeyboardNavigationUITests: XCTestCase {
     private var project: URL!
 
-    override func setUpWithError() throws {
+    // The async overrides rather than `setUpWithError()`: XCTest runs these on the main
+    // actor, so they can reach `project` without stepping outside the class's isolation.
+    override func setUp() async throws {
         continueAfterFailure = false
         project = try Self.makeProject()
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         try? FileManager.default.removeItem(at: project)
     }
 
