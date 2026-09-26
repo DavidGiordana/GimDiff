@@ -20,6 +20,17 @@ struct CanvasToolbarContent: ToolbarContent {
     @Binding var imageMatte: Color?
 
     var body: some ToolbarContent {
+        // The sidebar's toolbar carries the ways in, and it goes with the sidebar when ⌘0
+        // collapses it. Repeating them here only while it is hidden keeps a snapshot one
+        // click away without showing every button twice.
+        if !state.isSidebarVisible {
+            ToolbarItemGroup(placement: .navigation) {
+                OpenProjectButton(state: state)
+                OpenPullRequestButton(state: state)
+                PasteFromClipboardButton(state: state)
+            }
+        }
+
         ToolbarItemGroup(placement: .principal) {
             BackdropColorButton(
                 title: "Panel Background",

@@ -22,31 +22,17 @@ struct SidebarView: View {
         }
         .navigationTitle("Snapshots")
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    state.presentPullRequestSheet()
-                } label: {
-                    Label("Open PR", systemImage: "arrow.triangle.pull")
+            // A collapsed sidebar's toolbar items stay in the window's toolbar, where the
+            // canvas toolbar now offers the same buttons. Dropping them here while the
+            // sidebar is hidden is what keeps each one on screen once.
+            if state.isSidebarVisible {
+                ToolbarItem(placement: .primaryAction) {
+                    OpenPullRequestButton(state: state)
                 }
-                // Titled as well as iconed: no SF Symbol says "pull request" on its own.
-                .labelStyle(.titleAndIcon)
-                .help("Review GitHub PR - ⌘⇧O")
-            }
 
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    // Straight to the clipboard, not through `pasteCommand()`: clicking a
-                    // toolbar button leaves the filter field first responder, and forwarding
-                    // would drop the log into the search box instead of opening it.
-                    state.pasteFromClipboard()
-                } label: {
-                    Label("Paste", systemImage: "doc.on.clipboard")
+                ToolbarItem(placement: .primaryAction) {
+                    PasteFromClipboardButton(state: state)
                 }
-                // Titled like Open PR, and styled the same so neither outranks the other:
-                // the clipboard glyph alone does not say that a failure log, files, or a
-                // pull request link will be opened.
-                .labelStyle(.titleAndIcon)
-                .help("Open the snapshots named on the clipboard: a failure log, copied files, or a pull request link (⌘V)")
             }
 
             ToolbarItem(placement: .primaryAction) {
