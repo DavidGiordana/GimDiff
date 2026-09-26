@@ -217,6 +217,10 @@ struct SnapshotImageViewer<Accessory: View>: View {
                 zoomControls
             }
 
+            if case let .loaded(decoded) = image {
+                imageSizeLabel(decoded)
+            }
+
             Spacer(minLength: 0)
 
             accessory()
@@ -224,6 +228,23 @@ struct SnapshotImageViewer<Accessory: View>: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(.bar)
+    }
+
+    /// The stored size in pixels, with the density it was recorded at when that is not 1x,
+    /// so two panes that differ only in dimensions say so without a diff.
+    private func imageSizeLabel(_ decoded: DecodedSnapshotImage) -> some View {
+        let size = decoded.pixelSize
+        var text = "\(Int(size.width)) × \(Int(size.height)) px"
+        if decoded.recordedScale != 1 {
+            text += " @\(decoded.recordedScale.formatted())x"
+        }
+
+        return Text(text)
+            .font(.callout.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .fixedSize()
+            .help("Image size in pixels")
     }
 
     /// The zoom row, shown only in free mode: it is the only mode the numbers can move in.
