@@ -24,7 +24,7 @@ enum DiffMode: String, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .sideBySide: "Side by Side"
-        case .curtain: "Curtain"
+        case .curtain: "Split View"
         case .onionSkin: "Onion Skin"
         case .difference: "Difference"
         }

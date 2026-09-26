@@ -82,11 +82,12 @@ struct SnapshotCanvasView: View {
         if let candidate = preview?.candidate, let baseline = preview?.baseline {
             switch state.diffMode {
             case .sideBySide:
-                HStack(spacing: 1) {
+                // A gap rather than a hairline: a thin full-height seam between two panes is
+                // how macOS draws a split view's divider, and it was read as one to drag.
+                HStack(spacing: 8) {
                     pane(candidate)
                     pane(baseline)
                 }
-                .background(.quaternary)
 
             case .curtain:
                 combined(candidate: candidate, baseline: baseline) {
@@ -111,19 +112,12 @@ struct SnapshotCanvasView: View {
 
             case .onionSkin:
                 combined(candidate: candidate, baseline: baseline) {
-                    ZStack {
-                        SnapshotImageViewer(
-                            fileURL: baseline.fileURL,
-                            reloadToken: state.imageReloadToken,
-                            matte: imageMatte
-                        )
-                        SnapshotImageViewer(
-                            fileURL: candidate.fileURL,
-                            reloadToken: state.imageReloadToken,
-                            matte: nil
-                        )
-                        .opacity(0.5)
-                    }
+                    OnionSkinView(
+                        baseline: baseline,
+                        candidate: candidate,
+                        reloadToken: state.imageReloadToken,
+                        matte: imageMatte
+                    )
                 }
             }
         }

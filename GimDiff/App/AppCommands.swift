@@ -103,11 +103,12 @@ struct AppCommands: Commands {
 
             Divider()
 
-            // The toolbar's Compare and Diff Mask toggles, spelled out as the one choice they
-            // are: both write ``AppState/diffMode``, so a picker over it is the same control.
+            // The toolbar's comparison picker again: both write ``AppState/diffMode``, so a
+            // picker over it here is the same control.
             Picker("Comparison", selection: binding(\.diffMode)) {
                 Text("Side by Side").tag(DiffMode.sideBySide)
-                Text("Compare").tag(DiffMode.curtain)
+                Text("Split View").tag(DiffMode.curtain)
+                Text("Onion Skin").tag(DiffMode.onionSkin)
                 Text("Diff Mask").tag(DiffMode.difference)
             }
             .pickerStyle(.inline)

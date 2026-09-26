@@ -66,6 +66,7 @@
 				UI/Sidebar/TreeRowItem.swift,
 				UI/Toolbar/CanvasToolbarContent.swift,
 				UI/Viewers/DiffMaskView.swift,
+				UI/Viewers/OnionSkinView.swift,
 				UI/Viewers/ScrollWheelReader.swift,
 				UI/Viewers/SnapshotCanvasView.swift,
 				UI/Viewers/SnapshotImageLoader.swift,

@@ -10,10 +10,10 @@ import SwiftUI
 
 /// The canvas toolbar: how the images are drawn, and how they are put back.
 ///
-/// The two comparison toggles write to ``AppState/diffMode`` rather than carrying flags of
-/// their own. They are mutually exclusive by construction that way — a curtain over a
-/// difference mask would show neither — and the mode the canvas switches on stays the one
-/// thing that decides what is on screen.
+/// The comparison picker is a binding over ``AppState/diffMode`` rather than a set of flags.
+/// The modes are mutually exclusive by construction that way — a split over a difference
+/// mask would show neither — and the mode the canvas switches on stays the one thing that
+/// decides what is on screen.
 struct CanvasToolbarContent: ToolbarContent {
     let state: AppState
     @Binding var panelBackground: Color?
@@ -35,21 +35,18 @@ struct CanvasToolbarContent: ToolbarContent {
                 color: $imageMatte
             )
 
-            // Both toggles need two images to act on, so they are absent rather than
-            // disabled while one snapshot is on screen: a control that can never apply is
-            // noise in a toolbar this narrow.
+            // The picker needs two images to act on, so it is absent rather than disabled
+            // while one snapshot is on screen: a control that can never apply is noise in a
+            // toolbar this narrow.
             if hasBothImages {
-                Toggle(isOn: isCurtain) {
-                    Label("Compare", systemImage: DiffMode.curtain.symbolName)
+                Picker("Comparison", selection: comparison) {
+                    Text("Side by Side").tag(DiffMode.sideBySide)
+                    Text("Split View").tag(DiffMode.curtain)
+                    Text("Onion Skin").tag(DiffMode.onionSkin)
+                    Text("Diff Mask").tag(DiffMode.difference)
                 }
-                .toggleStyle(.button)
-                .help("Draw both images in one frame under a draggable split")
-
-                Toggle(isOn: isDiffMask) {
-                    Label("Diff Mask", systemImage: DiffMode.difference.symbolName)
-                }
-                .toggleStyle(.button)
-                .help("Paint every changed pixel in neon magenta")
+                .pickerStyle(.segmented)
+                .help("How the two images are compared: next to each other, under a draggable split, faded one over the other, or with every changed pixel painted magenta")
             }
         }
 
@@ -76,19 +73,10 @@ struct CanvasToolbarContent: ToolbarContent {
         state.preview?.isComparison == true
     }
 
-    private var isCurtain: Binding<Bool> {
-        mode(.curtain)
-    }
-
-    private var isDiffMask: Binding<Bool> {
-        mode(.difference)
-    }
-
-    /// A toggle over one value of ``DiffMode``, falling back to side by side when switched off.
-    private func mode(_ wanted: DiffMode) -> Binding<Bool> {
+    private var comparison: Binding<DiffMode> {
         Binding(
-            get: { state.diffMode == wanted },
-            set: { state.diffMode = $0 ? wanted : .sideBySide }
+            get: { state.diffMode },
+            set: { state.diffMode = $0 }
         )
     }
 }

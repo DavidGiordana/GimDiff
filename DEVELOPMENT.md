@@ -182,9 +182,9 @@ is still pointing at.
 
 Two more rules that are easy to undo by accident:
 
-- **`diffMode` is the only thing that decides what is drawn.** The toolbar's Compare and Diff
-  Mask toggles are bindings over `.curtain` and `.difference`, not flags of their own, which
-  is what makes them mutually exclusive without any code saying so.
+- **`diffMode` is the only thing that decides what is drawn.** The toolbar's segmented
+  picker and the View menu's Comparison picker are both bindings over it, not flags of their
+  own, which is what makes the modes mutually exclusive without any code saying so.
 - **Images are read by `SnapshotImageLoader`, never by `AsyncImage`.** `AsyncImage` caches on
   the URL, and GimDiff's whole job is a file whose name stays put while its contents change.
   `AppState.imageReloadToken` is the counter that says the bytes moved; every view that

@@ -178,10 +178,12 @@ private extension HelpTopic {
         ]),
         HelpSection(title: "Comparison modes", blocks: [
             .text("""
-                **Side by Side** shows the two images next to each other. **Compare** draws \
-                both in one frame under a split you drag across it. **Diff Mask** paints every \
-                changed pixel in magenta and reports how much of the image changed. Switch \
-                between them from the toolbar or the **View** menu.
+                **Side by Side** shows the two images next to each other. **Split View** draws \
+                both in one frame under a split you drag across it. **Onion Skin** lays the \
+                candidate over the baseline; drag its slider to fade from one to the other, \
+                and whatever moves is what changed. **Diff Mask** paints every changed \
+                pixel in magenta and reports how much of the image changed. Switch between them \
+                from the toolbar or the **View** menu.
                 """),
         ]),
         HelpSection(title: "Zoom and backgrounds", blocks: [
