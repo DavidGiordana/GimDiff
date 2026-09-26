@@ -26,21 +26,27 @@ struct SidebarView: View {
                 Button {
                     state.presentPullRequestSheet()
                 } label: {
-                    // The pull glyph is a single thin stroke, which at toolbar size reads as
-                    // a stray mark beside the filled icons around it. Weight, scale, and the
-                    // accent colour give it the presence the other buttons get from their shape.
-                    Label {
-                        Text("Open PR")
-                    } icon: {
-                        Image(systemName: "arrow.triangle.pull")
-                            .fontWeight(.bold)
-                            .imageScale(.large)
-                            .foregroundStyle(.tint)
-                    }
+                    Label("Open PR", systemImage: "arrow.triangle.pull")
                 }
                 // Titled as well as iconed: no SF Symbol says "pull request" on its own.
                 .labelStyle(.titleAndIcon)
                 .help("Review GitHub PR - ⌘⇧O")
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    // Straight to the clipboard, not through `pasteCommand()`: clicking a
+                    // toolbar button leaves the filter field first responder, and forwarding
+                    // would drop the log into the search box instead of opening it.
+                    state.pasteFromClipboard()
+                } label: {
+                    Label("Paste", systemImage: "doc.on.clipboard")
+                }
+                // Titled like Open PR, and styled the same so neither outranks the other:
+                // the clipboard glyph alone does not say that a failure log, files, or a
+                // pull request link will be opened.
+                .labelStyle(.titleAndIcon)
+                .help("Open the snapshots named on the clipboard: a failure log, copied files, or a pull request link (⌘V)")
             }
 
             ToolbarItem(placement: .primaryAction) {

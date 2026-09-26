@@ -97,9 +97,10 @@ private extension HelpTopic {
                 is read as the baseline and the second as the candidate.
                 """),
             .text("""
-                **Paste** (⌘V) works the same way. Copy a failure log from Xcode or Swift \
-                Testing and GimDiff reads the image paths out of it; copy files in the Finder \
-                and GimDiff opens them. A GitHub pull request link opens that pull request.
+                **Paste** (⌘V, or the **Paste** button in the toolbar) works the same way. \
+                Copy a failure log from Xcode or Swift Testing and GimDiff reads the image \
+                paths out of it; copy files in the Finder and GimDiff opens them. A GitHub \
+                pull request link opens that pull request.
                 """),
         ]),
         HelpSection(title: "Find a snapshot", blocks: [

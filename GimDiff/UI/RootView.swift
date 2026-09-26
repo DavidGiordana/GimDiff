@@ -13,7 +13,10 @@ import UniformTypeIdentifiers
 struct RootView: View {
     @Environment(AppState.self) private var state
 
+    @Environment(\.controlActiveState) private var controlActiveState
+
     @State private var isDropTargeted = false
+    @State private var hasRevealedSidebar = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: columnVisibility) {
@@ -38,6 +41,8 @@ struct RootView: View {
                 ErrorBanner(message: message, dismiss: state.dismissError)
             }
         }
+        .onAppear(perform: revealSidebarOnLaunch)
+        .onChange(of: controlActiveState) { revealSidebarOnLaunch() }
         .sheet(isPresented: pullRequestSheet) {
             OpenPRSheetView()
         }
@@ -75,6 +80,20 @@ struct RootView: View {
             get: { state.isSidebarVisible ? .all : .detailOnly },
             set: { state.isSidebarVisible = $0 != .detailOnly }
         )
+    }
+
+    /// Opens the sidebar once the window is up, whatever the split view decided on its own.
+    ///
+    /// `NavigationSplitView` settles its first layout after the binding has been read, and a
+    /// window restored narrower than it likes comes up with the sidebar collapsed — a
+    /// decision it writes back through ``columnVisibility``. Asserting the sidebar once, a
+    /// turn after the window becomes key, undoes that without taking ⌘0 away later on.
+    private func revealSidebarOnLaunch() {
+        guard !hasRevealedSidebar, controlActiveState != .inactive else { return }
+        hasRevealedSidebar = true
+        Task { @MainActor in
+            state.expandSidebar()
+        }
     }
 
     /// Reads the dropped paths and hands them to the state as one batch.

@@ -306,11 +306,15 @@ private struct RoleBadge: View {
 
 /// Shown when the canvas has nothing to draw.
 struct CanvasEmptyStateView: View {
+    @Environment(AppState.self) private var state
+
     var body: some View {
         EmptyStateView(
             systemImage: "photo.stack",
             title: "No Snapshot Selected",
-            message: "Select a snapshot test from the sidebar or paste snapshot paths with ⌘V."
+            message: "Select a snapshot test from the sidebar, or copy a failure log and paste it here (⌘V).",
+            actionTitle: "Paste from Clipboard",
+            action: state.pasteFromClipboard
         )
     }
 }
