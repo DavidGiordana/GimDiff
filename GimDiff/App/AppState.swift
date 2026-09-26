@@ -1011,7 +1011,9 @@ final class AppState {
         load(ProjectBundle(rootURL: session.tempDirectoryURL, suites: session.suites))
         // A pull request is read to see what it changed, so every change starts on show.
         expandedSuiteIDs = Set(session.suites.map(\.id))
-        selectedRowID = visibleRows.first?.id
+        // Land on the first change itself, not the suite above it, so the canvas has
+        // something to show the moment the sheet goes away.
+        selectRow(withID: visibleRows.first(where: \.isSnapshot)?.id ?? visibleRows.first?.id)
 
         isFetchingPullRequest = false
         isPullRequestSheetPresented = false

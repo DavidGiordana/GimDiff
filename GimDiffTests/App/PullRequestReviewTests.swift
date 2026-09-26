@@ -36,6 +36,18 @@ struct PullRequestReviewTests {
         #expect(fixture.service.requested == [Self.reference])
     }
 
+    @Test("A fetched pull request selects and shows its first snapshot")
+    func selectsFirstSnapshot() async throws {
+        let fixture = Fixture()
+
+        await fixture.open("https://github.com/octo/app/pull/7")
+
+        let snapshotRows = fixture.state.visibleRows.filter(\.isSnapshot)
+        let firstSnapshot = try #require(snapshotRows.first)
+        #expect(fixture.state.selectedRowID == firstSnapshot.id)
+        #expect(fixture.state.preview?.snapshotID == firstSnapshot.snapshot?.id)
+    }
+
     @Test("A failed fetch keeps the sheet up with the reason, and the project untouched")
     func failedFetchStaysInSheet() async throws {
         let fixture = Fixture(result: .failure(GitHubCLIAuthError.notAuthenticated))
