@@ -106,8 +106,10 @@ private extension HelpTopic {
         HelpSection(title: "Find a snapshot", blocks: [
             .text("""
                 Type in the sidebar's filter field (⌘F) to narrow the tree by name. The \
-                **Modified** chip keeps only snapshots that differ from their committed \
-                version, and **Warnings** keeps only suites whose test source could not be found.
+                **Modified** chip under it keeps only snapshots that differ from their \
+                committed version, and **Warnings** keeps only suites whose test source could \
+                not be found. Each chip appears only when the project has something it would \
+                keep.
                 """),
         ]),
         HelpSection(title: "After re-running your tests", blocks: [

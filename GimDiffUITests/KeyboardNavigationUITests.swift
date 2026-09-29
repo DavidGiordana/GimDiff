@@ -171,7 +171,7 @@ final class KeyboardNavigationUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["menu"].waitForExistence(timeout: 5))
     }
 
-    /// Both filter chips at once empty the tree, and the empty state must not drag the
+    /// A query that matches nothing empties the tree, and the empty state must not drag the
     /// search field into the middle of the sidebar with it.
     func testFilteringToNothingKeepsTheSearchFieldAtTheTop() {
         let app = launch()
@@ -179,8 +179,8 @@ final class KeyboardNavigationUITests: XCTestCase {
         XCTAssertTrue(search.waitForExistence(timeout: 10))
         let restingTop = search.frame.minY
 
-        filterChip("Modified", in: app).click()
-        filterChip("Warnings", in: app).click()
+        app.typeKey("f", modifierFlags: .command)
+        app.typeText("NothingIsCalledThis")
 
         XCTAssertTrue(app.staticTexts["No Matching Snapshots"].waitForExistence(timeout: 5))
         XCTAssertEqual(
@@ -192,6 +192,17 @@ final class KeyboardNavigationUITests: XCTestCase {
 
         app.buttons["Clear Filters"].click()
         XCTAssertTrue(app.staticTexts["AlphaTests"].waitForExistence(timeout: 5))
+    }
+
+    /// Only the chips that could keep something are shown: the fixture is not a Git
+    /// repository, but one of its suites has no test source.
+    func testOnlyApplicableFilterChipsAreShown() {
+        let app = launch()
+        XCTAssertTrue(app.staticTexts["AlphaTests"].waitForExistence(timeout: 10))
+
+        XCTAssertTrue(app.staticTexts["Filters"].exists)
+        XCTAssertTrue(filterChip("Warnings", in: app).exists)
+        XCTAssertFalse(filterChip("Modified", in: app).exists)
     }
 
     /// The sidebar header closes the project and hands the column back to the recent list.

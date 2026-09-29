@@ -68,22 +68,33 @@ struct SnapshotFilterBar: View {
             .padding(.vertical, 5)
             .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 6))
 
-            HStack(spacing: 6) {
-                Toggle(isOn: $state.showGitModifiedOnly) {
-                    Label("Modified", systemImage: "arrow.triangle.branch")
-                }
-                .help("Show only snapshots that differ from the committed version")
+            // Each chip appears only when the project has something it would keep, and the
+            // row goes with them: a filter that can only empty the tree is noise.
+            if state.canFilterByGitChanges || state.canFilterByWarnings {
+                HStack(spacing: 6) {
+                    Text("Filters")
+                        .foregroundStyle(.secondary)
 
-                Toggle(isOn: $state.showWarningsOnly) {
-                    Label("Warnings", systemImage: "exclamationmark.triangle")
-                }
-                .help("Show only suites whose test source could not be found")
+                    if state.canFilterByGitChanges {
+                        Toggle(isOn: $state.showGitModifiedOnly) {
+                            Label("Modified", systemImage: "arrow.triangle.branch")
+                        }
+                        .help("Show only snapshots that differ from the committed version")
+                    }
 
-                Spacer()
+                    if state.canFilterByWarnings {
+                        Toggle(isOn: $state.showWarningsOnly) {
+                            Label("Warnings", systemImage: "exclamationmark.triangle")
+                        }
+                        .help("Show only suites whose test source could not be found")
+                    }
+
+                    Spacer()
+                }
+                .toggleStyle(.button)
+                .controlSize(.small)
+                .font(.caption)
             }
-            .toggleStyle(.button)
-            .controlSize(.small)
-            .font(.caption)
         }
     }
 

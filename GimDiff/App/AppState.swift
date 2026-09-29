@@ -326,7 +326,24 @@ final class AppState {
         !trimmedFilterText.isEmpty || showGitModifiedOnly || showWarningsOnly
     }
 
-    /// Resets the search field and both filter chips.
+    /// Whether the Modified filter has anything to narrow the tree to.
+    ///
+    /// Stays true while the filter is on, so a rescan that clears the last change cannot
+    /// strand an empty tree behind a control that is no longer shown. Under review every
+    /// snapshot is a change, so the filter would keep all of them.
+    var canFilterByGitChanges: Bool {
+        showGitModifiedOnly
+            || (!isReviewingPullRequest && currentProject?.suites.contains(where: \.hasGitDiff) == true)
+    }
+
+    /// Whether the Warnings filter has anything to narrow the tree to; see
+    /// ``canFilterByGitChanges`` for why an active filter always counts.
+    var canFilterByWarnings: Bool {
+        showWarningsOnly
+            || (!isReviewingPullRequest && currentProject?.suites.contains(where: \.isMissingSourceCode) == true)
+    }
+
+    /// Resets the search field and both filters.
     func clearFilters() {
         filterText = ""
         showGitModifiedOnly = false
@@ -355,7 +372,7 @@ final class AppState {
             let suiteMatches = query.isEmpty || suite.name.lowercased().contains(query)
 
             if suiteMatches {
-                // The chip, unlike the query, is a statement about snapshots: a suite with
+                // The filter, unlike the query, is a statement about snapshots: a suite with
                 // nothing modified under it has nothing to say while it is on.
                 guard !showGitModifiedOnly || !children.isEmpty else { continue }
             } else {

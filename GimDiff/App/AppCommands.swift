@@ -99,7 +99,9 @@ struct AppCommands: Commands {
             Divider()
 
             Toggle("Show Only Modified Snapshots", isOn: binding(\.showGitModifiedOnly))
+                .disabled(!state.canFilterByGitChanges)
             Toggle("Show Only Suites with Warnings", isOn: binding(\.showWarningsOnly))
+                .disabled(!state.canFilterByWarnings)
 
             Divider()
 

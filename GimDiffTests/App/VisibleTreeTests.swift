@@ -119,7 +119,7 @@ struct VisibleTreeTests {
         #expect(fixture.rowDescriptions == ["AlphaTests", "AlphaTests/header"])
     }
 
-    @Test("The modified chip drops unchanged snapshots and the suites left empty")
+    @Test("The modified filter drops unchanged snapshots and the suites left empty")
     func showsOnlyModifiedSnapshots() {
         let bundle = ProjectBundle(
             rootURL: AppStateFixture.root,
@@ -139,7 +139,7 @@ struct VisibleTreeTests {
         #expect(fixture.rowDescriptions == ["AlphaTests", "AlphaTests/header", "BetaTests"])
     }
 
-    @Test("The warnings chip keeps only suites whose test source is missing")
+    @Test("The warnings filter keeps only suites whose test source is missing")
     func showsOnlySuitesWithWarnings() {
         let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
 
@@ -148,8 +148,8 @@ struct VisibleTreeTests {
         #expect(fixture.rowDescriptions == ["BetaTests"])
     }
 
-    @Test("Chips and the query narrow together")
-    func combinesTheQueryWithTheChips() {
+    @Test("Status filters and the query narrow together")
+    func combinesTheQueryWithTheStatusFilters() {
         let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
 
         fixture.state.showGitModifiedOnly = true
@@ -157,6 +157,53 @@ struct VisibleTreeTests {
 
         #expect(fixture.rowDescriptions.isEmpty)
         #expect(fixture.state.isFiltering)
+    }
+
+    @Test("Both status filters are offered when the project has something for each to keep")
+    func offersApplicableFilters() {
+        let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
+
+        #expect(fixture.state.canFilterByGitChanges)
+        #expect(fixture.state.canFilterByWarnings)
+    }
+
+    @Test("A clean project with every source found offers neither status filter")
+    func hidesFiltersWithNothingToKeep() {
+        let bundle = ProjectBundle(
+            rootURL: AppStateFixture.root,
+            suites: [
+                AppStateFixture.suite(
+                    named: "AlphaTests",
+                    hasSourceCode: true,
+                    snapshots: [("header", .unmodified)]
+                ),
+            ]
+        )
+        let fixture = AppStateFixture(bundle: bundle)
+
+        #expect(fixture.state.canFilterByGitChanges == false)
+        #expect(fixture.state.canFilterByWarnings == false)
+    }
+
+    @Test("A status filter that is on stays offered, so it can be turned off")
+    func keepsAnActiveFilterOffered() {
+        let bundle = ProjectBundle(
+            rootURL: AppStateFixture.root,
+            suites: [
+                AppStateFixture.suite(
+                    named: "AlphaTests",
+                    hasSourceCode: true,
+                    snapshots: [("header", .unmodified)]
+                ),
+            ]
+        )
+        let fixture = AppStateFixture(bundle: bundle)
+
+        fixture.state.showGitModifiedOnly = true
+        fixture.state.showWarningsOnly = true
+
+        #expect(fixture.state.canFilterByGitChanges)
+        #expect(fixture.state.canFilterByWarnings)
     }
 
     @Test("Clearing the filters restores every row")
