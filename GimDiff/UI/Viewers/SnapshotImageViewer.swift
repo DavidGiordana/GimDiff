@@ -10,20 +10,20 @@ import SwiftUI
 
 /// How one image is fitted into the room the canvas has for it.
 enum CanvasDisplayMode: String, CaseIterable, Identifiable, Sendable {
+    /// Whatever the pinch and the drag have made of it.
+    case free
     /// Scaled down until the whole image is on screen.
     case fit
     /// Drawn at the point size it was recorded at, scrollable in both directions.
     case actualSize
-    /// Whatever the pinch and the drag have made of it.
-    case free
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .free: "Free"
         case .fit: "Fit"
         case .actualSize: "Actual Size (1:1)"
-        case .free: "Free"
         }
     }
 }
@@ -48,7 +48,7 @@ struct SnapshotImageViewer<Accessory: View>: View {
     @ViewBuilder let accessory: () -> Accessory
 
     @State private var image: CanvasImage?
-    @State private var displayMode: CanvasDisplayMode = .fit
+    @State private var displayMode: CanvasDisplayMode = .free
     @State private var scale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
     /// Where the transform stood when the current gesture began.
