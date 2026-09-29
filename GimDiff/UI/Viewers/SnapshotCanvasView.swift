@@ -65,7 +65,11 @@ struct SnapshotCanvasView: View {
     private var content: some View {
         switch preview {
         case nil:
-            CanvasEmptyStateView()
+            if let loadingURL = state.loadingProjectURL {
+                CanvasLoadingStateView(projectURL: loadingURL, cancel: state.cancelProjectLoading)
+            } else {
+                CanvasEmptyStateView()
+            }
 
         case .single, .pullRequestSide:
             if let only = preview?.panes.first {
@@ -316,6 +320,41 @@ struct CanvasEmptyStateView: View {
             actionTitle: "Paste from Clipboard",
             action: state.pasteFromClipboard
         )
+    }
+}
+
+/// Shown on an empty canvas while a project is being scanned.
+///
+/// Laid out like ``EmptyStateView``, with a spinner where the icon would be, so the canvas
+/// does not jump when the scan lands and the empty state takes its place.
+struct CanvasLoadingStateView: View {
+    let projectURL: URL
+    let cancel: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.large)
+                .frame(height: 48)
+
+            Text("Opening “\(projectURL.lastPathComponent)”")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help(projectURL.path)
+
+            Text("Looking for snapshot tests…")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            Button("Cancel", action: cancel)
+                .padding(.top, 4)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ProjectLoadingState")
     }
 }
 

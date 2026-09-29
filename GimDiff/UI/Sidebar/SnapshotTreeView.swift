@@ -29,8 +29,8 @@ struct SnapshotTreeView: View {
                 PullRequestHeader(session: session, close: state.closePullRequestReview)
                     .padding(.horizontal, 10)
                     .padding(.top, 8)
-            } else if let project = state.currentProject {
-                ProjectHeader(rootURL: project.rootURL, close: state.closeProject)
+            } else if let rootURL = state.currentProject?.rootURL ?? state.loadingProjectURL {
+                ProjectHeader(rootURL: rootURL, close: state.closeProject)
                     .padding(.horizontal, 10)
                     .padding(.top, 8)
             }
@@ -82,8 +82,12 @@ struct SnapshotTreeView: View {
         .onChange(of: state.filterFocusRequests) { claimFilterFocus() }
         .onChange(of: state.treeFocusRequests) { focus = .tree }
         // A freshly scanned project replaces every row, so focus is claimed again rather
-        // than left on whatever the last project had.
-        .onChange(of: state.currentProject?.rootURL) { focus = .tree }
+        // than left on whatever the last project had. Deferred like the claim above: the
+        // first scan lands in the same update that swaps the spinner for the `List`, and an
+        // assignment made there reaches a view the focus system has not seen yet.
+        .onChange(of: state.currentProject?.rootURL) {
+            Task { @MainActor in focus = .tree }
+        }
     }
 
     /// The list's selection, routed through ``AppState/selectRow(withID:)`` so that

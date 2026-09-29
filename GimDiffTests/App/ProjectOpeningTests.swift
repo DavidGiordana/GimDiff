@@ -76,6 +76,59 @@ struct ProjectOpeningTests {
         #expect(state.isLoading == false)
     }
 
+    @Test("The folder being scanned is named before its project exists")
+    func namesTheFolderInFlight() async throws {
+        let fixture = try ProjectFixture.modularProject()
+        let defaults = TemporaryDefaults()
+        let state = state(defaults: defaults)
+
+        state.openProject(at: fixture.url)
+
+        #expect(state.isLoading)
+        #expect(state.currentProject == nil)
+        #expect(state.loadingProjectURL?.path == fixture.url.resolvingSymlinksInPath().path)
+
+        await state.currentScan?.value
+
+        #expect(state.loadingProjectURL == nil)
+        #expect(state.currentProject != nil)
+    }
+
+    @Test("Cancelling the first scan leaves no project open")
+    func cancellingAFirstOpen() async throws {
+        let fixture = try ProjectFixture.modularProject()
+        let defaults = TemporaryDefaults()
+        let state = state(defaults: defaults)
+
+        state.openProject(at: fixture.url)
+        let scan = state.currentScan
+        state.cancelProjectLoading()
+        await scan?.value
+
+        #expect(state.currentProject == nil)
+        #expect(state.isLoading == false)
+        #expect(state.lastError == nil)
+    }
+
+    @Test("Cancelling a rescan keeps the project it was refreshing")
+    func cancellingAReload() async throws {
+        let fixture = try ProjectFixture.pointFreeProject()
+        let defaults = TemporaryDefaults()
+        let state = state(defaults: defaults)
+
+        state.openProject(at: fixture.url)
+        await state.currentScan?.value
+
+        try fixture.write("Tests/__Snapshots__/ButtonTests/button.3.png")
+        state.reload()
+        let scan = state.currentScan
+        state.cancelProjectLoading()
+        await scan?.value
+
+        #expect(state.isLoading == false)
+        #expect(state.currentProject?.suites.first?.snapshots.count == 2)
+    }
+
     @Test("Reload rescans the open project and picks up a new snapshot")
     func reloadSeesNewSnapshots() async throws {
         let fixture = try ProjectFixture.pointFreeProject()

@@ -14,7 +14,9 @@ struct SidebarView: View {
 
     var body: some View {
         Group {
-            if state.currentProject == nil {
+            // The tree, not the recent list, while a first scan runs: it names the folder
+            // being read, so the click that opened it visibly did something.
+            if state.currentProject == nil, !state.isLoading {
                 RecentProjectsView()
             } else {
                 SnapshotTreeView()

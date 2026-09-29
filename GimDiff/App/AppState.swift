@@ -25,8 +25,11 @@ final class AppState {
 
     // MARK: - Project
 
+    /// The folder a scan in flight is reading, so both columns can say what is on its way
+    /// before the first open has a project to name.
+    private(set) var loadingProjectURL: URL?
     /// Whether a scan is in flight. The sidebar shows a spinner rather than an empty tree.
-    var isLoading = false
+    var isLoading: Bool { loadingProjectURL != nil }
     private(set) var currentProject: ProjectBundle?
     private(set) var recentProjects: [URL] = []
 
@@ -199,7 +202,7 @@ final class AppState {
         // A newer open supersedes the one in flight: scanning a large repository takes long
         // enough that two overlapping scans would race to publish their results.
         scanTask?.cancel()
-        isLoading = true
+        loadingProjectURL = root
         lastError = nil
         addRecentProject(root)
 
@@ -212,11 +215,11 @@ final class AppState {
                 guard !Task.isCancelled else { return }
                 load(bundle)
             } catch is CancellationError {
-                // Superseded by a newer scan, which owns `isLoading` now.
+                // Superseded by a newer scan, which owns `loadingProjectURL` now.
             } catch {
                 guard !Task.isCancelled else { return }
                 lastError = error.localizedDescription
-                isLoading = false
+                loadingProjectURL = nil
             }
         }
     }
@@ -245,11 +248,20 @@ final class AppState {
         currentProject = nil
         selectedRowID = nil
         expandedSuiteIDs = []
-        isLoading = false
+        loadingProjectURL = nil
         lastError = nil
         // The filters described the project that has just gone; carrying them into the next
         // one would hide most of it for no reason the user could see.
         clearFilters()
+    }
+
+    /// Abandons the scan in flight and leaves the window showing what it showed before.
+    ///
+    /// Unlike ``closeProject()``, a rescan cancelled this way keeps the project it was
+    /// refreshing: the rows on screen are only as old as they were a moment ago.
+    func cancelProjectLoading() {
+        scanTask?.cancel()
+        loadingProjectURL = nil
     }
 
     /// Asks the user for a folder and opens it.
@@ -270,7 +282,7 @@ final class AppState {
     /// is this plus the scan that produced it.
     func load(_ bundle: ProjectBundle) {
         currentProject = bundle
-        isLoading = false
+        loadingProjectURL = nil
         setPreview(nil)
         // A project with one suite is a suite, so there is nothing to be gained by making
         // the user open it. Several suites start closed, which is the useful overview.
