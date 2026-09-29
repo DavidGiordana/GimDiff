@@ -27,6 +27,11 @@ struct ProjectBundle: Sendable, Equatable {
     /// Whether any suite in the project differs from what the repository has committed.
     var hasGitDiff: Bool { suites.contains(where: \.hasGitDiff) }
 
+    /// How many snapshots the whole project holds, across every suite.
+    var snapshotsCount: Int {
+        suites.reduce(0) { $0 + $1.snapshots.count }
+    }
+
     /// How many snapshots across every suite differ from the committed versions.
     var modifiedSnapshotsCount: Int {
         suites.reduce(0) { $0 + $1.modifiedSnapshotsCount }

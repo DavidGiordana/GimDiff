@@ -37,6 +37,16 @@ struct ProjectScannerTests {
         #expect(bundle.hasGitDiff == false)
     }
 
+    @Test("Snapshots are counted across every suite")
+    func countsSnapshotsAcrossSuites() async throws {
+        let fixture = try ProjectFixture.modularProject()
+
+        let bundle = try await scanner().scan(projectRoot: fixture.url)
+
+        #expect(bundle.suites.count == 2)
+        #expect(bundle.snapshotsCount == 4)
+    }
+
     @Test("Changed snapshots are counted across every suite")
     func countsChangesAcrossSuites() async throws {
         let fixture = try ProjectFixture.modularProject()

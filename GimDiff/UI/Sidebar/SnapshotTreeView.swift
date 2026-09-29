@@ -30,7 +30,7 @@ struct SnapshotTreeView: View {
                     .padding(.horizontal, 10)
                     .padding(.top, 8)
             } else if let rootURL = state.currentProject?.rootURL ?? state.loadingProjectURL {
-                ProjectHeader(rootURL: rootURL, close: state.closeProject)
+                ProjectHeader(rootURL: rootURL, project: state.currentProject, close: state.closeProject)
                     .padding(.horizontal, 10)
                     .padding(.top, 8)
             }
@@ -174,9 +174,11 @@ struct SnapshotTreeView: View {
         }
     }
 }
-/// Names the open project and offers the way out of it.
+/// Names the open project, says how much it holds, and offers the way out of it.
 private struct ProjectHeader: View {
     let rootURL: URL
+    /// Absent while the first scan is still reading `rootURL`, when there is nothing to count.
+    let project: ProjectBundle?
     let close: () -> Void
 
     var body: some View {
@@ -184,11 +186,23 @@ private struct ProjectHeader: View {
             Image(systemName: "shippingbox.fill")
                 .foregroundStyle(.tint)
 
-            Text(rootURL.lastPathComponent)
-                .font(.headline)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .help(rootURL.path)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(rootURL.lastPathComponent)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(rootURL.path)
+
+                if let project {
+                    // Whole-project totals: the pills on each suite row already count what the
+                    // filters leave, so this line is what says how big the project really is.
+                    Text(summary(of: project))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .accessibilityIdentifier("ProjectSummary")
+                }
+            }
 
             Spacer(minLength: 0)
 
@@ -202,6 +216,14 @@ private struct ProjectHeader: View {
             .help("Close the project and go back to the recent list")
             .accessibilityLabel("Close Project")
         }
+    }
+
+    private func summary(of project: ProjectBundle) -> String {
+        let testCases = project.suites.count
+        let snapshots = project.snapshotsCount
+        let testCaseNoun = testCases == 1 ? "test case" : "test cases"
+        let snapshotNoun = snapshots == 1 ? "snapshot" : "snapshots"
+        return "\(testCases.formatted()) \(testCaseNoun) · \(snapshots.formatted()) \(snapshotNoun)"
     }
 }
 

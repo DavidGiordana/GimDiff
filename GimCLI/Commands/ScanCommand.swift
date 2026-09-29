@@ -52,7 +52,7 @@ enum ScanCommand {
         console.write("Project", bundle.rootURL.path)
         console.write("Git root", bundle.gitRootURL?.path ?? "(not a repository)")
         console.write("Suites", String(bundle.suites.count))
-        console.write("Snapshots", String(bundle.snapshotCount))
+        console.write("Snapshots", String(bundle.snapshotsCount))
         console.write("Modified", String(bundle.modifiedSnapshotsCount))
 
         guard !bundle.suites.isEmpty else {
@@ -89,7 +89,7 @@ enum ScanCommand {
             project = bundle.rootURL.path
             gitRoot = bundle.gitRootURL?.path
             suiteCount = bundle.suites.count
-            snapshotCount = bundle.snapshotCount
+            snapshotCount = bundle.snapshotsCount
             modifiedSnapshotCount = bundle.modifiedSnapshotsCount
             suites = bundle.suites.map { Suite($0, relativeTo: bundle.rootURL) }
         }
@@ -125,12 +125,5 @@ enum ScanCommand {
                 status = snapshot.gitStatus == .untracked ? "untracked" : "modified"
             }
         }
-    }
-}
-
-private extension ProjectBundle {
-    /// How many snapshots the whole project holds, across every suite.
-    var snapshotCount: Int {
-        suites.reduce(0) { $0 + $1.snapshots.count }
     }
 }
