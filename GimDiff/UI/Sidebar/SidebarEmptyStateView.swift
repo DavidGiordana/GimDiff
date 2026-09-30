@@ -66,6 +66,31 @@ extension SidebarEmptyStateView {
         )
     }
 
+    /// The last test run was read, and none of its failures is about a snapshot.
+    ///
+    /// Drawn in green for the same reason as ``noSnapshotChanges(prNumber:close:)``.
+    static func noTestFailures(showProject: @escaping () -> Void) -> SidebarEmptyStateView {
+        SidebarEmptyStateView(
+            systemImage: "checkmark.circle.fill",
+            tint: .green,
+            title: "No Snapshot Failures",
+            message: "The last test run failed on no snapshot of this project.",
+            actionTitle: "Show Project",
+            action: showProject
+        )
+    }
+
+    /// The last test run could not be found or read.
+    static func testRunUnavailable(message: String, showProject: @escaping () -> Void) -> SidebarEmptyStateView {
+        SidebarEmptyStateView(
+            systemImage: "xmark.octagon",
+            title: "No Test Results",
+            message: message,
+            actionTitle: "Show Project",
+            action: showProject
+        )
+    }
+
     /// The project holds snapshots, but the search text or the filter chips hide all of them.
     static func noMatches(clearFilters: @escaping () -> Void) -> SidebarEmptyStateView {
         SidebarEmptyStateView(

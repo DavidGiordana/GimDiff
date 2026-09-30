@@ -284,6 +284,64 @@ review then stands in for the open project until it is closed.
   when the review closes, when a project replaces it, and when the app terminates. Closing
   a review puts back the project it replaced.
 
+## Test run failures
+
+The sidebar has two views of an open project, switched by the *Project / Last Test Run*
+control under the project header (and View ▸ Sidebar Shows). `AppState.sidebarSource` holds
+which one is up; switch through `showTestRun()` and `showProjectStatus()`, never by assigning.
+
+- **The switch appears only when there is a run.** `load(_:)` looks for the project's
+  newest bundle with `locateTestRun()` — a property list per workspace, no `xcresulttool` —
+  and `showsSidebarSourcePicker` stays false until one is found. It stays up while the
+  run's view is showing, so a run deleted from under it still has a way back. A project
+  never tested has no `Logs/Test` folder to watch, so its first run appears on the next
+  load rather than live.
+- **The project view is the default, and reads nothing.** `load(_:)` always lands on it and
+  forgets any run read for the last project. The run is read the first time somebody
+  switches to it — exporting attachments through `xcresulttool` is not free, and most
+  visits to a project are not about its last run.
+- **The run's view lists only what failed**, plus a synthetic suite of images that matched
+  nothing. Its suites open on arrival and its first failure is selected. The Modified and
+  Warnings chips belong to the project view and are cleared on every switch.
+- **The run stays read across switches.** A new bundle arriving while the run's view is up
+  is read once the folder settles; one arriving while the project view is up only discards
+  the old results, so the next switch reads the new run.
+
+Nothing about reading a run assumes a snapshot library: every decision is made from Xcode's
+own structure or from bytes.
+
+- **Finding the run.** `DerivedDataLocator` matches each DerivedData folder's `info.plist`
+  (`WorkspacePath`) against the project root and its working tree, and takes the newest
+  `Logs/Test/*.xcresult` by the `dateCreated` the bundle records. It honours Xcode's
+  `IDECustomDerivedDataLocation` when that is absolute.
+- **Reading it.** `XcresultReader` goes through `xcrun xcresulttool` only — the bundle
+  format is private. Failed test cases come from `get test-results tests`; images are
+  grouped by the activity that attached them (innermost wins, since Xcode repeats an
+  attachment on every enclosing step); each failed test's attachments are exported into a
+  scratch folder and kept only if their leading bytes are PNG, JPEG, or WebP. Names are
+  displayed, never parsed.
+- **Matching it.** `TestRunMatcher` makes an attached image the baseline of a snapshot when
+  their bytes are identical. The candidate is the first image the step attached after
+  that — the one decision left to attachment order, since an assertion attaches what it
+  rendered before any picture of the difference, and the canvas draws its own difference
+  in the diff mask. A step matching nothing lists all its images. The test identifier is
+  consulted only to break a tie between identical snapshots.
+- **Staleness is by date.** A step whose matched snapshot was written after the run began
+  is dropped. Accepting a candidate makes the *rendered* image equal the snapshot; without
+  this rule, reading the same bundle again would offer the old reference as the candidate.
+- **The canvas.** A failing snapshot opens as `SnapshotPreview.testRunFailure`: the
+  candidate carries the `testRun` origin (never written to, so Revert is refused) and the
+  baseline is the working file (so Accept works and settles the failure in memory). Images
+  that match nothing are listed under a synthetic suite, `AppState.testRunSuiteID`, which
+  cannot be deleted and carries no source warning.
+- **Refreshing.** The watcher also watches each workspace's `Logs/Test`; see above for what
+  an event there does in each view. A re-read waits for the folder to be quiet for a
+  second, because a bundle is written for as long as the run lasts. The scratch folder is
+  deleted when the results are replaced, the project closes, or the app quits.
+
+Tests that load a project should hand `AppState` a `StubTestResults`, as `AppStateFixture`
+does, so the developer's own DerivedData never decides what an assertion sees.
+
 ## Command-line tool
 
 `gimdiff` is a `com.apple.product-type.tool` target. `GimCLI/` holds only argument parsing

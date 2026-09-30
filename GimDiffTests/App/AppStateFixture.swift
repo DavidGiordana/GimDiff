@@ -21,6 +21,8 @@ struct AppStateFixture {
     let filesystem: MockFilesystemService
     /// Stands in for FSEvents, so the only file events are the ones a test sends.
     let watcher = StubProjectWatcher()
+    /// Stands in for derived data, so no run is found unless a test sets one up.
+    let testResults = StubTestResults()
     /// Held for its lifetime: releasing it erases the defaults domain.
     let defaults: TemporaryDefaults
 
@@ -37,6 +39,8 @@ struct AppStateFixture {
             filesystem: filesystem,
             gitService: StubGitService(),
             watcher: watcher,
+            testResults: testResults,
+            testResultLocator: testResults,
             defaults: defaults.defaults
         )
 
@@ -107,14 +111,20 @@ struct AppStateFixture {
     /// The visible rows as `SuiteName` and `SuiteName/snapshot`, which is short enough to
     /// assert the whole projection against in one expression.
     var rowDescriptions: [String] {
-        state.visibleRows.map { row in
+        let rows = state.visibleRows
+        // Read off the rows rather than the project: a suite of the test run's attachments
+        // is a row without being part of the project.
+        var suiteNames: [String: String] = [:]
+        for case let .suite(suite, _, _) in rows {
+            suiteNames[suite.id] = suite.name
+        }
+
+        return rows.map { row in
             switch row {
             case let .suite(suite, _, _):
                 return suite.name
             case let .snapshot(snapshot, parentSuiteID):
-                let suiteName = state.currentProject?.suites
-                    .first { $0.id == parentSuiteID }?.name ?? "?"
-                return "\(suiteName)/\(snapshot.displayName)"
+                return "\(suiteNames[parentSuiteID] ?? "?")/\(snapshot.displayName)"
             }
         }
     }

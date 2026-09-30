@@ -43,6 +43,16 @@ struct DefaultFilesystemService: FilesystemService {
         )
     }
 
+    func fileSize(at url: URL) -> Int? {
+        let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard values?.isRegularFile == true else { return nil }
+        return values?.fileSize
+    }
+
+    func modificationDate(at url: URL) -> Date? {
+        (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+    }
+
     func readFile(at url: URL) throws -> Data {
         try Data(contentsOf: url)
     }

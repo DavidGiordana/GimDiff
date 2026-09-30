@@ -23,6 +23,7 @@ final class MockFilesystemService: FilesystemService, @unchecked Sendable {
     private var storedPackages: Set<String> = []
     private var storedTrashedPaths: [String] = []
     private var storedRemovedPaths: [String] = []
+    private var storedModificationDates: [String: Date] = [:]
 
     init(files: [URL: Data] = [:], directories: [URL] = []) {
         for directory in directories {
@@ -63,6 +64,12 @@ final class MockFilesystemService: FilesystemService, @unchecked Sendable {
             storedFiles[key] = data
             registerParents(of: key)
         }
+    }
+
+    /// Dates a file. Nothing has a date until a test gives it one: the mock keeps no clock,
+    /// and a date invented on every write would make tests depend on how fast they ran.
+    func setModificationDate(_ date: Date, at url: URL) {
+        lock.withLock { storedModificationDates[Self.key(for: url)] = date }
     }
 
     func createDirectory(at url: URL) {
@@ -123,6 +130,14 @@ final class MockFilesystemService: FilesystemService, @unchecked Sendable {
 
             return Set(names).sorted().map { url.appendingPathComponent($0) }
         }
+    }
+
+    func fileSize(at url: URL) -> Int? {
+        lock.withLock { storedFiles[Self.key(for: url)]?.count }
+    }
+
+    func modificationDate(at url: URL) -> Date? {
+        lock.withLock { storedModificationDates[Self.key(for: url)] }
     }
 
     func readFile(at url: URL) throws -> Data {

@@ -112,6 +112,17 @@ private extension HelpTopic {
                 keep.
                 """),
         ]),
+        HelpSection(title: "Failures from your last test run", blocks: [
+            .text("""
+                A project opens on its own status. Switch the sidebar from **Project** to \
+                **Last Test Run** (or View ▸ Last Test Run) to read the newest run Xcode left \
+                in DerivedData: the sidebar then lists only the snapshots it failed on, and \
+                selecting one shows the image the test rendered against the recorded file. \
+                Use **Diff Mask** to see where they differ. **Accept Candidate** (⌘→) re-records the snapshot without \
+                running the test again. Switch back to **Project** at any time; the run stays \
+                read, and a new one is picked up as soon as Xcode finishes writing it.
+                """),
+        ]),
         HelpSection(title: "After re-running your tests", blocks: [
             .text("""
                 GimDiff watches the open project, so a test run shows up on its own: \

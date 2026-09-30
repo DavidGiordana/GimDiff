@@ -71,12 +71,12 @@ struct SnapshotCanvasView: View {
                 CanvasEmptyStateView()
             }
 
-        case .single, .pullRequestSide:
+        case .single, .pullRequestSide, .testRunAttachment:
             if let only = preview?.panes.first {
                 pane(only)
             }
 
-        case .comparison:
+        case .comparison, .testRunFailure:
             comparison
         }
     }
@@ -200,11 +200,7 @@ struct SnapshotPaneHeader: View {
                 ChangeKindBadge(kind: change.kind)
             }
 
-            Text(pane.fileURL.lastPathComponent)
-                .font(.caption)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .help(pane.fileURL.path)
+            fileName
 
             Spacer(minLength: 8)
 
@@ -214,6 +210,46 @@ struct SnapshotPaneHeader: View {
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity)
         .background(.bar)
+    }
+
+    /// The file the pane shows, or the attachment it was copied from.
+    ///
+    /// An image out of a test run is exported under an identifier, which says nothing; the
+    /// name it was attached under does. When a test asserted the same snapshot more than
+    /// once, this is where the candidate is chosen among the renderings.
+    @ViewBuilder
+    private var fileName: some View {
+        let candidates = pane.role == .candidate ? state.testRunCandidatesOnScreen : []
+
+        if candidates.count > 1 {
+            Menu {
+                ForEach(candidates) { candidate in
+                    Button(candidate.name) {
+                        state.selectTestRunCandidate(candidate)
+                    }
+                }
+            } label: {
+                Text(displayName)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .menuStyle(.borderlessButton)
+            .font(.caption)
+            // Truncated rather than sized to fit: a header wider than its pane pushes the
+            // two panes off an even split.
+            .help("Choose which image the test attached to compare with the baseline")
+        } else {
+            Text(displayName)
+                .font(.caption)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help(pane.fileURL.path)
+        }
+    }
+
+    private var displayName: String {
+        guard pane.origin == .testRun else { return pane.fileURL.lastPathComponent }
+        return state.testRunImageName(at: pane.fileURL) ?? pane.fileURL.lastPathComponent
     }
 
     @ViewBuilder

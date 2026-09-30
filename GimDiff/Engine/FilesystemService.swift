@@ -32,6 +32,16 @@ protocol FilesystemService: Sendable {
         includingPropertiesForKeys keys: [URLResourceKey]?
     ) throws -> [URL]
 
+    /// Length of the file at `url` in bytes, or `nil` when there is no file there.
+    ///
+    /// Lets a caller looking for a file with particular contents rule most candidates out
+    /// without reading them.
+    func fileSize(at url: URL) -> Int?
+
+    /// When the contents of the file at `url` were last written, or `nil` when that is not
+    /// known.
+    func modificationDate(at url: URL) -> Date?
+
     func readFile(at url: URL) throws -> Data
 
     /// Writes `data` to `url`, creating any missing parent directories.

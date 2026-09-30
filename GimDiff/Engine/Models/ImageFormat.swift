@@ -37,6 +37,27 @@ enum ImageFormat: Sendable, Hashable {
         self.init(fileExtension: url.pathExtension)
     }
 
+    /// The format `data` is encoded in, read from its leading bytes.
+    ///
+    /// For an image whose name says nothing reliable: an attachment exported from a test
+    /// result bundle arrives named after its identifier, often with no extension at all.
+    /// `nil` when the bytes open like none of the formats GimDiff recognises.
+    init?(sniffing data: Data) {
+        let header = [UInt8](data.prefix(12))
+
+        if header.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+            self = .png
+        } else if header.starts(with: [0xFF, 0xD8, 0xFF]) {
+            self = .jpg
+        } else if header.count == 12,
+                  header.starts(with: Array("RIFF".utf8)),
+                  header[8...].elementsEqual(Array("WEBP".utf8)) {
+            self = .webp
+        } else {
+            return nil
+        }
+    }
+
     /// Whether GimDiff recognises the format, rather than having kept an unfamiliar
     /// extension verbatim.
     ///

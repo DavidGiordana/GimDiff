@@ -26,6 +26,8 @@ enum GimDiffError: Error, Equatable {
     case unreadableImage(URL)
     /// A pixel buffer or an encoder could not be created for an image.
     case imageProcessingFailed(URL)
+    /// A test result bundle answered with something other than the report it was asked for.
+    case unreadableTestResults(URL)
 }
 
 extension GimDiffError: LocalizedError {
@@ -47,6 +49,8 @@ extension GimDiffError: LocalizedError {
             "“\(url.path)” could not be read as an image."
         case let .imageProcessingFailed(url):
             "“\(url.path)” could not be prepared for comparison."
+        case let .unreadableTestResults(url):
+            "The test results in “\(url.path)” could not be read."
         }
     }
 }

@@ -40,6 +40,18 @@ extension AppState {
 
         let name = survivor.fileURL.deletingPathExtension().lastPathComponent
 
+        // An image out of the test run stays one on its own: nothing it is left beside
+        // makes it a file of the project.
+        guard survivor.origin != .testRun else {
+            let item = SnapshotItem(
+                id: preview?.snapshotID,
+                name: testRunImageName(at: survivor.fileURL) ?? name,
+                fileURL: survivor.fileURL
+            )
+            setPreview(.testRunAttachment(item))
+            return
+        }
+
         // A downloaded side stays a downloaded side: dropping its partner does not make it a
         // file on disk the user may act on. It keeps the snapshot's identifier too, so the
         // canvas can still say what the pull request did to it.
@@ -78,6 +90,12 @@ extension AppState {
 
     var canPromoteCandidate: Bool { candidatePromotionObstacle == nil }
 
+    /// Why the candidate out of a test run cannot be written to.
+    static let testRunRevertObstacle = """
+        The candidate is a copy of what the last test run rendered, not a file in the \
+        project. Run the test again to replace it.
+        """
+
     /// Why neither side of a pull request comparison can be written to.
     static let pullRequestPromotionObstacle = """
         Both images were downloaded from a GitHub pull request for review. Accept or revert \
@@ -105,13 +123,18 @@ extension AppState {
 
         guard copy(contentsOf: candidate.fileURL, over: baseline.fileURL) else { return }
         finishFileAction()
+
+        // The snapshot now holds what the run rendered, so the failure is settled.
+        if case let .testRunFailure(_, snapshotID, _) = preview {
+            resolveTestRunFailure(snapshotID: snapshotID)
+        }
     }
 
     /// Discards the candidate: copies the baseline back over it on disk.
     func revertCandidateToBaseline() {
         guard let candidate = preview?.candidate, let baseline = preview?.baseline else { return }
         guard candidate.isWritable else {
-            report(Self.pullRequestPromotionObstacle)
+            report(candidate.origin == .testRun ? Self.testRunRevertObstacle : Self.pullRequestPromotionObstacle)
             return
         }
         guard copy(contentsOf: baseline.fileURL, over: candidate.fileURL) else { return }

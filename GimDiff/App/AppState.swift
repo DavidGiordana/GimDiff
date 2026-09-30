@@ -91,6 +91,29 @@ final class AppState {
     private var projectBeforePullRequest: ProjectBundle?
     private var pullRequestTask: Task<Void, Never>?
 
+    // MARK: - Test run
+
+    /// What the sidebar lists: the project as it stands, or what its last test run failed
+    /// on. Changed through ``showProjectStatus()`` and ``showTestRun()``.
+    var sidebarSource: SidebarSource = .project
+    /// What the last test run of the open project failed on, or `nil` until somebody asks
+    /// for it. See `AppState+TestRun`.
+    private(set) var testRun: TestRunResults?
+    /// The newest result bundle Xcode has for the open project, found without reading it;
+    /// `nil` when the project has never been tested.
+    var latestTestRunBundle: URL?
+    var testRunLocateTask: Task<Void, Never>?
+    /// Whether the run is being read, so the sidebar can say so rather than stand empty.
+    var isReadingTestRun = false
+    /// Why the run could not be shown, in place of the rows.
+    var testRunError: String?
+    let testResults: any TestResultReading
+    let testResultLocator: any TestResultLocating
+    /// The read in flight, so a newer run supersedes it rather than racing it.
+    var testRunTask: Task<Void, Never>?
+    /// Where Xcode writes the project's result bundles, as handed to the watcher.
+    var testResultDirectories: [String] = []
+
     let filesystem: any FilesystemService
     let gitService: any GitService
     let imageDiff: any ImageDiffService
@@ -129,6 +152,8 @@ final class AppState {
         clipboard: ClipboardService = ClipboardService(),
         workspace: WorkspaceService = WorkspaceService(),
         pullRequests: (any GitHubPRService)? = nil,
+        testResults: (any TestResultReading)? = nil,
+        testResultLocator: any TestResultLocating = DerivedDataLocator(),
         defaults: UserDefaults = .standard
     ) {
         let git = gitService ?? DefaultGitService(filesystem: filesystem)
@@ -147,6 +172,8 @@ final class AppState {
             filesystem: filesystem
         )
         pullRequestResolver = GitHubPRReferenceResolver(gitService: git)
+        self.testResults = testResults ?? XcresultReader(runner: SystemCommandRunner(), filesystem: filesystem)
+        self.testResultLocator = testResultLocator
         self.defaults = defaults
         recentProjects = Self.loadRecentProjects(from: defaults)
     }
@@ -266,6 +293,9 @@ final class AppState {
         abandonPullRequestReview()
         scanTask?.cancel()
         stopWatching()
+        discardTestRun()
+        testRunLocateTask?.cancel()
+        latestTestRunBundle = nil
         closePreview()
         currentProject = nil
         selectedRowID = nil
@@ -309,8 +339,14 @@ final class AppState {
         // A project with one suite is a suite, so there is nothing to be gained by making
         // the user open it. Several suites start closed, which is the useful overview.
         expandedSuiteIDs = bundle.suites.count == 1 ? Set(bundle.suites.map(\.id)) : []
+        // Whatever the last project's run failed on says nothing about this one, and a
+        // project always opens on its own status: the run is read when it is asked for.
+        discardTestRun()
+        sidebarSource = .project
         selectedRowID = visibleRows.first?.id
         restartWatching()
+        latestTestRunBundle = nil
+        locateTestRun()
     }
 
     /// Swaps in a fresh scan of the project already open, leaving the window where it was.
@@ -326,7 +362,7 @@ final class AppState {
         // The scan read the working tree's status itself, and more recently.
         gitStatusTask?.cancel()
         currentProject = bundle
-        expandedSuiteIDs.formIntersection(bundle.suites.map(\.id))
+        expandedSuiteIDs.formIntersection(bundle.suites.map(\.id) + [Self.testRunSuiteID])
 
         let rows = visibleRows
         if rowsBefore.isEmpty {
@@ -336,7 +372,9 @@ final class AppState {
             selectedRowID = Self.survivor(of: selected, among: rowsBefore, in: rows)
         }
 
+        // An attachment of the test run was never in the scan, and is not gone for that.
         if let shown = preview?.snapshotID,
+           !Self.isTestRunAttachment(snapshotID: shown),
            !bundle.suites.contains(where: { $0.snapshots.contains { $0.id == shown } }) {
             closePreview()
         }
@@ -346,7 +384,7 @@ final class AppState {
     ///
     /// The nearest row below it in the old order that is still there, or failing that the
     /// nearest above: the same neighbour ``selection(surviving:)`` picks for a deletion.
-    private static func survivor(
+    static func survivor(
         of rowID: String,
         among rowsBefore: [TreeRowItem],
         in rows: [TreeRowItem]
@@ -405,14 +443,20 @@ final class AppState {
     /// snapshot is a change, so the filter would keep all of them.
     var canFilterByGitChanges: Bool {
         showGitModifiedOnly
-            || (!isReviewingPullRequest && currentProject?.suites.contains(where: \.hasGitDiff) == true)
+            || (isShowingProjectStatus && currentProject?.suites.contains(where: \.hasGitDiff) == true)
     }
 
     /// Whether the Warnings filter has anything to narrow the tree to; see
     /// ``canFilterByGitChanges`` for why an active filter always counts.
     var canFilterByWarnings: Bool {
         showWarningsOnly
-            || (!isReviewingPullRequest && currentProject?.suites.contains(where: \.isMissingSourceCode) == true)
+            || (isShowingProjectStatus && currentProject?.suites.contains(where: \.isMissingSourceCode) == true)
+    }
+
+    /// Whether the sidebar lists the project on disk, as opposed to a pull request or a
+    /// test run — the only view the Modified and Warnings chips have anything to say about.
+    private var isShowingProjectStatus: Bool {
+        !isReviewingPullRequest && sidebarSource == .project
     }
 
     /// Resets the search field and both filters.
@@ -434,19 +478,29 @@ final class AppState {
     /// search query is active: a query that matches a method name has to show the match,
     /// not the closed folder holding it.
     var visibleRows: [TreeRowItem] {
-        guard let suites = currentProject?.suites else { return [] }
+        guard var suites = currentProject?.suites else { return [] }
+        let isShowingTestRun = sidebarSource == .testRun
+        if isShowingTestRun {
+            guard testRun != nil else { return [] }
+            // Last, below everything the project itself holds: these are images the run
+            // attached that belong to none of it.
+            if let attachments = testRunAttachmentsSuite { suites.append(attachments) }
+        }
 
         let query = trimmedFilterText.lowercased()
         var rows: [TreeRowItem] = []
 
-        for suite in suites where !showWarningsOnly || suite.isMissingSourceCode {
+        for suite in suites where !showWarningsOnly || hasSourceWarning(suite) {
             var children = showGitModifiedOnly ? suite.snapshots.filter(\.hasGitDiff) : suite.snapshots
+            if isShowingTestRun {
+                children = children.filter { isFailingInTestRun($0) }
+            }
             let suiteMatches = query.isEmpty || suite.name.lowercased().contains(query)
 
             if suiteMatches {
-                // The filter, unlike the query, is a statement about snapshots: a suite with
-                // nothing modified under it has nothing to say while it is on.
-                guard !showGitModifiedOnly || !children.isEmpty else { continue }
+                // A filter, unlike the query, is a statement about snapshots: a suite with
+                // nothing it keeps under it has nothing to say while it is on.
+                guard !(showGitModifiedOnly || isShowingTestRun) || !children.isEmpty else { continue }
             } else {
                 children = children.filter { $0.displayName.lowercased().contains(query) }
                 guard !children.isEmpty else { continue }
@@ -469,6 +523,10 @@ final class AppState {
 
     func isExpanded(suiteWithID id: String) -> Bool {
         expandedSuiteIDs.contains(id)
+    }
+
+    func expandSuites(_ ids: some Sequence<String>) {
+        expandedSuiteIDs.formUnion(ids)
     }
 
     func toggleExpansion(ofSuiteWithID id: String) {
@@ -622,6 +680,19 @@ final class AppState {
             return
         }
 
+        guard !Self.isTestRunAttachment(snapshotID: snapshot.id) else {
+            setPreview(.testRunAttachment(snapshot))
+            return
+        }
+
+        // What the last run rendered says more than what the last commit held: the failure
+        // is why the snapshot is being looked at.
+        if withGitDiff, sidebarSource == .testRun,
+           let candidate = testRun?.candidates(forSnapshotID: snapshot.id).first {
+            showTestRunCandidate(candidate, against: snapshot)
+            return
+        }
+
         setPreview(.single(snapshot))
 
         guard withGitDiff,
@@ -723,6 +794,11 @@ final class AppState {
     /// Makes every view holding a decoded image read it off disk again.
     func invalidateLoadedImages() {
         imageReloadToken += 1
+    }
+
+    /// Replaces what the last test run is known to have failed on.
+    func setTestRun(_ newValue: TestRunResults?) {
+        testRun = newValue
     }
 
     func report(_ error: any Error) {
@@ -917,7 +993,7 @@ final class AppState {
     }
 
     func delete(snapshot: SnapshotItem, in suiteID: String) {
-        guard !refusesDeletionUnderReview() else { return }
+        guard !refusesDeletionUnderReview(), !refusesDeletionOfTestRunAttachments(in: suiteID) else { return }
         let rowID = TreeRowItem.snapshotRowID(snapshot.id, parentSuiteID: suiteID)
         let replacement = selection(surviving: [rowID])
 
@@ -932,7 +1008,7 @@ final class AppState {
     }
 
     func delete(suite: SnapshotSuite) {
-        guard !refusesDeletionUnderReview() else { return }
+        guard !refusesDeletionUnderReview(), !refusesDeletionOfTestRunAttachments(in: suite.id) else { return }
         var removedRowIDs: Set<String> = [TreeRowItem.suiteRowID(suite.id)]
         for snapshot in suite.snapshots {
             removedRowIDs.insert(TreeRowItem.snapshotRowID(snapshot.id, parentSuiteID: suite.id))

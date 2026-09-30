@@ -184,11 +184,57 @@ struct MockFilesystemServiceTests {
         #expect(filesystem.isDirectory(at: first.deletingLastPathComponent()))
         #expect(!filesystem.fileExists(at: first))
     }
+
+    @Test("A file reports its length, and anything that is not a file reports none")
+    func reportsFileSize() throws {
+        let filesystem = MockFilesystemService()
+        let file = root.appendingPathComponent("home.png")
+        try filesystem.writeFile(at: file, data: Data([1, 2, 3]))
+
+        #expect(filesystem.fileSize(at: file) == 3)
+        #expect(filesystem.fileSize(at: root) == nil)
+        #expect(filesystem.fileSize(at: root.appendingPathComponent("missing.png")) == nil)
+    }
+
+    @Test("A file has no modification date until one is given")
+    func reportsModificationDate() throws {
+        let filesystem = MockFilesystemService()
+        let file = root.appendingPathComponent("home.png")
+        let date = Date(timeIntervalSince1970: 1_000)
+        try filesystem.writeFile(at: file, data: Data([1]))
+
+        #expect(filesystem.modificationDate(at: file) == nil)
+        filesystem.setModificationDate(date, at: file)
+        #expect(filesystem.modificationDate(at: file) == date)
+    }
 }
 
 @Suite("FileManager-backed filesystem")
 struct DefaultFilesystemServiceTests {
     private let filesystem = DefaultFilesystemService()
+
+    @Test("A file reports its length, and anything that is not a file reports none")
+    func reportsFileSize() throws {
+        let root = try TemporaryDirectory()
+        let file = root.url.appendingPathComponent("home.png")
+        try filesystem.writeFile(at: file, data: Data([1, 2, 3]))
+
+        #expect(filesystem.fileSize(at: file) == 3)
+        #expect(filesystem.fileSize(at: root.url) == nil)
+        #expect(filesystem.fileSize(at: root.url.appendingPathComponent("missing.png")) == nil)
+    }
+
+    @Test("Reports when a file's contents were last written")
+    func reportsModificationDate() throws {
+        let root = try TemporaryDirectory()
+        let file = root.url.appendingPathComponent("home.png")
+        let date = Date(timeIntervalSince1970: 1_000_000)
+        try filesystem.writeFile(at: file, data: Data([1]))
+        try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: file.path)
+
+        #expect(filesystem.modificationDate(at: file) == date)
+        #expect(filesystem.modificationDate(at: root.url.appendingPathComponent("missing.png")) == nil)
+    }
 
     @Test("Writes, reads, and distinguishes folders from files")
     func writesAndReads() throws {

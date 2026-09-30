@@ -35,7 +35,13 @@ struct SnapshotTreeView: View {
                     .padding(.top, 8)
             }
 
-            if state.currentProject != nil {
+            if state.showsSidebarSourcePicker {
+                SidebarSourcePicker()
+                    .padding(.horizontal, 10)
+                    .padding(.top, 8)
+            }
+
+            if state.currentProject != nil, !state.isShowingTestRunPlaceholder {
                 SnapshotFilterBar(focus: $focus)
                     .padding(.horizontal, 10)
                     .padding(.top, 8)
@@ -53,6 +59,8 @@ struct SnapshotTreeView: View {
                     prNumber: session.prNumber,
                     close: state.closePullRequestReview
                 )
+            } else if state.isShowingTestRunPlaceholder {
+                testRunPlaceholder
             } else if state.currentProject?.suites.isEmpty == true {
                 SidebarEmptyStateView.noSnapshotsDiscovered(reload: state.reload)
             } else if rows.isEmpty {
@@ -81,12 +89,31 @@ struct SnapshotTreeView: View {
         .onChange(of: controlActiveState) { claimFocusIfIdle() }
         .onChange(of: state.filterFocusRequests) { claimFilterFocus() }
         .onChange(of: state.treeFocusRequests) { focus = .tree }
+        // Switching views swaps every row; the keyboard stays with the tree.
+        .onChange(of: state.sidebarSource) {
+            Task { @MainActor in focus = .tree }
+        }
         // A freshly scanned project replaces every row, so focus is claimed again rather
         // than left on whatever the last project had. Deferred like the claim above: the
         // first scan lands in the same update that swaps the spinner for the `List`, and an
         // assignment made there reaches a view the focus system has not seen yet.
         .onChange(of: state.currentProject?.rootURL) {
             Task { @MainActor in focus = .tree }
+        }
+    }
+
+    /// What stands in for the rows while the run is read, when it could not be, or when it
+    /// failed on nothing.
+    @ViewBuilder
+    private var testRunPlaceholder: some View {
+        if state.isReadingTestRun, state.testRun == nil {
+            ProgressView("Reading test results…")
+                .controlSize(.small)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let error = state.testRunError {
+            SidebarEmptyStateView.testRunUnavailable(message: error, showProject: state.showProjectStatus)
+        } else {
+            SidebarEmptyStateView.noTestFailures(showProject: state.showProjectStatus)
         }
     }
 
@@ -176,6 +203,8 @@ struct SnapshotTreeView: View {
 }
 /// Names the open project, says how much it holds, and offers the way out of it.
 private struct ProjectHeader: View {
+    @Environment(AppState.self) private var state
+
     let rootURL: URL
     /// Absent while the first scan is still reading `rootURL`, when there is nothing to count.
     let project: ProjectBundle?
@@ -223,7 +252,39 @@ private struct ProjectHeader: View {
         let snapshots = project.snapshotsCount
         let testCaseNoun = testCases == 1 ? "test case" : "test cases"
         let snapshotNoun = snapshots == 1 ? "snapshot" : "snapshots"
-        return "\(testCases.formatted()) \(testCaseNoun) · \(snapshots.formatted()) \(snapshotNoun)"
+        let totals = "\(testCases.formatted()) \(testCaseNoun) · \(snapshots.formatted()) \(snapshotNoun)"
+        guard state.sidebarSource == .testRun, let run = state.testRun else { return totals }
+
+        // Under the run, the line says which run and how much of the project it failed on.
+        let failed = "\(run.failedSnapshotsCount.formatted()) of \(snapshots.formatted()) failed"
+        guard let startedAt = run.startedAt else { return failed }
+        return "\(failed) · run \(startedAt.formatted(.relative(presentation: .named)))"
+    }
+}
+
+/// Switches the tree between the project as it stands and what its last test run failed on.
+private struct SidebarSourcePicker: View {
+    @Environment(AppState.self) private var state
+
+    var body: some View {
+        Picker("Show", selection: source) {
+            Text("Project").tag(SidebarSource.project)
+            Text("Last Test Run").tag(SidebarSource.testRun)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .controlSize(.small)
+        .help("Show the project's snapshots, or the ones its last test run in Xcode failed on")
+        .accessibilityIdentifier("SidebarSource")
+    }
+
+    /// Goes through ``AppState/showTestRun()`` rather than assigning: switching also reads
+    /// the run the first time, and moves the selection to something the new view lists.
+    private var source: Binding<SidebarSource> {
+        Binding(
+            get: { state.sidebarSource },
+            set: { $0 == .testRun ? state.showTestRun() : state.showProjectStatus() }
+        )
     }
 }
 
@@ -275,9 +336,14 @@ private struct TreeRowView: View {
                 GitDiffBadge()
             }
 
+            let failing = state.sidebarSource == .testRun ? state.failingSnapshotsCount(in: suite) : 0
+            if failing > 0, suite.id != AppState.testRunSuiteID {
+                TestFailureBadge(count: failing)
+            }
+
             // A pull request's suites never have a source file on disk, so the warning would
             // sit on every row and say nothing.
-            if suite.isMissingSourceCode, !state.isReviewingPullRequest {
+            if state.hasSourceWarning(suite), !state.isReviewingPullRequest {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
                     .help("GimDiff could not find the test source for this suite")
@@ -288,7 +354,7 @@ private struct TreeRowView: View {
 
     private func snapshotRow(_ snapshot: SnapshotItem) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: "function")
+            Image(systemName: AppState.isTestRunAttachment(snapshotID: snapshot.id) ? "paperclip" : "function")
                 .foregroundStyle(.secondary)
 
             Text(snapshot.displayName)
@@ -299,8 +365,13 @@ private struct TreeRowView: View {
 
             if let change = state.pullRequestChange(forSnapshotID: snapshot.id) {
                 ChangeKindBadge(kind: change.kind)
-            } else if snapshot.hasGitDiff {
-                GitDiffBadge()
+            } else {
+                if state.sidebarSource == .testRun, state.testRun?.isFailing(snapshotID: snapshot.id) == true {
+                    TestFailureBadge()
+                }
+                if snapshot.hasGitDiff {
+                    GitDiffBadge()
+                }
             }
         }
     }
@@ -318,6 +389,31 @@ private struct CountPill: View {
             .padding(.vertical, 1)
             .background(.quaternary, in: .capsule)
             .accessibilityLabel("\(count) snapshots")
+    }
+}
+
+/// Marks a snapshot the last test run failed on, or a suite holding some.
+private struct TestFailureBadge: View {
+    /// How many failed, on a suite row; `nil` on the snapshot itself.
+    var count: Int?
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Image(systemName: "xmark.octagon.fill")
+            if let count {
+                Text(count.formatted())
+                    .font(.caption2.monospacedDigit())
+            }
+        }
+        .foregroundStyle(.red)
+        .help(explanation)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(explanation)
+    }
+
+    private var explanation: String {
+        guard let count else { return "Failed in the last test run" }
+        return count == 1 ? "1 snapshot failed in the last test run" : "\(count) snapshots failed in the last test run"
     }
 }
 

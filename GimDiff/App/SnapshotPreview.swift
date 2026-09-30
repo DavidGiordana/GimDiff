@@ -22,6 +22,11 @@ enum SnapshotOrigin: Equatable, Sendable {
     /// Both sides of such a comparison carry it: neither file is the one in the pull
     /// request, so neither is anything a promotion could meaningfully overwrite.
     case pullRequest
+    /// An image a test attached when it last failed, exported from the run's result bundle.
+    ///
+    /// Only ever a candidate. It may be written *from* — that is what accepting it means —
+    /// but nothing is reverted onto it: the copy is scratch, and the run is over.
+    case testRun
 }
 
 /// One side of what the canvas is showing.
@@ -54,6 +59,7 @@ struct SnapshotPane: Identifiable, Equatable, Sendable {
         switch (role, origin) {
         case (.candidate, .pullRequest): "Pull Request Head"
         case (.baseline, .pullRequest): "Base Branch"
+        case (_, .testRun): "Last Test Run"
         case (.candidate, _): "Current"
         case (.baseline, .committedVersion): "Committed in Git"
         case (.baseline, .workingTree): "Recorded on Disk"
@@ -86,6 +92,13 @@ enum SnapshotPreview: Equatable, Sendable {
     /// Kept apart from ``single(_:)`` because that case is always the candidate on disk,
     /// and a deleted snapshot's only image is neither.
     case pullRequestSide(SnapshotItem, role: SnapshotPane.Role)
+    /// A snapshot on disk against an image its test attached when it last failed.
+    ///
+    /// The pair reads the way every other one does: the reference is the recorded file,
+    /// which is what accepting the candidate overwrites.
+    case testRunFailure(SnapshotPair, snapshotID: String, title: String)
+    /// An image a failed test attached that is about no snapshot the project holds.
+    case testRunAttachment(SnapshotItem)
 
     /// Identifier of the discovered snapshot this preview came from, when it came from one.
     ///
@@ -96,6 +109,8 @@ enum SnapshotPreview: Equatable, Sendable {
         case let .single(snapshot): snapshot.id
         case let .comparison(_, snapshotID, _, _): snapshotID
         case let .pullRequestSide(snapshot, _): snapshot.id
+        case let .testRunFailure(_, snapshotID, _): snapshotID
+        case let .testRunAttachment(snapshot): snapshot.id
         }
     }
 
@@ -105,13 +120,17 @@ enum SnapshotPreview: Equatable, Sendable {
         case let .single(snapshot): snapshot.displayName
         case let .comparison(_, _, title, _): title
         case let .pullRequestSide(snapshot, _): snapshot.displayName
+        case let .testRunFailure(_, _, title): title
+        case let .testRunAttachment(snapshot): snapshot.displayName
         }
     }
 
     /// Whether two images are on screen, which is what the diff-mode picker acts on.
     var isComparison: Bool {
-        guard case .comparison = self else { return false }
-        return true
+        switch self {
+        case .comparison, .testRunFailure: true
+        case .single, .pullRequestSide, .testRunAttachment: false
+        }
     }
 
     /// The panes to draw, left to right.
@@ -134,6 +153,13 @@ enum SnapshotPreview: Equatable, Sendable {
                 ),
                 SnapshotPane(role: .baseline, fileURL: pair.reference.url, origin: baselineOrigin),
             ]
+        case let .testRunFailure(pair, _, _):
+            [
+                SnapshotPane(role: .candidate, fileURL: pair.failure.url, origin: .testRun),
+                SnapshotPane(role: .baseline, fileURL: pair.reference.url, origin: .workingTree),
+            ]
+        case let .testRunAttachment(snapshot):
+            [SnapshotPane(role: .candidate, fileURL: snapshot.fileURL, origin: .testRun)]
         }
     }
 

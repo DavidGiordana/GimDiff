@@ -35,6 +35,12 @@ extension AppState {
             roots.append(gitDirectory)
         }
 
+        // Where Xcode writes the next run's results, which is outside the project entirely.
+        testResultDirectories = testResultLocator
+            .resultDirectories(forProjectAt: project.rootURL, gitRootURL: project.gitRootURL)
+            .map(\.standardizedFileURL.path)
+        roots += testResultDirectories.map { URL(fileURLWithPath: $0, isDirectory: true) }
+
         let batches = watcher.changes(under: roots)
         // Weakly held: the loop only ends when the stream does, and a strong reference
         // would keep the state alive to go on feeding a window that is gone.
@@ -48,6 +54,7 @@ extension AppState {
     func stopWatching() {
         watchTask?.cancel()
         watchTask = nil
+        testResultDirectories = []
         cancelBackgroundRefresh()
     }
 
@@ -66,6 +73,12 @@ extension AppState {
     /// Works out what a batch of file events means and queues the refresh it calls for.
     func projectFilesChanged(_ events: [ProjectFileEvent]) async {
         guard !isReviewingPullRequest, let project = currentProject else { return }
+
+        // A result bundle being written is a test run under way, and says nothing about the
+        // snapshots until it is finished.
+        if touchesTestResults(events) {
+            testResultsChanged()
+        }
 
         let change = await Self.classify(events, in: project, with: changeClassifier)
         // The project can have been replaced while the batch was being read.

@@ -98,6 +98,16 @@ struct AppCommands: Commands {
 
             Divider()
 
+            // The sidebar's own Project / Last Test Run switch again, over the same state.
+            Picker("Sidebar Shows", selection: sidebarSource) {
+                Text("Project Status").tag(SidebarSource.project)
+                Text("Last Test Run").tag(SidebarSource.testRun)
+            }
+            .pickerStyle(.inline)
+            .disabled(!state.canShowTestRun)
+
+            Divider()
+
             Toggle("Show Only Modified Snapshots", isOn: binding(\.showGitModifiedOnly))
                 .disabled(!state.canFilterByGitChanges)
             Toggle("Show Only Suites with Warnings", isOn: binding(\.showWarningsOnly))
@@ -230,6 +240,15 @@ struct AppCommands: Commands {
     }
 
     /// A binding onto one of the state's properties, which `Commands` cannot take with `$`.
+    /// Switches through ``AppState/showTestRun()`` and ``AppState/showProjectStatus()``
+    /// rather than assigning, because switching also reads the run and moves the selection.
+    private var sidebarSource: Binding<SidebarSource> {
+        Binding(
+            get: { state.sidebarSource },
+            set: { $0 == .testRun ? state.showTestRun() : state.showProjectStatus() }
+        )
+    }
+
     private func binding<Value>(_ keyPath: ReferenceWritableKeyPath<AppState, Value>) -> Binding<Value> {
         let state = state
         return Binding(

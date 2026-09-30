@@ -27,6 +27,12 @@ struct TreeItemContextMenu: View {
         }
     }
 
+    /// Whether the row is one of the images the last test run attached, which are copies
+    /// with no test file behind them and nothing in the project to delete.
+    private var isTestRunAttachment: Bool {
+        item.suiteID == AppState.testRunSuiteID
+    }
+
     @ViewBuilder
     private func suiteMenu(_ suite: SnapshotSuite) -> some View {
         Button {
@@ -37,7 +43,7 @@ struct TreeItemContextMenu: View {
 
         // A pull request under review is a set of downloaded copies: there is no test file
         // on disk to open, and nothing deleting a copy would change.
-        if !state.isReviewingPullRequest {
+        if !state.isReviewingPullRequest, !isTestRunAttachment {
             Button {
                 state.openTestSource(for: suite)
             } label: {
@@ -45,7 +51,7 @@ struct TreeItemContextMenu: View {
             }
         }
 
-        if !state.isReviewingPullRequest {
+        if !state.isReviewingPullRequest, !isTestRunAttachment {
             Button {
                 state.openSnapshotsFolder(for: suite)
             } label: {
@@ -73,10 +79,7 @@ struct TreeItemContextMenu: View {
         Button {
             state.showSnapshot(snapshot, withGitDiff: true)
         } label: {
-            Label(
-                state.isReviewingPullRequest ? "Compare with Base Branch" : "Show Snapshot (with Git diff)",
-                systemImage: "eye"
-            )
+            Label(compareTitle(for: snapshot), systemImage: "eye")
         }
 
         Button {
@@ -115,13 +118,23 @@ struct TreeItemContextMenu: View {
                 }
             }
 
-            Divider()
+            if !isTestRunAttachment {
+                Divider()
 
-            Button(role: .destructive) {
-                state.delete(snapshot: snapshot, in: parentSuiteID)
-            } label: {
-                Label("Delete Snapshot", systemImage: "trash")
+                Button(role: .destructive) {
+                    state.delete(snapshot: snapshot, in: parentSuiteID)
+                } label: {
+                    Label("Delete Snapshot", systemImage: "trash")
+                }
             }
         }
+    }
+
+    private func compareTitle(for snapshot: SnapshotItem) -> String {
+        if state.isReviewingPullRequest { return "Compare with Base Branch" }
+        if state.sidebarSource == .testRun, state.testRun?.isFailing(snapshotID: snapshot.id) == true {
+            return "Compare with Last Test Run"
+        }
+        return "Show Snapshot (with Git diff)"
     }
 }
