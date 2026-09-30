@@ -94,7 +94,9 @@ final class AppState {
     let filesystem: any FilesystemService
     let gitService: any GitService
     let imageDiff: any ImageDiffService
-    private let scanner: ProjectScanner
+    let scanner: ProjectScanner
+    let watcher: any ProjectWatching
+    let changeClassifier: ProjectChangeClassifier
     private let ingestion: any IngestionService
     private let clipboard: ClipboardService
     private let workspace: WorkspaceService
@@ -106,12 +108,23 @@ final class AppState {
     /// Held so a second diff request supersedes the first rather than racing it.
     var diffTask: Task<Void, Never>?
     var gitStatusTask: Task<Void, Never>?
+    /// The loop reading the watcher's events. Kept out of observation so it stays a plain
+    /// stored property, which is what lets `deinit` reach it.
+    @ObservationIgnored var watchTask: Task<Void, Never>?
+    /// The one refresh working through ``pendingChange``; see ``schedule(_:)``.
+    var backgroundRefreshTask: Task<Void, Never>?
+    /// What the watcher has reported that no refresh has picked up yet.
+    var pendingChange = ProjectChange()
+    /// Counts the prunings ``currentProject`` has had in memory, so a background scan can
+    /// tell that the tree moved under it while it was walking the disk.
+    private(set) var projectEdits = 0
 
     init(
         filesystem: any FilesystemService = DefaultFilesystemService(),
         gitService: (any GitService)? = nil,
         imageDiff: (any ImageDiffService)? = nil,
         scanner: ProjectScanner? = nil,
+        watcher: any ProjectWatching = FSEventsProjectWatcher(),
         ingestion: any IngestionService = DefaultIngestionService(),
         clipboard: ClipboardService = ClipboardService(),
         workspace: WorkspaceService = WorkspaceService(),
@@ -123,6 +136,8 @@ final class AppState {
         self.gitService = git
         self.imageDiff = imageDiff ?? DefaultImageDiffService(filesystem: filesystem)
         self.scanner = scanner ?? ProjectScanner(filesystem: filesystem, gitService: git)
+        self.watcher = watcher
+        changeClassifier = ProjectChangeClassifier(filesystem: filesystem)
         self.ingestion = ingestion
         self.clipboard = clipboard
         self.workspace = workspace
@@ -134,6 +149,10 @@ final class AppState {
         pullRequestResolver = GitHubPRReferenceResolver(gitService: git)
         self.defaults = defaults
         recentProjects = Self.loadRecentProjects(from: defaults)
+    }
+
+    deinit {
+        watchTask?.cancel()
     }
 
     // MARK: - Opening
@@ -202,6 +221,8 @@ final class AppState {
         // A newer open supersedes the one in flight: scanning a large repository takes long
         // enough that two overlapping scans would race to publish their results.
         scanTask?.cancel()
+        // The scan about to start reads everything a background refresh would have.
+        cancelBackgroundRefresh()
         loadingProjectURL = root
         lastError = nil
         addRecentProject(root)
@@ -244,6 +265,7 @@ final class AppState {
     func closeProject() {
         abandonPullRequestReview()
         scanTask?.cancel()
+        stopWatching()
         closePreview()
         currentProject = nil
         selectedRowID = nil
@@ -288,6 +310,56 @@ final class AppState {
         // the user open it. Several suites start closed, which is the useful overview.
         expandedSuiteIDs = bundle.suites.count == 1 ? Set(bundle.suites.map(\.id)) : []
         selectedRowID = visibleRows.first?.id
+        restartWatching()
+    }
+
+    /// Swaps in a fresh scan of the project already open, leaving the window where it was.
+    ///
+    /// ``load(_:)`` is for a project somebody asked for and resets everything that described
+    /// the last one. This is for a scan nobody asked for: the open suites, the filters, and
+    /// the canvas all stay, and the selection moves only when the row under it is gone —
+    /// to the neighbour a deletion would have picked, for the same reason.
+    func merge(_ bundle: ProjectBundle) {
+        guard bundle != currentProject else { return }
+        let rowsBefore = visibleRows
+
+        // The scan read the working tree's status itself, and more recently.
+        gitStatusTask?.cancel()
+        currentProject = bundle
+        expandedSuiteIDs.formIntersection(bundle.suites.map(\.id))
+
+        let rows = visibleRows
+        if rowsBefore.isEmpty {
+            // A tree that had nothing to select now does, and the keyboard needs a row.
+            selectedRowID = selectedRowID ?? rows.first?.id
+        } else if let selected = selectedRowID, !rows.contains(where: { $0.id == selected }) {
+            selectedRowID = Self.survivor(of: selected, among: rowsBefore, in: rows)
+        }
+
+        if let shown = preview?.snapshotID,
+           !bundle.suites.contains(where: { $0.snapshots.contains { $0.id == shown } }) {
+            closePreview()
+        }
+    }
+
+    /// The row that takes the place of one a rescan no longer has.
+    ///
+    /// The nearest row below it in the old order that is still there, or failing that the
+    /// nearest above: the same neighbour ``selection(surviving:)`` picks for a deletion.
+    private static func survivor(
+        of rowID: String,
+        among rowsBefore: [TreeRowItem],
+        in rows: [TreeRowItem]
+    ) -> String? {
+        let remaining = Set(rows.map(\.id))
+        guard let index = rowsBefore.firstIndex(where: { $0.id == rowID }) else {
+            return rows.first?.id
+        }
+
+        if let below = rowsBefore[index...].first(where: { remaining.contains($0.id) }) {
+            return below.id
+        }
+        return rowsBefore[..<index].last(where: { remaining.contains($0.id) })?.id ?? rows.first?.id
     }
 
     // MARK: - Recent projects
@@ -896,6 +968,7 @@ final class AppState {
     }
 
     private func finishDeletion(replacement: String?, removedSnapshotIDs: Set<String>) {
+        projectEdits += 1
         selectedRowID = replacement
         if let shown = preview?.snapshotID, removedSnapshotIDs.contains(shown) {
             closePreview()

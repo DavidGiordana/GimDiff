@@ -261,6 +261,20 @@ struct PullRequestReviewTests {
         #expect(fixture.filesystem.trashedPaths.isEmpty)
     }
 
+    @Test("A review is left unwatched, and closing it watches the project again")
+    func reviewIsNotWatched() async throws {
+        let fixture = Fixture()
+        let project = AppStateFixture.twoSuites()
+        fixture.state.load(project)
+        #expect(fixture.watcher.watchedRoots == [[project.rootURL]])
+
+        await fixture.open("https://github.com/octo/app/pull/7")
+        #expect(fixture.watcher.watchedRoots.count == 1)
+
+        fixture.state.closePullRequestReview()
+        #expect(fixture.watcher.watchedRoots == [[project.rootURL], [project.rootURL]])
+    }
+
     @Test("Closing a review opened with no project returns to the recent list")
     func closeWithoutProject() async throws {
         let fixture = Fixture()
@@ -343,6 +357,7 @@ private struct Fixture {
     let state: AppState
     let filesystem = MockFilesystemService()
     let service: StubPRService
+    let watcher = StubProjectWatcher()
     let pasteboard = NSPasteboard(name: NSPasteboard.Name("GimDiffTests-\(UUID().uuidString)"))
     let defaults = TemporaryDefaults()
 
@@ -354,6 +369,7 @@ private struct Fixture {
         state = AppState(
             filesystem: filesystem,
             gitService: gitService,
+            watcher: watcher,
             clipboard: ClipboardService(pasteboard: pasteboard),
             pullRequests: service,
             defaults: defaults.defaults

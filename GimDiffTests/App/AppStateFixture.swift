@@ -19,6 +19,8 @@ import Foundation
 struct AppStateFixture {
     let state: AppState
     let filesystem: MockFilesystemService
+    /// Stands in for FSEvents, so the only file events are the ones a test sends.
+    let watcher = StubProjectWatcher()
     /// Held for its lifetime: releasing it erases the defaults domain.
     let defaults: TemporaryDefaults
 
@@ -34,6 +36,7 @@ struct AppStateFixture {
         state = AppState(
             filesystem: filesystem,
             gitService: StubGitService(),
+            watcher: watcher,
             defaults: defaults.defaults
         )
 

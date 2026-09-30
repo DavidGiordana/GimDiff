@@ -193,6 +193,38 @@ Two more rules that are easy to undo by accident:
 `⌘R` refreshes the images on screen and `⇧⌘R` rescans the project, rather than the other way
 round: a snapshot is looked at far more often than a folder is walked again.
 
+### Background refresh
+
+Nobody has to press ⌘R after a test run. `AppState+Watching` keeps the open project in step
+with the disk, whether or not the window is key:
+
+- **One FSEvents stream, not a descriptor per folder.** `FSEventsProjectWatcher` implements
+  `ProjectWatching`, which `Engine/` declares. The kernel does the watching, so an idle
+  project costs nothing. The stream carries `kFSEventStreamCreateFlagIgnoreSelf`: GimDiff's
+  own promotions and deletions already refresh as part of being performed.
+- **`ProjectChangeClassifier` decides what a batch means**, off the main actor, and drops
+  most of it on the path alone — anything under a folder `ProviderIgnoreFilter` prunes, the
+  Git object store, a test source being saved. What is left asks for one of three things,
+  cheapest first: the badges (`HEAD` moved), the images on screen (a snapshot already in the
+  tree was rewritten), or a rescan (a snapshot, a suite, or a test source came or went).
+- **`.git/index` is not watched, on purpose.** `git status` refreshes the index as a side
+  effect, so answering an index change with a status read would never stop. Only `HEAD`,
+  `packed-refs`, and `refs/heads/` count.
+- **A background rescan goes through `merge(_:)`, never `load(_:)`.** `load` is for a project
+  somebody asked for and resets the selection, the open suites, and the canvas. `merge`
+  keeps all three, and moves the selection only when its row is gone — to the neighbour a
+  deletion would have picked.
+- **One refresh at a time.** Changes that arrive while a rescan is walking the project
+  accumulate in `pendingChange` and become a single follow-up, so a test run that writes for
+  a minute does not queue a minute of scans. A deletion made during a scan bumps
+  `projectEdits`, which makes that scan's result be thrown away and taken again: it may have
+  listed the file before it went, and GimDiff's own writes are not reported for a later
+  batch to correct.
+
+A pull request review is not watched. Tests that load a project hand `AppState` a
+`StubProjectWatcher`, so no real stream delivers an event halfway through an assertion;
+`AppState.projectFilesChanged(_:)` is the seam they drive instead.
+
 ### URL scheme
 
 `gimdiff://` is registered in `GimDiff/Info.plist` (role `Viewer`, identifier

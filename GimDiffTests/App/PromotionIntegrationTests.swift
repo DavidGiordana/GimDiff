@@ -40,7 +40,7 @@ struct PromotionIntegrationTests {
     private func state(for repository: GitFixture, item: SnapshotItem, defaults: TemporaryDefaults)
         -> AppState
     {
-        let state = AppState(defaults: defaults.defaults)
+        let state = AppState(watcher: StubProjectWatcher(), defaults: defaults.defaults)
         state.load(ProjectBundle(
             rootURL: repository.url,
             gitRootURL: repository.url,

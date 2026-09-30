@@ -150,6 +150,7 @@ struct CanvasDiffTests {
                 repositoryRoot: AppStateFixture.root,
                 statuses: [footer: .modified]
             ),
+            watcher: StubProjectWatcher(),
             defaults: defaults.defaults
         )
         state.load(bundle)
@@ -170,6 +171,7 @@ struct CanvasDiffTests {
         let state = AppState(
             filesystem: MockFilesystemService(),
             gitService: StubGitService(repositoryRoot: AppStateFixture.root),
+            watcher: StubProjectWatcher(),
             defaults: defaults.defaults
         )
         state.load(AppStateFixture.twoSuites())

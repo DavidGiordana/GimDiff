@@ -45,6 +45,7 @@
 				App/AppDelegate.swift,
 				App/AppState.swift,
 				"App/AppState+FileActions.swift",
+				"App/AppState+Watching.swift",
 				App/GimDiffApp.swift,
 				App/SnapshotPreview.swift,
 				"Extensions/Color+Hex.swift",

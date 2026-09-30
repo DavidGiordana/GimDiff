@@ -114,9 +114,12 @@ private extension HelpTopic {
         ]),
         HelpSection(title: "After re-running your tests", blocks: [
             .text("""
-                **Refresh Images** (⌘R) reads the images on screen off disk again. \
-                **Reload Project** (⇧⌘R) rescans the whole folder, which you need only when \
-                snapshots were added or removed.
+                GimDiff watches the open project, so a test run shows up on its own: \
+                rewritten images are redrawn, new and deleted snapshots come and go in the \
+                tree, and the badges follow your commits — even while GimDiff is in the \
+                background. **Refresh Images** (⌘R) and **Reload Project** (⇧⌘R) are there \
+                for when you would rather ask: the first reads the images on screen off \
+                disk again, the second rescans the whole folder from scratch.
                 """),
         ]),
     ]

@@ -15,7 +15,7 @@ import Testing
 @MainActor
 struct ProjectOpeningTests {
     private func state(defaults: TemporaryDefaults) -> AppState {
-        AppState(gitService: StubGitService(), defaults: defaults.defaults)
+        AppState(gitService: StubGitService(), watcher: StubProjectWatcher(), defaults: defaults.defaults)
     }
 
     @Test("A scanned project fills the tree and remembers the folder")
