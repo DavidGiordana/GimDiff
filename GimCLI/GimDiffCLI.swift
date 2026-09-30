@@ -11,7 +11,7 @@ import Foundation
 /// Routes a command line to the subcommand that handles it.
 enum GimDiffCLI {
     static let toolName = "gimdiff"
-    static let version = "1.0.0 Beta 2"
+    static let version = "1.0.0 Beta 3"
 
     static let usage = """
     gimdiff — snapshot comparison for the terminal.
