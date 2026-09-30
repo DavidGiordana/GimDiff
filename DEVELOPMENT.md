@@ -165,9 +165,11 @@ suppresses the window entirely. The UI tests therefore reset state with a defaul
 
 The detail column talks in ``SnapshotPane`` values, not in left and right. A pane carries a
 **role** (`candidate` or `baseline`) and an **origin** (`workingTree` or `committedVersion`),
-and `SnapshotPreview.panes` always puts the candidate first — every action in a pane header
-reads as an arrow pointing at the file it overwrites, and that only works if the sides keep
-their order.
+and `SnapshotPreview.panes` always puts the baseline first and the candidate second, reading
+old to new like every other diff tool. Every action in a pane header — and `⌘←` / `⌘→` in the
+*Snapshot* menu — reads as an arrow pointing at the file it overwrites: Accept points left at
+the baseline, Revert points right at the candidate. That only works if the sides keep their
+order.
 
 The origin is load-bearing. A comparison against `HEAD` holds a baseline `git show` wrote to
 a scratch file, so *accepting the candidate has nothing to write to*: the candidate already

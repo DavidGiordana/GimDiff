@@ -135,9 +135,9 @@ enum SnapshotPreview: Equatable, Sendable {
 
     /// The panes to draw, left to right.
     ///
-    /// The candidate leads: it is the image the user just produced and the one every action
-    /// in the header is about, so it reads first and the baseline it is measured against
-    /// sits beside it.
+    /// The baseline leads and the candidate follows it, old to new, the way `git diff`,
+    /// GitHub, and every other diff tool read. The order is fixed rather than configurable:
+    /// the header actions and ⌘← / ⌘→ are arrows pointing at the pane they overwrite.
     var panes: [SnapshotPane] {
         switch self {
         case let .single(snapshot):
@@ -146,17 +146,17 @@ enum SnapshotPreview: Equatable, Sendable {
             [SnapshotPane(role: role, fileURL: snapshot.fileURL, origin: .pullRequest)]
         case let .comparison(pair, _, _, baselineOrigin):
             [
+                SnapshotPane(role: .baseline, fileURL: pair.reference.url, origin: baselineOrigin),
                 SnapshotPane(
                     role: .candidate,
                     fileURL: pair.failure.url,
                     origin: baselineOrigin == .pullRequest ? .pullRequest : .workingTree
                 ),
-                SnapshotPane(role: .baseline, fileURL: pair.reference.url, origin: baselineOrigin),
             ]
         case let .testRunFailure(pair, _, _):
             [
-                SnapshotPane(role: .candidate, fileURL: pair.failure.url, origin: .testRun),
                 SnapshotPane(role: .baseline, fileURL: pair.reference.url, origin: .workingTree),
+                SnapshotPane(role: .candidate, fileURL: pair.failure.url, origin: .testRun),
             ]
         case let .testRunAttachment(snapshot):
             [SnapshotPane(role: .candidate, fileURL: snapshot.fileURL, origin: .testRun)]

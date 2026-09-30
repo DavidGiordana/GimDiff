@@ -89,15 +89,15 @@ struct SnapshotCanvasView: View {
                 // A gap rather than a hairline: a thin full-height seam between two panes is
                 // how macOS draws a split view's divider, and it was read as one to drag.
                 HStack(spacing: 8) {
-                    pane(candidate)
                     pane(baseline)
+                    pane(candidate)
                 }
 
             case .curtain:
                 combined(candidate: candidate, baseline: baseline) {
                     SnapshotSplitSliderView(
-                        leading: candidate,
-                        trailing: baseline,
+                        leading: baseline,
+                        trailing: candidate,
                         reloadToken: state.imageReloadToken,
                         matte: imageMatte
                     )
@@ -154,8 +154,8 @@ struct SnapshotCanvasView: View {
     ) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 1) {
-                SnapshotPaneHeader(pane: candidate)
                 SnapshotPaneHeader(pane: baseline)
+                SnapshotPaneHeader(pane: candidate)
             }
             .background(.quaternary)
 
@@ -265,22 +265,22 @@ struct SnapshotPaneHeader: View {
             Button {
                 state.promoteCandidateToBaseline()
             } label: {
-                Image(systemName: "arrow.right")
+                Image(systemName: "arrow.left")
             }
             .buttonStyle(.borderless)
             .disabled(!state.canPromoteCandidate)
-            .help(state.candidatePromotionObstacle ?? "Accept Candidate / Overwrite Baseline (⌘→)")
+            .help(state.candidatePromotionObstacle ?? "Accept Candidate / Overwrite Baseline (⌘←)")
             .accessibilityLabel("Accept Candidate")
 
         case .baseline:
             Button {
                 state.revertCandidateToBaseline()
             } label: {
-                Image(systemName: "arrow.left")
+                Image(systemName: "arrow.right")
             }
             .buttonStyle(.borderless)
             .disabled(!state.canRevertToBaseline)
-            .help("Revert to Baseline — overwrite the candidate on disk (⌘←)")
+            .help("Revert to Baseline — overwrite the candidate on disk (⌘→)")
             .accessibilityLabel("Revert to Baseline")
         }
 

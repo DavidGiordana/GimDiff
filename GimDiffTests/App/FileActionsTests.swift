@@ -186,10 +186,10 @@ struct FileActionsTests {
         #expect(committed.isWritable == false)
     }
 
-    @Test("The candidate leads, so the promotion arrow points at the baseline beside it")
+    @Test("The baseline leads, so the panes read old to new and the promotion arrow points left")
     func ordersThePanes() {
         let fixture = loosePair()
 
-        #expect(fixture.state.preview?.panes.map(\.role) == [.candidate, .baseline])
+        #expect(fixture.state.preview?.panes.map(\.role) == [.baseline, .candidate])
     }
 }

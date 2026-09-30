@@ -204,13 +204,13 @@ struct AppCommands: Commands {
             Button("Accept Candidate / Overwrite Baseline") {
                 state.promoteCandidateToBaseline()
             }
-            .keyboardShortcut(.rightArrow, modifiers: .command)
+            .keyboardShortcut(.leftArrow, modifiers: .command)
             .disabled(!state.canPromoteCandidate)
 
             Button("Revert to Baseline") {
                 state.revertCandidateToBaseline()
             }
-            .keyboardShortcut(.leftArrow, modifiers: .command)
+            .keyboardShortcut(.rightArrow, modifiers: .command)
             .disabled(!state.canRevertToBaseline)
 
             Divider()

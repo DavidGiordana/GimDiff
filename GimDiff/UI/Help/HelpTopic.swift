@@ -118,7 +118,7 @@ private extension HelpTopic {
                 **Last Test Run** (or View ▸ Last Test Run) to read the newest run Xcode left \
                 in DerivedData: the sidebar then lists only the snapshots it failed on, and \
                 selecting one shows the image the test rendered against the recorded file. \
-                Use **Diff Mask** to see where they differ. **Accept Candidate** (⌘→) re-records the snapshot without \
+                Use **Diff Mask** to see where they differ. **Accept Candidate** (⌘←) re-records the snapshot without \
                 running the test again. Switch back to **Project** at any time; the run stays \
                 read, and a new one is picked up as soon as Xcode finishes writing it.
                 """),
@@ -165,8 +165,8 @@ private extension HelpTopic {
         ]),
         HelpSection(title: "Snapshot", blocks: [
             .shortcuts([
-                HelpShortcut("⌘→", "Accept the candidate, overwriting the baseline"),
-                HelpShortcut("⌘←", "Revert the candidate to the baseline"),
+                HelpShortcut("⌘←", "Accept the candidate, overwriting the baseline"),
+                HelpShortcut("⌘→", "Revert the candidate to the baseline"),
                 HelpShortcut("⌘↩", "Reveal the selection in the Finder"),
                 HelpShortcut("⌘L", "Clear the canvas"),
                 HelpShortcut("⌘⌫", "Move the selection to the Trash"),
@@ -186,7 +186,7 @@ private extension HelpTopic {
             .text("""
                 The **candidate** is the image your test just recorded: the file on disk. The \
                 **baseline** is what it is measured against — the version committed to git, \
-                or a reference image you opened beside it. The candidate is always on the left.
+                or a reference image you opened beside it. The baseline is always on the left and the candidate on the right.
                 """),
             .text("""
                 Selecting a snapshot compares it with its committed version when git has one. \
@@ -213,8 +213,8 @@ private extension HelpTopic {
         ]),
         HelpSection(title: "Accepting and reverting", blocks: [
             .text("""
-                **Accept Candidate** (⌘→) copies the candidate over the baseline file. \
-                **Revert to Baseline** (⌘←) copies the baseline over the candidate. Both \
+                **Accept Candidate** (⌘←) copies the candidate over the baseline file. \
+                **Revert to Baseline** (⌘→) copies the baseline over the candidate. Both \
                 overwrite a file on disk.
                 """),
             .text("""
