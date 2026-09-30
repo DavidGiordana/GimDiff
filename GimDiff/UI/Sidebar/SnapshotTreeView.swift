@@ -292,6 +292,10 @@ private struct SidebarSourcePicker: View {
 private struct TreeRowView: View {
     @Environment(AppState.self) private var state
 
+    /// How far the chevron's hit area reaches past the glyph on every side. Wide enough to
+    /// catch the gap to the folder icon, short of taking that icon's clicks.
+    private static let chevronHitSlop: CGFloat = 6
+
     let item: TreeRowItem
 
     var body: some View {
@@ -315,8 +319,17 @@ private struct TreeRowView: View {
                     .foregroundStyle(.secondary)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     .frame(width: 10)
+                    // A plain button is hit only where its label is, and a caption-sized
+                    // glyph is a target the pointer has to be aimed at. The padding grows
+                    // the hit area; the negative padding below gives the space back, so
+                    // the row lays out exactly as it did.
+                    .padding(.horizontal, Self.chevronHitSlop)
+                    .padding(.vertical, Self.chevronHitSlop)
+                    .contentShape(.rect)
             }
             .buttonStyle(.plain)
+            .padding(.horizontal, -Self.chevronHitSlop)
+            .padding(.vertical, -Self.chevronHitSlop)
             .accessibilityLabel(isExpanded ? "Collapse \(suite.name)" : "Expand \(suite.name)")
 
             Image(systemName: isExpanded ? "folder.fill" : "folder")

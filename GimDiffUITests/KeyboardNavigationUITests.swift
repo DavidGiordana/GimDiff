@@ -220,6 +220,29 @@ final class KeyboardNavigationUITests: XCTestCase {
         XCTAssertEqual(app.windows.count, 1, "Closing a project is not closing the window.")
     }
 
+    /// The chevron answers a click that lands beside the glyph, not only one on it.
+    ///
+    /// Not a keyboard test, but it needs the same project and the same tree. The click lands
+    /// 9pt right of the glyph's centre: past the 10pt glyph, short of the folder icon.
+    func testClickingBesideTheChevronOpensTheSuite() {
+        let app = launch()
+        XCTAssertTrue(app.staticTexts["AlphaTests"].waitForExistence(timeout: 10))
+
+        let chevron = app.buttons["Expand AlphaTests"]
+        XCTAssertTrue(chevron.exists)
+        // Measured from the centre, which the hit slop grows around evenly, so the offset
+        // means the same thing whatever size the button reports.
+        chevron
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .withOffset(CGVector(dx: 9, dy: 0))
+            .click()
+
+        XCTAssertTrue(
+            app.staticTexts["header"].waitForExistence(timeout: 5),
+            "A click just beside the chevron must open the suite."
+        )
+    }
+
     // MARK: - Helpers
 
     /// Restoration is off so a window left in full screen cannot hide in its own Space; see
