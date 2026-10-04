@@ -37,9 +37,15 @@ struct TestRunDifference: Identifiable, Sendable, Equatable {
 /// Pairs the images of a test run with the snapshots of the open project.
 ///
 /// The pairing is made on contents alone. An assertion that attaches the reference it
-/// compared against attaches a copy of a file the project holds, so an attachment with the
-/// same bytes as a snapshot *is* that snapshot's baseline, whatever either one is called
-/// and whichever library attached it.
+/// compared against attaches a picture of a file the project holds, so an attachment
+/// showing the same image as a snapshot *is* that snapshot's baseline, whatever either one
+/// is called and whichever library attached it.
+///
+/// Identical bytes are looked for first, and identical pixels only when no image of a step
+/// has them. A library that attaches the reference as a decoded image re-encodes it —
+/// swift-snapshot-testing does — and that usually reproduces the file only because the
+/// same encoder wrote it. A snapshot recorded on another machine or edited by hand holds
+/// the same picture in other bytes.
 struct TestRunMatcher: Sendable {
     private let filesystem: any FilesystemService
 
@@ -72,10 +78,20 @@ struct TestRunMatcher: Sendable {
         since runStart: Date?,
         index: inout SnapshotIndex
     ) -> [TestRunDifference] {
-        var matches: [Match] = []
-        for image in group.images {
-            guard let data = try? filesystem.readFile(at: image.fileURL) else { continue }
-            matches += index.snapshots(holding: data).map { Match(image: image, baseline: $0) }
+        let attached = group.images.compactMap { image -> (image: TestRunImage, data: Data)? in
+            guard let data = try? filesystem.readFile(at: image.fileURL) else { return nil }
+            return (image, data)
+        }
+
+        var matches = attached.flatMap { image, data in
+            index.snapshots(holding: data).map { Match(image: image, baseline: $0) }
+        }
+        if matches.isEmpty {
+            let related = Self.nameParts(of: failure)
+            matches = attached.flatMap { image, data in
+                index.snapshots(depicting: data, preferringPathsNaming: related)
+                    .map { Match(image: image, baseline: $0) }
+            }
         }
 
         guard !matches.isEmpty else {
@@ -145,16 +161,21 @@ struct TestRunMatcher: Sendable {
     private static func mostRelated(_ matches: [Match], to failure: TestRunFailure) -> [Match] {
         guard matches.count > 1 else { return matches }
 
-        let parts = failure.id
-            .split(separator: "/")
-            .map { $0.prefix { $0 != "(" } }
-            .filter { !$0.isEmpty }
+        let parts = nameParts(of: failure)
         let scores = matches.map { match in
             parts.filter { match.baseline.fileURL.path.contains($0) }.count
         }
         let best = scores.max() ?? 0
 
         return zip(matches, scores).filter { $0.1 == best }.map(\.0)
+    }
+
+    /// The parts of the identifier Xcode gives the failed test: its class and its method.
+    private static func nameParts(of failure: TestRunFailure) -> [Substring] {
+        failure.id
+            .split(separator: "/")
+            .map { $0.prefix { $0 != "(" } }
+            .filter { !$0.isEmpty }
     }
 }
 
@@ -165,8 +186,12 @@ struct TestRunMatcher: Sendable {
 /// that may hold thousands.
 private struct SnapshotIndex {
     private let filesystem: any FilesystemService
+    private var baselines: [TestRunDifference.Baseline] = []
     private var baselinesBySize: [Int: [TestRunDifference.Baseline]] = [:]
     private var contents: [String: Data] = [:]
+    /// What each snapshot decoded to, `nil` when it would not decode. Only the digest is
+    /// kept: a decoded snapshot is megabytes.
+    private var pixels: [String: ImagePixels?] = [:]
 
     init(project: ProjectBundle, filesystem: any FilesystemService) {
         self.filesystem = filesystem
@@ -174,13 +199,13 @@ private struct SnapshotIndex {
         for suite in project.suites {
             for snapshot in suite.snapshots {
                 guard let size = filesystem.fileSize(at: snapshot.fileURL) else { continue }
-                baselinesBySize[size, default: []].append(
-                    TestRunDifference.Baseline(
-                        suiteID: suite.id,
-                        snapshotID: snapshot.id,
-                        fileURL: snapshot.fileURL
-                    )
+                let baseline = TestRunDifference.Baseline(
+                    suiteID: suite.id,
+                    snapshotID: snapshot.id,
+                    fileURL: snapshot.fileURL
                 )
+                baselines.append(baseline)
+                baselinesBySize[size, default: []].append(baseline)
             }
         }
     }
@@ -190,10 +215,46 @@ private struct SnapshotIndex {
         (baselinesBySize[data.count] ?? []).filter { contents(of: $0.fileURL) == data }
     }
 
+    /// Every snapshot showing the same pixels as `data`, however either one was encoded.
+    ///
+    /// Decoding is what makes this the fallback: a length rules nothing out here, so every
+    /// snapshot is a candidate. The ones whose path names the failed test are decoded
+    /// first, and the rest only when none of those is the picture. The names only order the
+    /// search; the pixels decide.
+    mutating func snapshots(
+        depicting data: Data,
+        preferringPathsNaming parts: [Substring]
+    ) -> [TestRunDifference.Baseline] {
+        guard let attached = ImagePixels(decoding: data) else { return [] }
+
+        let (named, others) = baselines.reduce(
+            into: ([TestRunDifference.Baseline](), [TestRunDifference.Baseline]())
+        ) { tiers, baseline in
+            if parts.contains(where: { baseline.fileURL.path.contains($0) }) {
+                tiers.0.append(baseline)
+            } else {
+                tiers.1.append(baseline)
+            }
+        }
+
+        for tier in [named, others] {
+            let found = tier.filter { pixels(of: $0.fileURL) == attached }
+            if !found.isEmpty { return found }
+        }
+        return []
+    }
+
     private mutating func contents(of url: URL) -> Data? {
         if let known = contents[url.path] { return known }
         let data = try? filesystem.readFile(at: url)
         contents[url.path] = data
         return data
+    }
+
+    private mutating func pixels(of url: URL) -> ImagePixels? {
+        if let known = pixels[url.path] { return known }
+        let decoded = (try? filesystem.readFile(at: url)).flatMap(ImagePixels.init(decoding:))
+        pixels[url.path] = decoded
+        return decoded
     }
 }

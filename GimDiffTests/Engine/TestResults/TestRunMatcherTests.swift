@@ -234,4 +234,74 @@ struct TestRunMatcherTests {
 
         #expect(found.count == 1)
     }
+
+    // MARK: - Re-encoded references
+
+    /// Stubs an exported attachment holding real image bytes.
+    private func image(_ id: String, data: Data) -> TestRunImage {
+        let url = scratch.appendingPathComponent("\(id).png")
+        filesystem.stub(url, data: data)
+        return TestRunImage(id: id, name: "attachment \(id)", fileURL: url)
+    }
+
+    /// Stubs a snapshot holding real image bytes and returns the suite holding it.
+    private func suite(_ name: String, snapshot file: String, data: Data) -> SnapshotSuite {
+        let url = project.appendingPathComponent("Tests/__Snapshots__/\(name)/\(file)")
+        filesystem.stub(url, data: data)
+        return SnapshotSuite(
+            name: name,
+            snapshotsFolderURL: url.deletingLastPathComponent(),
+            snapshots: [SnapshotItem(name: file, fileURL: url)],
+            providerId: "test"
+        )
+    }
+
+    @Test("A reference attached in other bytes than the snapshot is matched by its pixels")
+    func matchesReencodedReference() throws {
+        let recorded = try Data(contentsOf: ImageFixtures.identicalA)
+        let cards = suite("CardsTests", snapshot: "testArtwork.png", data: recorded)
+        let images = [
+            image("X", data: try ImagePixelsTests.reencoded(ImageFixtures.identicalA)),
+            image("Y", data: try Data(contentsOf: ImageFixtures.modifiedB)),
+            image("Z", data: try Data(contentsOf: ImageFixtures.mismatchedDimensions)),
+        ]
+
+        let found = try differences(report(groups: [images]), suites: [cards])
+
+        #expect(found.map(\.baseline?.fileURL) == [cards.snapshots[0].fileURL])
+        #expect(found.first?.candidates.map(\.id) == ["Y"])
+    }
+
+    @Test("Identical pictures in two suites are told apart by the test that failed")
+    func prefersPictureNamedAfterTheTest() throws {
+        let recorded = try Data(contentsOf: ImageFixtures.identicalA)
+        let settings = suite("SettingsTests", snapshot: "testSettings.png", data: recorded)
+        let cards = suite("CardsTests", snapshot: "testArtwork.png", data: recorded)
+        let images = [
+            image("X", data: try ImagePixelsTests.reencoded(ImageFixtures.identicalA)),
+            image("Y", data: try Data(contentsOf: ImageFixtures.modifiedB)),
+        ]
+
+        let found = try differences(report(groups: [images]), suites: [settings, cards])
+
+        #expect(found.map(\.baseline?.suiteID) == [cards.id])
+    }
+
+    @Test("A picture the project does not hold leaves the step unmatched")
+    func keepsStepWithUnknownPicture() throws {
+        let cards = suite(
+            "CardsTests",
+            snapshot: "testArtwork.png",
+            data: try Data(contentsOf: ImageFixtures.modifiedA)
+        )
+        let images = [
+            image("X", data: try Data(contentsOf: ImageFixtures.modifiedB)),
+            image("Y", data: try Data(contentsOf: ImageFixtures.mismatchedDimensions)),
+        ]
+
+        let found = try differences(report(groups: [images]), suites: [cards])
+
+        #expect(found.map(\.baseline) == [nil])
+        #expect(found.first?.candidates.map(\.id) == ["X", "Y"])
+    }
 }
