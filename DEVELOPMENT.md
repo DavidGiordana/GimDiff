@@ -205,7 +205,7 @@ Both write through a scratch file rather than straight over the destination.
 the exchange atomic — so handing it the candidate directly would delete the image the canvas
 is still pointing at.
 
-Two more rules that are easy to undo by accident:
+Three more rules that are easy to undo by accident:
 
 - **`diffMode` is the only thing that decides what is drawn.** The toolbar's segmented
   picker and the View menu's Comparison picker are both bindings over it, not flags of their
@@ -214,6 +214,11 @@ Two more rules that are easy to undo by accident:
   the URL, and GimDiff's whole job is a file whose name stays put while its contents change.
   `AppState.imageReloadToken` is the counter that says the bytes moved; every view that
   decodes an image keys its `task(id:)` on it.
+- **The View menu reaches the canvas's own controls through requests.** Display mode, zoom,
+  and the onion skin's fade are each view's `@State`, so the menu posts a
+  `CanvasViewCommand` through `AppState.requestCanvasView(_:)` and every view on screen
+  carries out `canvasViewRequest`. The two canvas colours stay out of `AppState` and reach
+  the menu as the `canvasBackdrop` focused scene value.
 
 `⌘R` refreshes the images on screen and `⇧⌘R` rescans the project, rather than the other way
 round: a snapshot is looked at far more often than a folder is walked again.

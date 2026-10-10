@@ -25,6 +25,12 @@ struct DetailView: View {
             panelBackground: panelBackground,
             imageMatte: imageMatte
         )
+        // Scene-wide rather than tied to focus: the View menu sets these whether the
+        // sidebar or the canvas has the keyboard.
+        .focusedSceneValue(
+            \.canvasBackdrop,
+            CanvasBackdrop(panelBackground: $panelBackground, imageMatte: $imageMatte)
+        )
         .toolbar {
             CanvasToolbarContent(
                 state: state,
@@ -36,6 +42,23 @@ struct DetailView: View {
         // both images in full, which is not something to spend on every selection.
         .onChange(of: state.diffMode) { state.updateDiffReport() }
         .onChange(of: state.preview) { state.updateDiffReport() }
+    }
+}
+
+/// The canvas colours, handed to the menu bar, which has no other way to reach view state.
+struct CanvasBackdrop {
+    let panelBackground: Binding<Color?>
+    let imageMatte: Binding<Color?>
+}
+
+private struct CanvasBackdropKey: FocusedValueKey {
+    typealias Value = CanvasBackdrop
+}
+
+extension FocusedValues {
+    var canvasBackdrop: CanvasBackdrop? {
+        get { self[CanvasBackdropKey.self] }
+        set { self[CanvasBackdropKey.self] = newValue }
     }
 }
 

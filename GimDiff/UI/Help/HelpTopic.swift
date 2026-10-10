@@ -90,6 +90,12 @@ private extension HelpTopic {
                 from the recent list. GimDiff finds every snapshot folder in it and groups the \
                 images under the test suite that recorded them.
                 """),
+            .text("""
+                **File ▸ Open Recent** lists the same folders as the recent list. Hover over a \
+                folder in the list and click its **×**, or right-click it, to forget it or \
+                reveal it in the Finder; **Clear Recent Projects** forgets them all. The **×** \
+                beside the project's name (or **File ▸ Close Project**) goes back to the list.
+                """),
         ]),
         HelpSection(title: "Open images directly", blocks: [
             .text("""
@@ -109,7 +115,25 @@ private extension HelpTopic {
                 **Modified** chip under it keeps only snapshots that differ from their \
                 committed version, and **Warnings** keeps only suites whose test source could \
                 not be found. Each chip appears only when the project has something it would \
-                keep.
+                keep. **Edit ▸ Clear Filters**, ⎋ in the field, or the field's **×** puts the \
+                whole tree back.
+                """),
+        ]),
+        HelpSection(title: "Act on a snapshot", blocks: [
+            .text("""
+                Right-click a row, or use the **Snapshot** menu on the selected one, to copy its \
+                name, open it in Preview, reveal it in the Finder, open its snapshots folder, \
+                open its test file in Xcode, or move it to the Trash. The buttons at the right \
+                of each pane's header do the same for the image in that pane.
+                """),
+        ]),
+        HelpSection(title: "Discard changes", blocks: [
+            .text("""
+                **Discard Changes** puts a modified snapshot back to its committed version; on \
+                a suite it does so for every modified snapshot in it. **Discard All…**, beside \
+                the filter chips (or **Snapshot ▸ Discard All Changes in Project…**), does it \
+                for the whole project after asking first. Untracked snapshots are left alone, \
+                and a change that was never committed cannot be recovered.
                 """),
         ]),
         HelpSection(title: "Failures from your test runs", blocks: [
@@ -121,7 +145,11 @@ private extension HelpTopic {
                 snapshots the run failed on, and \
                 selecting one shows the image the test rendered against the recorded file. \
                 Use **Diff Mask** to see where they differ. **Accept** re-records the snapshot without \
-                running the test again. Switch back to **Project** at any time; the run stays \
+                running the test again, and **Accept All…** beside the run picker (or \
+                **Snapshot ▸ Accept All Test Run Failures…**) does so for every failure at \
+                once, after asking. When a test attached the snapshot more than once, click \
+                the candidate's file name (or use **Snapshot ▸ Test Run Candidate**) to choose \
+                which rendering to compare. Switch back to **Project** at any time; the run stays \
                 read, and a new one is picked up as soon as Xcode finishes writing it — unless \
                 you picked an older run, which stays until you pick the newest again.
                 """),
@@ -170,6 +198,7 @@ private extension HelpTopic {
             .shortcuts([
                 HelpShortcut("⌘↩", "Reveal the selection in the Finder"),
                 HelpShortcut("⌘L", "Clear the canvas"),
+                HelpShortcut("⌘= ⌘-", "Zoom the images in and out"),
                 HelpShortcut("⌘⌫", "Move the selection to the Trash"),
             ]),
         ]),
@@ -201,15 +230,27 @@ private extension HelpTopic {
                 candidate over the baseline; drag its slider to fade from one to the other, \
                 and whatever moves is what changed. **Diff Mask** paints every changed \
                 pixel in magenta and reports how much of the image changed. Switch between them \
-                from the toolbar or the **View** menu.
+                from the toolbar or the **View** menu. **View ▸ Onion Skin** jumps the fade to \
+                either image or back to both equally, as the slider's **Reset** does.
+                """),
+            .text("""
+                The **×** in a pane's header (or **Snapshot ▸ Close Baseline** and **Close \
+                Candidate**) closes that side and leaves the other on screen on its own.
                 """),
         ]),
         HelpSection(title: "Zoom and backgrounds", blocks: [
             .text("""
                 Each pane has its own display mode: **Fit**, **Actual Size (1:1)**, or \
-                **Free**. In Free, scroll over the image to zoom around the pointer. The \
-                toolbar's colour wells set the panel background and a matte behind the image, \
-                which makes a transparent snapshot readable.
+                **Free**. In Free, scroll or pinch over the image to zoom around the pointer, \
+                drag to move it, or use the **−** and **+** buttons and type a factor between \
+                them; the target button centres the image at 1.0 again. **View ▸ Image Size**, \
+                **Zoom In** (⌘=), **Zoom Out** (⌘-), and **Centre and Reset Zoom** do the same \
+                for every pane at once.
+                """),
+            .text("""
+                The toolbar's colour wells set the panel background and a matte behind the \
+                image, which makes a transparent snapshot readable. **View ▸ Panel Background** \
+                and **View ▸ Image Matte** offer the same presets.
                 """),
         ]),
         HelpSection(title: "Accepting and rejecting", blocks: [

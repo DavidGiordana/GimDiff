@@ -14,6 +14,7 @@ struct AppCommands: Commands {
     let delegate: AppDelegate
 
     @Environment(\.openWindow) private var openWindow
+    @FocusedValue(\.canvasBackdrop) private var canvasBackdrop
 
     var body: some Commands {
         let _ = registerWindowOpener()
@@ -64,8 +65,20 @@ struct AppCommands: Commands {
                 }
             }
 
-            Button("Clear Recent Projects") {
-                state.clearRecentProjects()
+            // The sidebar's recent list again. Forgetting one folder stays on its row: a
+            // menu has no way to point at the folder an item would remove.
+            Menu("Open Recent") {
+                ForEach(state.recentProjects, id: \.path) { url in
+                    Button(url.lastPathComponent) {
+                        state.openProject(at: url)
+                    }
+                }
+
+                Divider()
+
+                Button("Clear Recent Projects") {
+                    state.clearRecentProjects()
+                }
             }
             .disabled(state.recentProjects.isEmpty)
         }
@@ -134,6 +147,53 @@ struct AppCommands: Commands {
             }
             .pickerStyle(.inline)
             .disabled(state.preview?.isComparison != true)
+
+            Divider()
+
+            // The footer controls of each pane, applied to every pane on screen at once.
+            // ⌘0 is Collapse Sidebar's, so resetting the zoom goes without a shortcut.
+            Menu("Image Size") {
+                Button("Fit") { state.requestCanvasView(.fit) }
+                Button("Actual Size (1:1)") { state.requestCanvasView(.actualSize) }
+                Button("Free") { state.requestCanvasView(.free) }
+            }
+            .disabled(!state.canvasHasZoomableImages)
+
+            Button("Zoom In") { state.requestCanvasView(.zoomIn) }
+                .keyboardShortcut("=", modifiers: .command)
+                .disabled(!state.canvasHasZoomableImages)
+            Button("Zoom Out") { state.requestCanvasView(.zoomOut) }
+                .keyboardShortcut("-", modifiers: .command)
+                .disabled(!state.canvasHasZoomableImages)
+            Button("Centre and Reset Zoom") { state.requestCanvasView(.resetZoom) }
+                .disabled(!state.canvasHasZoomableImages)
+
+            // The onion skin's slider, at the three places worth going to by name.
+            Menu("Onion Skin") {
+                Button("\(onionSideTitle(.baseline)) Only") {
+                    state.requestCanvasView(.fadeOnionSkin(to: 0))
+                }
+                Button("Both Equally") {
+                    state.requestCanvasView(.fadeOnionSkin(to: OnionSkinView.defaultOpacity))
+                }
+                Button("\(onionSideTitle(.candidate)) Only") {
+                    state.requestCanvasView(.fadeOnionSkin(to: 1))
+                }
+            }
+            .disabled(!state.canvasShowsOnionSkin)
+
+            Divider()
+
+            // The toolbar's two colour wells, minus the custom colour, which needs the well.
+            Picker("Panel Background", selection: canvasBackdrop?.panelBackground ?? .constant(nil)) {
+                backdropChoices
+            }
+            .disabled(canvasBackdrop == nil)
+
+            Picker("Image Matte", selection: canvasBackdrop?.imageMatte ?? .constant(nil)) {
+                backdropChoices
+            }
+            .disabled(canvasBackdrop == nil)
         }
 
         CommandGroup(replacing: .textEditing) {
@@ -162,18 +222,12 @@ struct AppCommands: Commands {
             }
             .disabled(state.selectedSnapshot == nil)
 
-            Button(
-                state.isReviewingPullRequest ? "Compare with Base Branch" : "Show Snapshot with Git Diff"
-            ) {
+            Button(state.compareActionTitle(for: state.selectedSnapshot)) {
                 state.showSelectedSnapshot(withGitDiff: true)
             }
             .disabled(state.selectedSnapshot == nil)
 
-            Button(
-                state.isReviewingPullRequest
-                    ? "Show Pull Request Version Only"
-                    : "Show Snapshot without Git Diff"
-            ) {
+            Button(state.showAloneActionTitle) {
                 state.showSelectedSnapshot(withGitDiff: false)
             }
             .disabled(state.selectedSnapshot == nil)
@@ -247,7 +301,26 @@ struct AppCommands: Commands {
             }
             .disabled(state.acceptableTestRunFailuresCount == 0)
 
+            // The candidate pane's file menu, for a test that attached the snapshot more
+            // than once.
+            if state.testRunCandidatesOnScreen.count > 1 {
+                Picker("Test Run Candidate", selection: testRunCandidate) {
+                    ForEach(state.testRunCandidatesOnScreen) { candidate in
+                        Text(candidate.name).tag(Optional(candidate.fileURL))
+                    }
+                }
+            }
+
             Divider()
+
+            // Each pane header's close button.
+            if state.preview?.isComparison == true, let panes = state.preview?.panes {
+                ForEach(panes) { pane in
+                    Button("Close \(state.sideTitle(for: pane))") {
+                        state.closePane(pane.role)
+                    }
+                }
+            }
 
             Button("Clear Canvas") {
                 state.closePreview()
@@ -302,6 +375,35 @@ struct AppCommands: Commands {
             get: { state.selectedTestRunBundle?.url },
             set: { url in url.map(state.showTestRun(from:)) }
         )
+    }
+
+    /// The image in the candidate pane, switched through ``AppState/selectTestRunCandidate(_:)``.
+    private var testRunCandidate: Binding<URL?> {
+        Binding(
+            get: { state.preview?.candidate?.fileURL },
+            set: { url in
+                guard let candidate = state.testRunCandidatesOnScreen.first(where: { $0.fileURL == url })
+                else { return }
+                state.selectTestRunCandidate(candidate)
+            }
+        )
+    }
+
+    /// What the onion skin calls one side, which is its position when the roles are unknown.
+    private func onionSideTitle(_ role: SnapshotPane.Role) -> String {
+        guard let pane = state.preview?.panes.first(where: { $0.role == role }) else {
+            return role == .baseline ? "Baseline" : "Candidate"
+        }
+        return state.sideTitle(for: pane)
+    }
+
+    /// No colour, then the toolbar's presets in the same order.
+    @ViewBuilder
+    private var backdropChoices: some View {
+        Text("None").tag(Color?.none)
+        ForEach(BackdropColorButton.presets, id: \.name) { preset in
+            Text(preset.name).tag(Optional(preset.color))
+        }
     }
 
     private func binding<Value>(_ keyPath: ReferenceWritableKeyPath<AppState, Value>) -> Binding<Value> {

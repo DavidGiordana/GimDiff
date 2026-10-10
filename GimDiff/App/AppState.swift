@@ -61,6 +61,12 @@ final class AppState {
     /// A counter rather than a flag because the file name never changes: nothing about the
     /// URL tells a view that the bytes behind it were rewritten by a test run.
     private(set) var imageReloadToken = 0
+    /// The last View menu command addressed to the canvas's own controls.
+    ///
+    /// Display mode, zoom, and the onion skin's fade belong to the views that draw them, so
+    /// the menu cannot set them directly; it posts a request each of those views carries
+    /// out. The serial makes the same command twice in a row two requests.
+    private(set) var canvasViewRequest: CanvasViewRequest?
     /// The most recent failure, shown as a banner until it is dismissed.
     private(set) var lastError: String?
 
@@ -1021,6 +1027,44 @@ final class AppState {
         copyToClipboard(name)
     }
 
+    /// What showing `snapshot` with its diff is called, in the menu bar and on the row alike.
+    func compareActionTitle(for snapshot: SnapshotItem?) -> String {
+        if isReviewingPullRequest { return "Compare with Base Branch" }
+        if let snapshot, sidebarSource == .testRun, testRun?.isFailing(snapshotID: snapshot.id) == true {
+            return "Compare with Test Run"
+        }
+        return "Show Snapshot with Git Diff"
+    }
+
+    /// What showing a snapshot on its own is called, in the menu bar and on the row alike.
+    var showAloneActionTitle: String {
+        isReviewingPullRequest ? "Show Pull Request Version Only" : "Show Snapshot without Git Diff"
+    }
+
+    // MARK: - Canvas view commands
+
+    /// Whether anything on screen has the display mode and zoom the View menu drives: a
+    /// single image, a side-by-side pair, or the diff mask. The curtain and the onion skin
+    /// draw both images in one fixed frame.
+    var canvasHasZoomableImages: Bool {
+        guard let preview else { return false }
+        guard preview.isComparison else { return true }
+        return diffMode == .sideBySide || diffMode == .difference
+    }
+
+    /// Whether the onion skin is on screen for the View menu's fade commands to reach.
+    var canvasShowsOnionSkin: Bool {
+        preview?.isComparison == true && diffMode == .onionSkin
+    }
+
+    /// Hands `command` to whichever canvas views it applies to.
+    func requestCanvasView(_ command: CanvasViewCommand) {
+        canvasViewRequest = CanvasViewRequest(
+            serial: (canvasViewRequest?.serial ?? 0) + 1,
+            command: command
+        )
+    }
+
     func showSelectedSnapshot(withGitDiff: Bool) {
         guard let snapshot = selectedSnapshot else { return }
         showSnapshot(snapshot, withGitDiff: withGitDiff)
@@ -1305,4 +1349,22 @@ final class AppState {
         guard filePath.hasPrefix(prefix) else { return nil }
         return String(filePath.dropFirst(prefix.count))
     }
+}
+
+/// Something the View menu asks of the canvas's own controls.
+enum CanvasViewCommand: Equatable, Sendable {
+    case fit
+    case actualSize
+    case free
+    case zoomIn
+    case zoomOut
+    case resetZoom
+    /// Sets the onion skin's fade: 0 is the baseline alone, 1 the candidate alone.
+    case fadeOnionSkin(to: Double)
+}
+
+/// One ``CanvasViewCommand``, numbered so that repeating it is still a change.
+struct CanvasViewRequest: Equatable, Sendable {
+    let serial: Int
+    let command: CanvasViewCommand
 }

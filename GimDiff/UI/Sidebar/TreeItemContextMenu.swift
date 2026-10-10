@@ -38,7 +38,7 @@ struct TreeItemContextMenu: View {
         Button {
             state.copyToClipboard(suite.name)
         } label: {
-            Label("Copy TestCase name", systemImage: "paperclip")
+            Label("Copy Name", systemImage: "paperclip")
         }
 
         // A pull request under review is a set of downloaded copies: there is no test file
@@ -47,7 +47,7 @@ struct TreeItemContextMenu: View {
             Button {
                 state.openTestSource(for: suite)
             } label: {
-                Label("Open Test file in Xcode", systemImage: "ellipsis.curlybraces")
+                Label("Open Test File in Xcode", systemImage: "ellipsis.curlybraces")
             }
         }
 
@@ -55,7 +55,7 @@ struct TreeItemContextMenu: View {
             Button {
                 state.openSnapshotsFolder(for: suite)
             } label: {
-                Label("Open Snapshots Folder in Finder", systemImage: "folder")
+                Label("Open Snapshots Folder", systemImage: "folder")
             }
 
             Divider()
@@ -77,7 +77,7 @@ struct TreeItemContextMenu: View {
             Button(role: .destructive) {
                 state.delete(suite: suite)
             } label: {
-                Label("Delete Snapshots Folder", systemImage: "trash")
+                Label("Move Snapshots Folder to Trash", systemImage: "trash")
             }
         }
     }
@@ -87,24 +87,19 @@ struct TreeItemContextMenu: View {
         Button {
             state.copyToClipboard(snapshot.displayName)
         } label: {
-            Label("Copy Snapshot name", systemImage: "paperclip")
+            Label("Copy Name", systemImage: "paperclip")
         }
 
         Button {
             state.showSnapshot(snapshot, withGitDiff: true)
         } label: {
-            Label(compareTitle(for: snapshot), systemImage: "eye")
+            Label(state.compareActionTitle(for: snapshot), systemImage: "eye")
         }
 
         Button {
             state.showSnapshot(snapshot, withGitDiff: false)
         } label: {
-            Label(
-                state.isReviewingPullRequest
-                    ? "Show Pull Request Version Only"
-                    : "Show Snapshot without Git diff",
-                systemImage: "rectangle.portrait.split.2x1.slash"
-            )
+            Label(state.showAloneActionTitle, systemImage: "rectangle.portrait.split.2x1.slash")
         }
 
         // Everything below acts on a file on disk. Under pull request review the files are
@@ -115,7 +110,7 @@ struct TreeItemContextMenu: View {
             Button {
                 state.openInPreviewApp(snapshot.fileURL)
             } label: {
-                Label("Open in Preview.app", systemImage: "doc")
+                Label("Open in Preview", systemImage: "doc")
             }
 
             Button {
@@ -128,7 +123,7 @@ struct TreeItemContextMenu: View {
                 Button {
                     state.openTestSource(for: suite)
                 } label: {
-                    Label("Open Test file in Xcode", systemImage: "ellipsis.curlybraces")
+                    Label("Open Test File in Xcode", systemImage: "ellipsis.curlybraces")
                 }
             }
 
@@ -146,17 +141,9 @@ struct TreeItemContextMenu: View {
                 Button(role: .destructive) {
                     state.delete(snapshot: snapshot, in: parentSuiteID)
                 } label: {
-                    Label("Delete Snapshot", systemImage: "trash")
+                    Label("Move Snapshot to Trash", systemImage: "trash")
                 }
             }
         }
-    }
-
-    private func compareTitle(for snapshot: SnapshotItem) -> String {
-        if state.isReviewingPullRequest { return "Compare with Base Branch" }
-        if state.sidebarSource == .testRun, state.testRun?.isFailing(snapshotID: snapshot.id) == true {
-            return "Compare with Test Run"
-        }
-        return "Show Snapshot (with Git diff)"
     }
 }

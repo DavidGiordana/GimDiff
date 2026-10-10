@@ -51,6 +51,11 @@ struct OnionSkinView: View {
         .task(id: ReloadKey(baseline: baseline.fileURL.path, candidate: candidate.fileURL.path, token: reloadToken)) {
             await loadImages()
         }
+        .onChange(of: state.canvasViewRequest) { _, request in
+            if case let .fadeOnionSkin(opacity)? = request?.command {
+                candidateOpacity = opacity
+            }
+        }
     }
 
     // MARK: - Pieces

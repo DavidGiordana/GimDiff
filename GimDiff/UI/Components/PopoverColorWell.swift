@@ -86,13 +86,15 @@ struct PopoverColorWell: NSViewRepresentable {
 /// colour that appears in neither mode — and a colour well handles anything else.
 struct BackdropColorButton: View {
     /// The neutrals and the one loud colour a transparent snapshot is usually read against.
-    static let presets: [Color] = [
-        .white,
-        Color(white: 0.85),
-        Color(white: 0.5),
-        Color(white: 0.2),
-        .black,
-        Color(red: 0, green: 0.85, blue: 0.3),
+    ///
+    /// Named, because the View menu offers the same colours by name.
+    static let presets: [(name: String, color: Color)] = [
+        ("White", .white),
+        ("Light Grey", Color(white: 0.85)),
+        ("Grey", Color(white: 0.5)),
+        ("Dark Grey", Color(white: 0.2)),
+        ("Black", .black),
+        ("Green", Color(red: 0, green: 0.85, blue: 0.3)),
     ]
 
     let title: String
@@ -125,8 +127,8 @@ struct BackdropColorButton: View {
 
             HStack(spacing: 8) {
                 swatchButton(nil, name: "None")
-                ForEach(Array(Self.presets.enumerated()), id: \.offset) { index, preset in
-                    swatchButton(preset, name: "Preset \(index + 1)")
+                ForEach(Self.presets, id: \.name) { preset in
+                    swatchButton(preset.color, name: preset.name)
                 }
             }
 

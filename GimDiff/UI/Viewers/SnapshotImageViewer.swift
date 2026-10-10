@@ -39,6 +39,7 @@ struct SnapshotImageViewer<Accessory: View>: View {
     static var zoomStep: CGFloat { 0.25 }
 
     @Environment(\.displayScale) private var displayScale
+    @Environment(AppState.self) private var state
 
     let fileURL: URL
     /// Bumped by ``AppState/invalidateLoadedImages()`` to force a re-read off disk.
@@ -80,6 +81,34 @@ struct SnapshotImageViewer<Accessory: View>: View {
             resetTransform(animated: false)
         }
         .onChange(of: displayMode) { resetTransform(animated: false) }
+        .onChange(of: state.canvasViewRequest) { _, request in
+            if let request { perform(request.command) }
+        }
+    }
+
+    /// Carries out a View menu command, which reaches every pane on screen at once.
+    ///
+    /// Zooming a pane that is not in free mode switches it to free first: the scale only
+    /// means something there, and the switch itself starts it at 1.0.
+    private func perform(_ command: CanvasViewCommand) {
+        switch command {
+        case .fit:
+            displayMode = .fit
+        case .actualSize:
+            displayMode = .actualSize
+        case .free:
+            displayMode = .free
+        case .zoomIn, .zoomOut:
+            guard displayMode == .free else {
+                displayMode = .free
+                return
+            }
+            step(by: command == .zoomIn ? Self.zoomStep : -Self.zoomStep)
+        case .resetZoom:
+            resetTransform(animated: true)
+        case .fadeOnionSkin:
+            break
+        }
     }
 
     // MARK: - Image

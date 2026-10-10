@@ -69,4 +69,41 @@ struct MenuActionsTests {
 
         #expect(fixture.state.preview == nil)
     }
+
+    @Test("The project view names the show actions after the Git diff")
+    func showActionTitles() {
+        let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
+        fixture.expand("AlphaTests")
+        fixture.select("AlphaTests/footer")
+
+        #expect(fixture.state.compareActionTitle(for: fixture.state.selectedSnapshot) == "Show Snapshot with Git Diff")
+        #expect(fixture.state.showAloneActionTitle == "Show Snapshot without Git Diff")
+    }
+
+    @Test("Zoom commands apply only while an image is on screen")
+    func zoomNeedsAnImage() {
+        let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
+        fixture.expand("AlphaTests")
+        fixture.select("AlphaTests/footer")
+        #expect(fixture.state.canvasHasZoomableImages == false)
+
+        fixture.state.showSelectedSnapshot(withGitDiff: false)
+
+        #expect(fixture.state.canvasHasZoomableImages)
+        #expect(fixture.state.canvasShowsOnionSkin == false)
+    }
+
+    @Test("Repeating a canvas command is still a new request")
+    func canvasRequestsAreNumbered() throws {
+        let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
+
+        fixture.state.requestCanvasView(.zoomIn)
+        let first = try #require(fixture.state.canvasViewRequest)
+        fixture.state.requestCanvasView(.zoomIn)
+        let second = try #require(fixture.state.canvasViewRequest)
+
+        #expect(first.command == .zoomIn)
+        #expect(second.command == .zoomIn)
+        #expect(first != second)
+    }
 }

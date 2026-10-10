@@ -43,7 +43,7 @@ struct SidebarView: View {
                 } label: {
                     Label("Reload", systemImage: "arrow.clockwise")
                 }
-                .help("Rescan the project for snapshots (⌘R)")
+                .help("Rescan the project for snapshots (⇧⌘R)")
                 .disabled(state.currentProject == nil)
             }
         }
