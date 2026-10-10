@@ -23,6 +23,27 @@ struct StubGitService: GitService {
     var trackedFiles: Set<URL> = []
     /// When true, ``isTracked(_:repositoryRoot:)`` cannot answer, as when git fails to run.
     var trackingFails = false
+    /// When set, ``discardChanges(to:repositoryRoot:)`` fails with it.
+    var discardError: GimDiffError?
+    /// Every file ``discardChanges(to:repositoryRoot:)`` was asked to restore, in order.
+    let discarded = DiscardLog()
+
+    /// Shared rather than copied with the stub, so a test can read what `AppState` asked for.
+    final class DiscardLog: @unchecked Sendable {
+        private let lock = NSLock()
+        private var urls: [URL] = []
+
+        var recorded: [URL] { lock.withLock { urls } }
+
+        func append(_ newURLs: [URL]) {
+            lock.withLock { urls += newURLs }
+        }
+    }
+
+    func discardChanges(to fileURLs: [URL], repositoryRoot: URL) async throws {
+        if let discardError { throw discardError }
+        discarded.append(fileURLs)
+    }
 
     func isTracked(_ fileURL: URL, repositoryRoot: URL) async -> Bool? {
         guard !trackingFails else { return nil }

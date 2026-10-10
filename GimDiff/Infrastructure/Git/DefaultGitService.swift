@@ -103,6 +103,18 @@ struct DefaultGitService: GitService {
         return result.trimmedOutput
     }
 
+    func discardChanges(to fileURLs: [URL], repositoryRoot: URL) async throws {
+        guard !fileURLs.isEmpty else { return }
+        let result = try await runner.run(GitCommand.restoreFromHEAD(paths: fileURLs, in: repositoryRoot))
+        guard result.isSuccess else {
+            throw GimDiffError.commandFailed(
+                command: "git restore",
+                exitCode: result.exitCode,
+                message: result.standardError.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        }
+    }
+
     func isTracked(_ fileURL: URL, repositoryRoot: URL) async -> Bool? {
         guard let result = try? await runner.run(
             GitCommand.lsFilesErrorUnmatch(path: fileURL, in: repositoryRoot)

@@ -138,6 +138,8 @@ final class AppState {
     /// Held so a second diff request supersedes the first rather than racing it.
     var diffTask: Task<Void, Never>?
     var gitStatusTask: Task<Void, Never>?
+    /// The `git restore` in flight, so a caller can wait for it.
+    var discardTask: Task<Void, Never>?
     /// Deciding the sides of a pasted or dropped pair, before it is shown.
     private var looseRoleTask: Task<Void, Never>?
     /// The loop reading the watcher's events. Kept out of observation so it stays a plain
@@ -885,6 +887,19 @@ final class AppState {
     func applyGitStatuses(_ statuses: [URL: GitFileStatus]) {
         guard let suites = currentProject?.suites else { return }
         currentProject?.suites = ProviderRegistry.annotate(suites, with: statuses)
+    }
+
+    /// Records that Git has nothing against these snapshots any more, ahead of the status
+    /// read that will say so.
+    func markUnmodified(_ snapshotIDs: Set<String>) {
+        guard var suites = currentProject?.suites else { return }
+        for suiteIndex in suites.indices {
+            for snapshotIndex in suites[suiteIndex].snapshots.indices
+            where snapshotIDs.contains(suites[suiteIndex].snapshots[snapshotIndex].id) {
+                suites[suiteIndex].snapshots[snapshotIndex].gitStatus = .unmodified
+            }
+        }
+        currentProject?.suites = suites
     }
 
     /// Reads a comparison out of whatever is on the pasteboard.

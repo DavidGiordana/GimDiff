@@ -60,6 +60,20 @@ struct TreeItemContextMenu: View {
 
             Divider()
 
+            let discardable = state.discardableSnapshots(in: suite)
+            if !discardable.isEmpty {
+                Button(role: .destructive) {
+                    state.discardGitChanges(of: discardable)
+                } label: {
+                    Label(
+                        discardable.count == 1
+                            ? "Discard Changes to 1 Snapshot"
+                            : "Discard Changes to \(discardable.count) Snapshots",
+                        systemImage: "arrow.uturn.backward"
+                    )
+                }
+            }
+
             Button(role: .destructive) {
                 state.delete(suite: suite)
             } label: {
@@ -120,6 +134,14 @@ struct TreeItemContextMenu: View {
 
             if !isTestRunAttachment {
                 Divider()
+
+                if state.canDiscardGitChanges(of: snapshot) {
+                    Button(role: .destructive) {
+                        state.discardGitChanges(of: [snapshot])
+                    } label: {
+                        Label("Discard Changes", systemImage: "arrow.uturn.backward")
+                    }
+                }
 
                 Button(role: .destructive) {
                     state.delete(snapshot: snapshot, in: parentSuiteID)

@@ -33,6 +33,10 @@ protocol GitService: Sendable {
     /// The URL the remote called `name` fetches from, such as `git@github.com:owner/repo.git`.
     func remoteURL(named name: String, repositoryRoot: URL) async throws -> String
 
+    /// Throws away every local change to the files at `fileURLs`, staged or not, leaving
+    /// them as `HEAD` holds them.
+    func discardChanges(to fileURLs: [URL], repositoryRoot: URL) async throws
+
     /// Whether Git tracks the file at `fileURL`, or `nil` when Git could not be asked.
     ///
     /// `nil` is kept apart from `false` on purpose: a failure to run git says nothing about

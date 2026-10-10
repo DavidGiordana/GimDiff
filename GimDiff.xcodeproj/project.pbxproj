@@ -45,6 +45,7 @@
 				App/AppDelegate.swift,
 				App/AppState.swift,
 				"App/AppState+FileActions.swift",
+				"App/AppState+GitChanges.swift",
 				"App/AppState+TestRun.swift",
 				"App/AppState+Watching.swift",
 				App/GimDiffApp.swift,

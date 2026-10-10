@@ -77,6 +77,30 @@ struct PromotionIntegrationTests {
         #expect(state.currentProject?.hasGitDiff == false)
     }
 
+    @Test("Discarding puts HEAD back, staged change included, and leaves the image on its own")
+    func discardsAModifiedSnapshot() async throws {
+        let (repository, item) = try repositoryWithAModifiedSnapshot()
+        try repository.stage(Self.snapshotPath)
+        try repository.write(Self.snapshotPath, data: Data(repeating: 0x43, count: 256))
+        let defaults = TemporaryDefaults()
+        let state = state(for: repository, item: item, defaults: defaults)
+
+        state.showSnapshot(item, withGitDiff: true)
+        await state.currentGitDiff?.value
+        #expect(state.preview?.isComparison == true)
+
+        state.discardGitChanges(of: [item])
+        await state.currentDiscard?.value
+
+        #expect(try Data(contentsOf: item.fileURL) == Self.committedBytes)
+        #expect(state.lastError == nil)
+        #expect(state.preview?.isComparison == false)
+        #expect(state.preview?.snapshotID == item.id)
+
+        await state.currentGitStatusRefresh?.value
+        #expect(state.currentProject?.hasGitDiff == false)
+    }
+
     @Test("Accepting a candidate overwrites the recorded baseline and keeps both files")
     func promotesOntoARecordedBaseline() throws {
         let repository = try GitFixture()

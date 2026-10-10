@@ -23,21 +23,24 @@ struct AppStateFixture {
     let watcher = StubProjectWatcher()
     /// Stands in for derived data, so no run is found unless a test sets one up.
     let testResults = StubTestResults()
+    /// Records what a discard asked git to restore.
+    let gitService: StubGitService
     /// Held for its lifetime: releasing it erases the defaults domain.
     let defaults: TemporaryDefaults
 
     /// Root the built bundles hang off.
     static let root = URL(fileURLWithPath: "/Projects/Demo", isDirectory: true)
 
-    init(bundle: ProjectBundle? = nil) {
+    init(bundle: ProjectBundle? = nil, gitService: StubGitService = StubGitService()) {
         let filesystem = MockFilesystemService()
         let defaults = TemporaryDefaults()
 
         self.filesystem = filesystem
         self.defaults = defaults
+        self.gitService = gitService
         state = AppState(
             filesystem: filesystem,
-            gitService: StubGitService(),
+            gitService: gitService,
             watcher: watcher,
             testResults: testResults,
             testResultLocator: testResults,

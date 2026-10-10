@@ -52,6 +52,14 @@ enum GitCommand {
         command(["checkout", "--"] + paths.map(\.path), in: directory)
     }
 
+    /// Puts `paths` back to what `HEAD` holds, in the index and the working tree alike.
+    ///
+    /// `restore` rather than `checkout --`: checkout copies from the index, so a change that
+    /// was staged would survive being discarded.
+    static func restoreFromHEAD(paths: [URL], in directory: URL) -> Command {
+        command(["restore", "--source=HEAD", "--staged", "--worktree", "--"] + paths.map(\.path), in: directory)
+    }
+
     /// Stages `paths`.
     static func add(paths: [URL], in directory: URL) -> Command {
         command(["add", "--"] + paths.map(\.path), in: directory)

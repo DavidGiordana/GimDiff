@@ -37,6 +37,14 @@ struct GitCommandTests {
         ])
     }
 
+    @Test("Discarding restores from HEAD, the index included, with the paths behind --")
+    func restoreFromHEADArguments() {
+        let path = URL(fileURLWithPath: "/tmp/My Repo/--force.png")
+        #expect(GitCommand.restoreFromHEAD(paths: [path], in: repository).arguments == [
+            "restore", "--source=HEAD", "--staged", "--worktree", "--", "/tmp/My Repo/--force.png",
+        ])
+    }
+
     @Test("Branch lookup uses the abbreviated ref")
     func currentBranchArguments() {
         #expect(GitCommand.currentBranch(in: repository).arguments == [

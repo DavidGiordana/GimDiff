@@ -250,6 +250,13 @@ struct AppCommands: Commands {
 
             Divider()
 
+            // No shortcut, for the reason Accept and Reject have none: it overwrites a file,
+            // and git keeps no copy of a change that was never staged.
+            Button(state.selectedSnapshot == nil ? "Discard Changes in Suite" : "Discard Changes") {
+                state.discardSelectionGitChanges()
+            }
+            .disabled(state.discardableSelection.isEmpty)
+
             Button(state.selectedSnapshot == nil ? "Move Snapshots Folder to Trash" : "Move Snapshot to Trash") {
                 state.deleteSelection()
             }

@@ -38,6 +38,11 @@ final class GitFixture {
         try data.write(to: file)
     }
 
+    /// Stages one path, leaving the rest of the working tree as it is.
+    func stage(_ relativePath: String) throws {
+        try run(["add", "--", relativePath])
+    }
+
     /// Stages everything and commits it without touching the developer's global Git config.
     func commit() throws {
         try run(["add", "--all"])
