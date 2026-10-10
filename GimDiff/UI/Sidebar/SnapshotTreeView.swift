@@ -101,16 +101,12 @@ struct SnapshotTreeView: View {
         .onChange(of: state.filterFocusRequests) { claimFilterFocus() }
         .onChange(of: state.treeFocusRequests) { focus = .tree }
         // Switching views swaps every row; the keyboard stays with the tree.
-        .onChange(of: state.sidebarSource) {
-            Task { @MainActor in focus = .tree }
-        }
+        .onChange(of: state.sidebarSource) { claimTreeFocus() }
         // A freshly scanned project replaces every row, so focus is claimed again rather
-        // than left on whatever the last project had. Deferred like the claim above: the
-        // first scan lands in the same update that swaps the spinner for the `List`, and an
-        // assignment made there reaches a view the focus system has not seen yet.
-        .onChange(of: state.currentProject?.rootURL) {
-            Task { @MainActor in focus = .tree }
-        }
+        // than left on whatever the last project had. The first scan lands in the same
+        // update that swaps the spinner for the `List`, so the claim has to wait for the
+        // focus system to see the new view.
+        .onChange(of: state.currentProject?.rootURL) { claimTreeFocus() }
     }
 
     /// What stands in for the rows while the run is read, when it could not be, or when it
@@ -159,13 +155,28 @@ struct SnapshotTreeView: View {
     /// Puts focus on the rows, unless the sidebar already has it somewhere.
     ///
     /// Guarded so returning to the window does not yank focus out of the search box the
-    /// user left it in, and deferred by one turn of the main actor: assigned inside the
-    /// update that made the window key, the focus system has not engaged yet and drops it.
+    /// user left it in.
     private func claimFocusIfIdle() {
         guard controlActiveState != .inactive, focus == nil else { return }
+        claimTreeFocus(unlessFocused: true)
+    }
+
+    /// Moves focus onto the rows, retrying until the focus system takes it.
+    ///
+    /// Deferred, because an assignment inside the update that made the window key or put
+    /// the `List` on screen is dropped. One turn of the main actor is not always enough
+    /// either: when the first scan lands, the `List` can still be unseen by the focus system
+    /// a turn later, and the app launches with rows the arrow keys cannot move. So the claim
+    /// is repeated for a few frames, as ``claimFilterFocus()`` does, and stops as soon as
+    /// focus is anywhere at all, so a click into the search box in the meantime stands.
+    private func claimTreeFocus(unlessFocused: Bool = false) {
         Task { @MainActor in
-            guard focus == nil else { return }
-            focus = .tree
+            if unlessFocused, focus != nil { return }
+            for _ in 0..<20 {
+                focus = .tree
+                try? await Task.sleep(for: .milliseconds(25))
+                guard focus == nil else { return }
+            }
         }
     }
 

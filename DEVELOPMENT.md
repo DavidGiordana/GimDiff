@@ -148,14 +148,18 @@ Two more traps in the same area:
 ### Sidebar focus
 
 `SnapshotTreeView` claims focus when the window becomes key, from `onAppear` and from
-`onChange(of: controlActiveState)`, and defers the assignment by one turn of the main actor.
+`onChange(of: controlActiveState)`, and defers the assignment, repeating it for a few frames
+until it holds (`claimTreeFocus`).
 
 All three parts are load-bearing. A `@FocusState` assignment made before the window is key
 is discarded, and assigning inside the update that *made* it key is still too early — the
-focus system has not engaged. Either mistake ships an app that launches with a selected row
-the arrow keys cannot move until the tree is clicked once. `defaultFocus` does not work here
-either. `GimDiffUITests/KeyboardNavigationUITests` is the regression guard: it drives the
-tree with nothing but keys, so a focus regression fails there rather than reaching a user.
+focus system has not engaged. Nor is one turn of the main actor always enough: when the first
+scan swaps the spinner for the `List`, the list can still be unseen by the focus system a turn
+later, and the single assignment is dropped without a word. Any of these mistakes ships an
+app that launches with a selected row the arrow keys cannot move until the tree is clicked
+once. `defaultFocus` does not work here either. `GimDiffUITests/KeyboardNavigationUITests`
+is the regression guard: it drives the tree with nothing but keys, so a focus regression
+fails there rather than reaching a user.
 
 A non-flag launch argument is read by AppKit as a file to open, and one that names no file
 suppresses the window entirely. The UI tests therefore reset state with a defaults override
