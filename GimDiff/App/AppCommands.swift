@@ -210,17 +210,35 @@ struct AppCommands: Commands {
 
             Divider()
 
-            Button("Accept Candidate / Overwrite Baseline") {
-                state.promoteCandidateToBaseline()
-            }
-            .keyboardShortcut(.leftArrow, modifiers: .command)
-            .disabled(!state.canPromoteCandidate)
+            // The same two choices the bar under the canvas offers, in the same words.
+            if state.looseRolesAreUnknown {
+                Button("Keep Left") {
+                    state.keepLeft()
+                }
 
-            Button("Revert to Baseline") {
-                state.revertCandidateToBaseline()
+                Button("Keep Right") {
+                    state.keepRight()
+                }
+            } else if state.preview?.isLoosePair == true {
+                Button("Keep Baseline") {
+                    state.keepBaseline()
+                }
+
+                Button("Keep Candidate") {
+                    state.keepCandidate()
+                }
+                .disabled(!state.canPromoteCandidate)
+            } else {
+                Button("Accept Candidate") {
+                    state.promoteCandidateToBaseline()
+                }
+                .disabled(!state.canPromoteCandidate)
+
+                Button("Reject Candidate") {
+                    state.revertCandidateToBaseline()
+                }
+                .disabled(!state.canRevertToBaseline)
             }
-            .keyboardShortcut(.rightArrow, modifiers: .command)
-            .disabled(!state.canRevertToBaseline)
 
             Divider()
 

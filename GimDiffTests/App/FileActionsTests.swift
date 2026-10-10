@@ -64,6 +64,166 @@ struct FileActionsTests {
         #expect(fixture.state.lastError == nil)
     }
 
+    @Test("A comparison of two files on disk leaves both decisions open, with nothing to explain")
+    func offersBothDecisions() {
+        let fixture = loosePair()
+
+        #expect(fixture.state.candidatePromotionObstacle == nil)
+        #expect(fixture.state.candidateRevertObstacle == nil)
+    }
+
+    @Test("Rejection with no comparison on screen is unavailable, and says so")
+    func explainsAnUnavailableRejection() {
+        let filesystem = MockFilesystemService()
+        let defaults = TemporaryDefaults()
+        filesystem.stub(Self.candidateURL, contents: "candidate-bytes")
+        let state = AppState(
+            filesystem: filesystem,
+            gitService: StubGitService(),
+            defaults: defaults.defaults
+        )
+        state.openPath(Self.candidateURL)
+
+        #expect(state.canRevertToBaseline == false)
+        #expect(state.candidateRevertObstacle != nil)
+        // Nothing to compare is not a failure, so nothing reaches the banner.
+        state.revertCandidateToBaseline()
+        #expect(state.lastError == nil)
+    }
+
+    // MARK: - Loose pairs
+
+    @Test("A pasted pair is decided by keeping a side; a snapshot's comparison is not")
+    func recognisesALoosePair() {
+        let fixture = loosePair()
+        #expect(fixture.state.preview?.isLoosePair == true)
+
+        fixture.state.setPreview(.comparison(
+            SnapshotPair(reference: Self.baselineURL, failure: Self.candidateURL),
+            snapshotID: "header",
+            title: "header",
+            baselineOrigin: .workingTree
+        ))
+        #expect(fixture.state.preview?.isLoosePair == false)
+    }
+
+    @Test("Keeping the baseline writes nothing and leaves the baseline on screen alone")
+    func keepsTheBaseline() {
+        let fixture = loosePair()
+
+        fixture.state.keepBaseline()
+
+        #expect(fixture.filesystem.contents(of: Self.baselineURL) == "baseline-bytes")
+        #expect(fixture.filesystem.contents(of: Self.candidateURL) == "candidate-bytes")
+        #expect(fixture.state.preview?.isComparison == false)
+        #expect(fixture.state.preview?.panes.map(\.fileURL) == [Self.baselineURL])
+    }
+
+    @Test("Keeping the candidate writes it over the baseline, which then stands alone")
+    func keepsTheCandidate() {
+        let fixture = loosePair()
+
+        fixture.state.keepCandidate()
+
+        #expect(fixture.filesystem.contents(of: Self.baselineURL) == "candidate-bytes")
+        #expect(fixture.state.preview?.isComparison == false)
+        #expect(fixture.state.preview?.panes.map(\.fileURL) == [Self.baselineURL])
+        #expect(fixture.state.lastError == nil)
+    }
+
+    @Test("Keeping a candidate that cannot be written leaves the pair up beside the error")
+    func keepsThePairWhenTheWriteFails() {
+        let filesystem = MockFilesystemService()
+        let defaults = TemporaryDefaults()
+        filesystem.stub(Self.baselineURL, contents: "baseline-bytes")
+        let state = AppState(
+            filesystem: filesystem,
+            gitService: StubGitService(),
+            defaults: defaults.defaults
+        )
+        // The candidate is named but was never written, so the copy has no source.
+        state.showComparison(reference: Self.baselineURL, failure: Self.candidateURL)
+
+        state.keepCandidate()
+
+        #expect(state.preview?.isComparison == true)
+        #expect(state.lastError != nil)
+    }
+
+    // MARK: - Undecided pairs
+
+    @Test("A pair nothing could tell apart is named by position, not by role")
+    func namesAnUndecidedPairByPosition() throws {
+        let fixture = loosePair()
+        fixture.state.showComparison(
+            reference: Self.baselineURL,
+            failure: Self.candidateURL,
+            certainty: .unknown
+        )
+
+        let preview = try #require(fixture.state.preview)
+        #expect(fixture.state.looseRolesAreUnknown)
+        #expect(preview.panes.map(fixture.state.sideTitle(for:)) == ["Left", "Right"])
+
+        // Keeping "the baseline" would be acting on a guess, so it is not on offer.
+        fixture.state.keepBaseline()
+        #expect(fixture.state.preview?.isComparison == true)
+    }
+
+    @Test("Keeping the left image writes it over the right one, which may be the recorded file")
+    func keepsTheLeftImage() {
+        let fixture = loosePair()
+        fixture.state.showComparison(
+            reference: Self.baselineURL,
+            failure: Self.candidateURL,
+            certainty: .unknown
+        )
+
+        fixture.state.keepLeft()
+
+        #expect(fixture.filesystem.contents(of: Self.candidateURL) == "baseline-bytes")
+        #expect(fixture.state.preview?.panes.map(\.fileURL) == [Self.baselineURL])
+    }
+
+    @Test("Keeping the right image writes it over the left one and leaves it on screen")
+    func keepsTheRightImage() {
+        let fixture = loosePair()
+        fixture.state.showComparison(
+            reference: Self.baselineURL,
+            failure: Self.candidateURL,
+            certainty: .unknown
+        )
+
+        fixture.state.keepRight()
+
+        #expect(fixture.filesystem.contents(of: Self.baselineURL) == "candidate-bytes")
+        #expect(fixture.state.preview?.panes.map(\.fileURL) == [Self.candidateURL])
+        // The pair is decided; the image left on screen is no longer one of two unknowns.
+        #expect(fixture.state.looseRolesAreUnknown == false)
+    }
+
+    @Test("A pasted pair whose files tell them apart is shown the right way round")
+    func resolvesAPastedPairFromTheFiles() async {
+        let filesystem = MockFilesystemService()
+        let defaults = TemporaryDefaults()
+        var git = StubGitService(repositoryRoot: URL(fileURLWithPath: "/Projects/Demo"))
+        git.trackedFiles = [Self.baselineURL]
+        let state = AppState(filesystem: filesystem, gitService: git, defaults: defaults.defaults)
+
+        // Handed over the wrong way round, with nothing in the source to say otherwise.
+        state.showLooseComparison(
+            baseline: Self.candidateURL,
+            candidate: Self.baselineURL,
+            rolesAreStated: false
+        )
+        await state.currentLooseRoleResolution?.value
+
+        #expect(state.preview?.baseline?.fileURL == Self.baselineURL)
+        #expect(state.preview?.candidate?.fileURL == Self.candidateURL)
+        #expect(state.looseRoleCertainty == .inferred(.trackedByGit, swapped: true))
+        #expect(state.preview.map { $0.panes.map(state.sideTitle(for:)) } == ["Baseline", "Candidate"])
+    }
+
     @Test("Neither action leaves the staging file behind")
     func cleansUpTheStagingFile() {
         let fixture = loosePair()
@@ -186,7 +346,7 @@ struct FileActionsTests {
         #expect(committed.isWritable == false)
     }
 
-    @Test("The baseline leads, so the panes read old to new and the promotion arrow points left")
+    @Test("The baseline leads, so the panes read old to new")
     func ordersThePanes() {
         let fixture = loosePair()
 

@@ -22,6 +22,7 @@ struct OnionSkinView: View {
     let reloadToken: Int
     let matte: Color?
 
+    @Environment(AppState.self) private var state
     @Environment(\.displayScale) private var displayScale
 
     /// How much of the candidate shows: 0 is the baseline alone, 1 the candidate alone.
@@ -71,16 +72,16 @@ struct OnionSkinView: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
-            Text(baseline.roleTitle)
+            Text(state.sideTitle(for: baseline))
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
             Slider(value: $candidateOpacity, in: 0...1)
                 .frame(maxWidth: 280)
-                .accessibilityLabel("Candidate Opacity")
+                .accessibilityLabel("\(state.sideTitle(for: candidate)) Opacity")
                 .accessibilityValue("\(Int((candidateOpacity * 100).rounded())) percent")
 
-            Text(candidate.roleTitle)
+            Text(state.sideTitle(for: candidate))
                 .font(.callout)
                 .foregroundStyle(.secondary)
 

@@ -184,13 +184,14 @@ struct ProjectOpeningTests {
     }
 
     @Test("Two dropped images become one comparison")
-    func pairsTwoDroppedImages() {
+    func pairsTwoDroppedImages() async {
         let defaults = TemporaryDefaults()
         let state = state(defaults: defaults)
         let reference = URL(fileURLWithPath: "/tmp/reference.png")
         let failure = URL(fileURLWithPath: "/tmp/failure.png")
 
         state.openPaths([reference, failure])
+        await state.currentLooseRoleResolution?.value
 
         guard case let .comparison(pair, snapshotID, title, baselineOrigin) = state.preview else {
             Issue.record("Expected a comparison, got \(String(describing: state.preview))")
@@ -202,6 +203,8 @@ struct ProjectOpeningTests {
         #expect(title == "failure")
         // Two loose files are both on disk, so both promotion actions apply to them.
         #expect(baselineOrigin == .workingTree)
+        // Neither file stands apart and a drop labels nothing, so the order is only a guess.
+        #expect(state.looseRoleCertainty == .unknown)
     }
 
     @Test("An empty drop changes nothing")

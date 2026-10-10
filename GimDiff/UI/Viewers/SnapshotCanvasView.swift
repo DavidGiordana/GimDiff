@@ -81,8 +81,21 @@ struct SnapshotCanvasView: View {
         }
     }
 
-    @ViewBuilder
+    /// The comparison, with the decision about it underneath.
+    ///
+    /// Under pull request review there is no file to write, so the bar is gone rather than
+    /// showing two disabled buttons.
     private var comparison: some View {
+        VStack(spacing: 0) {
+            comparisonSurface
+            if !state.isReviewingPullRequest {
+                SnapshotDecisionBar()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var comparisonSurface: some View {
         if let candidate = preview?.candidate, let baseline = preview?.baseline {
             switch state.diffMode {
             case .sideBySide:
@@ -144,9 +157,8 @@ struct SnapshotCanvasView: View {
 
     /// One surface showing both images, with both headers stacked above it.
     ///
-    /// The headers stay side by side even though the images no longer are: the actions in
-    /// them are still about one file each, and moving them around as the mode changes would
-    /// leave the user hunting for the button that promotes a candidate.
+    /// The headers stay side by side even though the images no longer are, so each side's
+    /// name and origin read in the same place whatever the mode.
     private func combined(
         candidate: SnapshotPane,
         baseline: SnapshotPane,
@@ -190,9 +202,15 @@ struct SnapshotPaneHeader: View {
             }
             .buttonStyle(.borderless)
             .help("Close this pane")
-            .accessibilityLabel("Close \(pane.roleTitle)")
+            .accessibilityLabel("Close \(state.sideTitle(for: pane))")
 
-            RoleBadge(pane: pane)
+            // A pair whose sides nobody could tell apart is named by position only:
+            // calling either image the baseline would be a guess dressed as a fact.
+            if state.looseRolesAreUnknown {
+                PositionBadge(isLeft: pane.role == .baseline)
+            } else {
+                RoleBadge(pane: pane)
+            }
 
             // Once per preview rather than once per pane: both panes are the same change.
             if let change = state.pullRequestChange(forSnapshotID: state.preview?.snapshotID),
@@ -252,38 +270,10 @@ struct SnapshotPaneHeader: View {
         return state.testRunImageName(at: pane.fileURL) ?? pane.fileURL.lastPathComponent
     }
 
+    /// Accepting and rejecting are not here: they decide between both panes, so they live
+    /// once in ``SnapshotDecisionBar`` rather than split across the two headers.
     @ViewBuilder
     private var actions: some View {
-        // The promotion lives on the candidate and the revert on the baseline, because each
-        // one reads as an arrow pointing at the file it overwrites. Under pull request review
-        // neither arrow has a file to point at, so both are gone rather than disabled.
-        switch pane.role {
-        case _ where state.isReviewingPullRequest:
-            EmptyView()
-
-        case .candidate:
-            Button {
-                state.promoteCandidateToBaseline()
-            } label: {
-                Image(systemName: "arrow.left")
-            }
-            .buttonStyle(.borderless)
-            .disabled(!state.canPromoteCandidate)
-            .help(state.candidatePromotionObstacle ?? "Accept Candidate / Overwrite Baseline (⌘←)")
-            .accessibilityLabel("Accept Candidate")
-
-        case .baseline:
-            Button {
-                state.revertCandidateToBaseline()
-            } label: {
-                Image(systemName: "arrow.right")
-            }
-            .buttonStyle(.borderless)
-            .disabled(!state.canRevertToBaseline)
-            .help("Revert to Baseline — overwrite the candidate on disk (⌘→)")
-            .accessibilityLabel("Revert to Baseline")
-        }
-
         // Every action below opens a file on disk somewhere else. Under pull request review
         // the files are scratch copies deleted when the review ends, and there is no test
         // source to open, so the header offers none of them.
@@ -313,6 +303,166 @@ struct SnapshotPaneHeader: View {
             .disabled(state.previewSuite == nil)
             .help("Open Test Source in Xcode")
         }
+    }
+}
+
+/// The strip under a comparison that decides it: keep the candidate, or put the baseline back.
+///
+/// One place for both actions, whatever the diff mode, with the reason an action is
+/// unavailable written out beside it rather than left to a tooltip. A pasted pair is
+/// offered as a choice of which side to keep instead, since rejecting it has nothing worth
+/// writing to; see ``SnapshotPreview/isLoosePair``. When nothing could say which of the
+/// two is the baseline, the choice is offered by position, with no side named as either.
+struct SnapshotDecisionBar: View {
+    @Environment(AppState.self) private var state
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 12) {
+                if state.looseRolesAreUnknown {
+                    note(Self.undecidedNote)
+                    Spacer(minLength: 8)
+                    positionButtons
+                } else if state.preview?.isLoosePair == true {
+                    if let reason = Self.reason(for: state.looseRoleCertainty) {
+                        note(reason)
+                    }
+                    Spacer(minLength: 8)
+                    keepButtons
+                } else {
+                    obstacle
+                    Spacer(minLength: 8)
+                    decisionButtons
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+        }
+        .background(.bar)
+    }
+
+    /// Neither one prominent: with the sides unknown there is no answer to suggest.
+    @ViewBuilder
+    private var positionButtons: some View {
+        Button {
+            state.keepLeft()
+        } label: {
+            Label("Keep Left", systemImage: "checkmark")
+        }
+        .controlSize(.large)
+        .help("Overwrite the right image with the left one")
+
+        Button {
+            state.keepRight()
+        } label: {
+            Label("Keep Right", systemImage: "checkmark")
+        }
+        .controlSize(.large)
+        .help("Overwrite the left image with the right one")
+    }
+
+    static let undecidedNote = """
+        GimDiff can’t tell which image is the recorded snapshot. Keep the one that’s \
+        right; the other is overwritten with it.
+        """
+
+    /// What decided the sides, when it was the files rather than the source's own labels.
+    static func reason(for certainty: LooseRoleCertainty?) -> String? {
+        guard case let .inferred(evidence, swapped) = certainty else { return nil }
+        let because = switch evidence {
+        case .trackedByGit: "Git tracks the baseline and not the candidate"
+        case .insideProject: "the baseline is in the open project and the candidate is not"
+        }
+        return swapped
+            ? "Sides swapped from the order given: \(because)."
+            : "Sides chosen because \(because)."
+    }
+
+    private func note(_ text: String) -> some View {
+        Label(text, systemImage: "info.circle")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
+            .truncationMode(.tail)
+            .help(text)
+    }
+
+    /// Baseline first, like the panes above them.
+    @ViewBuilder
+    private var keepButtons: some View {
+        Button {
+            state.keepBaseline()
+        } label: {
+            Label("Keep Baseline", systemImage: "checkmark")
+        }
+        .controlSize(.large)
+        .help("Leave the baseline as it is and set the candidate aside")
+
+        Button {
+            state.keepCandidate()
+        } label: {
+            Label("Keep Candidate", systemImage: "checkmark")
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .disabled(!state.canPromoteCandidate)
+        .help(state.candidatePromotionObstacle ?? "Overwrite the baseline with the candidate")
+    }
+
+    @ViewBuilder
+    private var decisionButtons: some View {
+        Button {
+            state.revertCandidateToBaseline()
+        } label: {
+            Label("Reject", systemImage: "xmark")
+        }
+        .controlSize(.large)
+        .disabled(!state.canRevertToBaseline)
+        .help(state.candidateRevertObstacle ?? "Overwrite the candidate with the baseline")
+        .accessibilityLabel("Reject Candidate")
+
+        Button {
+            state.promoteCandidateToBaseline()
+        } label: {
+            Label("Accept", systemImage: "checkmark")
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .disabled(!state.canPromoteCandidate)
+        .help(state.candidatePromotionObstacle ?? "Overwrite the baseline with the candidate")
+        .accessibilityLabel("Accept Candidate")
+    }
+
+    /// Why one of the two buttons is disabled, when one is.
+    ///
+    /// Accept's reason first: a comparison against `HEAD` is the common case, and the
+    /// disabled Accept is the one that needs explaining.
+    @ViewBuilder
+    private var obstacle: some View {
+        if let reason = state.candidatePromotionObstacle ?? state.candidateRevertObstacle {
+            Label(reason, systemImage: "info.circle")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .truncationMode(.tail)
+                .help(reason)
+        }
+    }
+}
+
+/// The pill naming a side by where it sits, for a pair whose roles are unknown.
+private struct PositionBadge: View {
+    let isLeft: Bool
+
+    var body: some View {
+        Text(isLeft ? "Left" : "Right")
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(.gray.opacity(0.15), in: .capsule)
+            .overlay(Capsule().strokeBorder(.gray.opacity(0.45)))
+            .fixedSize()
     }
 }
 

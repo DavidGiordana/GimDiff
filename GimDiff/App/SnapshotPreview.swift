@@ -133,11 +133,22 @@ enum SnapshotPreview: Equatable, Sendable {
         }
     }
 
+    /// Whether this is two loose files handed over by a paste, a drop, or a URL, rather
+    /// than a snapshot the project or a test run knows about.
+    ///
+    /// Such a pair is decided by keeping one side: the candidate is usually a failure
+    /// artifact in a temporary folder, so putting the baseline back over it would be a
+    /// write that changes nothing anybody looks at again.
+    var isLoosePair: Bool {
+        guard case let .comparison(_, snapshotID, _, baselineOrigin) = self else { return false }
+        return snapshotID == nil && baselineOrigin == .workingTree
+    }
+
     /// The panes to draw, left to right.
     ///
     /// The baseline leads and the candidate follows it, old to new, the way `git diff`,
-    /// GitHub, and every other diff tool read. The order is fixed rather than configurable:
-    /// the header actions and ⌘← / ⌘→ are arrows pointing at the pane they overwrite.
+    /// GitHub, and every other diff tool read. The order is fixed rather than configurable,
+    /// so each side is always where the eye last left it.
     var panes: [SnapshotPane] {
         switch self {
         case let .single(snapshot):

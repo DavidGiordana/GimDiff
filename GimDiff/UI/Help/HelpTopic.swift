@@ -120,7 +120,7 @@ private extension HelpTopic {
                 Xcode still keeps, to look at an older one instead. The sidebar lists only the \
                 snapshots the run failed on, and \
                 selecting one shows the image the test rendered against the recorded file. \
-                Use **Diff Mask** to see where they differ. **Accept Candidate** (⌘←) re-records the snapshot without \
+                Use **Diff Mask** to see where they differ. **Accept** re-records the snapshot without \
                 running the test again. Switch back to **Project** at any time; the run stays \
                 read, and a new one is picked up as soon as Xcode finishes writing it — unless \
                 you picked an older run, which stays until you pick the newest again.
@@ -168,8 +168,6 @@ private extension HelpTopic {
         ]),
         HelpSection(title: "Snapshot", blocks: [
             .shortcuts([
-                HelpShortcut("⌘←", "Accept the candidate, overwriting the baseline"),
-                HelpShortcut("⌘→", "Revert the candidate to the baseline"),
                 HelpShortcut("⌘↩", "Reveal the selection in the Finder"),
                 HelpShortcut("⌘L", "Clear the canvas"),
                 HelpShortcut("⌘⌫", "Move the selection to the Trash"),
@@ -214,11 +212,24 @@ private extension HelpTopic {
                 which makes a transparent snapshot readable.
                 """),
         ]),
-        HelpSection(title: "Accepting and reverting", blocks: [
+        HelpSection(title: "Accepting and rejecting", blocks: [
             .text("""
-                **Accept Candidate** (⌘←) copies the candidate over the baseline file. \
-                **Revert to Baseline** (⌘→) copies the baseline over the candidate. Both \
-                overwrite a file on disk.
+                The bar under a comparison decides it. **Accept** copies the candidate over \
+                the baseline file. **Reject** copies the baseline over the candidate. Both \
+                overwrite a file on disk; when one is unavailable, the bar says why.
+                """),
+            .text("""
+                A pair pasted from a failure log, dropped in, or opened by URL offers \
+                **Keep Baseline** and **Keep Candidate** instead. Keeping the baseline writes \
+                nothing; keeping the candidate copies it over the baseline. Either way the \
+                baseline is left on screen on its own.
+                """),
+            .text("""
+                GimDiff checks which side is which before showing the pair: a file Git \
+                tracks, or one inside the open project, is the baseline, even when the log \
+                listed it second. When nothing tells the two apart, the panes are called \
+                **Left** and **Right** instead, and the bar offers **Keep Left** and \
+                **Keep Right**: the image you keep is copied over the other one.
                 """),
             .text("""
                 When the baseline is the committed version there is nothing to accept into: \

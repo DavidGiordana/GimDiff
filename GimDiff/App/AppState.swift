@@ -52,6 +52,10 @@ final class AppState {
     private(set) var diffReport: ImageDiffReport?
     /// Whether that comparison is in flight, so the footer can say so rather than go blank.
     private(set) var isComputingDiff = false
+    /// How the sides of a loose pair were chosen, while one is on screen.
+    ///
+    /// `nil` for anything else: a snapshot's own comparison has sides the project gave it.
+    private(set) var looseRoleCertainty: LooseRoleCertainty?
     /// Bumped to make the canvas read its images off disk again.
     ///
     /// A counter rather than a flag because the file name never changes: nothing about the
@@ -134,6 +138,8 @@ final class AppState {
     /// Held so a second diff request supersedes the first rather than racing it.
     var diffTask: Task<Void, Never>?
     var gitStatusTask: Task<Void, Never>?
+    /// Deciding the sides of a pasted or dropped pair, before it is shown.
+    private var looseRoleTask: Task<Void, Never>?
     /// The loop reading the watcher's events. Kept out of observation so it stays a plain
     /// stored property, which is what lets `deinit` reach it.
     @ObservationIgnored var watchTask: Task<Void, Never>?
@@ -199,7 +205,7 @@ final class AppState {
             case let .open(folder):
                 openProject(at: folder)
             case let .compare(reference, failure):
-                showComparison(reference: reference, failure: failure)
+                showComparison(reference: reference, failure: failure, certainty: .stated)
             case let .openPullRequest(input):
                 openPullRequest(input)
             }
@@ -233,7 +239,8 @@ final class AppState {
             return
         }
 
-        showComparison(reference: images[0], failure: images[1])
+        // A drop carries no labels, only the order the files were selected in.
+        showLooseComparison(baseline: images[0], candidate: images[1], rolesAreStated: false)
     }
 
     /// Scans `url` and replaces whatever the window was showing.
@@ -757,7 +764,10 @@ final class AppState {
     }
 
     /// Shows two loose images side by side, from a drop, the clipboard, or a URL.
-    func showComparison(reference: URL, failure: URL) {
+    ///
+    /// - Parameter certainty: How the sides were chosen. A caller that named them — a
+    ///   `gimdiff://compare` URL — leaves the default.
+    func showComparison(reference: URL, failure: URL, certainty: LooseRoleCertainty = .stated) {
         gitDiffTask?.cancel()
         setPreview(.comparison(
             SnapshotPair(reference: reference, failure: failure),
@@ -765,7 +775,35 @@ final class AppState {
             title: failure.deletingPathExtension().lastPathComponent,
             baselineOrigin: .workingTree
         ))
+        looseRoleCertainty = certainty
     }
+
+    /// Shows a pasted or dropped pair once ``LooseRoleResolver`` has looked at the files.
+    ///
+    /// The pair is shown only after: drawing it in the source's order first and swapping
+    /// it a moment later would put a baseline label on the wrong image, however briefly.
+    func showLooseComparison(baseline: URL, candidate: URL, rolesAreStated: Bool) {
+        looseRoleTask?.cancel()
+        let resolver = LooseRoleResolver(gitService: gitService)
+        let projectRoot = currentProject?.rootURL
+        looseRoleTask = Task {
+            let resolution = await resolver.resolve(
+                baseline: baseline,
+                candidate: candidate,
+                rolesAreStated: rolesAreStated,
+                projectRoot: projectRoot
+            )
+            guard !Task.isCancelled else { return }
+            showComparison(
+                reference: resolution.baselineURL,
+                failure: resolution.candidateURL,
+                certainty: resolution.certainty
+            )
+        }
+    }
+
+    /// The side decision in flight for a pasted or dropped pair, if any.
+    var currentLooseRoleResolution: Task<Void, Never>? { looseRoleTask }
 
     func closePreview() {
         gitDiffTask?.cancel()
@@ -785,6 +823,9 @@ final class AppState {
     /// when the new preview has only one image.
     func setPreview(_ newValue: SnapshotPreview?) {
         diffTask?.cancel()
+        // Whatever the canvas shows next, a pair still being decided is no longer wanted.
+        looseRoleTask?.cancel()
+        looseRoleCertainty = nil
         preview = newValue
         diffReport = nil
         isComputingDiff = false
@@ -871,7 +912,11 @@ final class AppState {
             return
         }
 
-        showComparison(reference: baseline, failure: payload.candidateURL)
+        showLooseComparison(
+            baseline: baseline,
+            candidate: payload.candidateURL,
+            rolesAreStated: payload.rolesAreStated
+        )
     }
 
     /// Command-V: pastes into the focused text field when there is one, and ingests the

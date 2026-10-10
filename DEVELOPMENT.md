@@ -170,10 +170,29 @@ suppresses the window entirely. The UI tests therefore reset state with a defaul
 The detail column talks in ``SnapshotPane`` values, not in left and right. A pane carries a
 **role** (`candidate` or `baseline`) and an **origin** (`workingTree` or `committedVersion`),
 and `SnapshotPreview.panes` always puts the baseline first and the candidate second, reading
-old to new like every other diff tool. Every action in a pane header — and `⌘←` / `⌘→` in the
-*Snapshot* menu — reads as an arrow pointing at the file it overwrites: Accept points left at
-the baseline, Revert points right at the candidate. That only works if the sides keep their
-order.
+old to new like every other diff tool. The decision is not in either pane header:
+`SnapshotDecisionBar` sits once under every comparison, in every diff mode, with **Reject**
+and **Accept** side by side and the reason a disabled one is unavailable written beside them
+(`candidatePromotionObstacle`, `candidateRevertObstacle`). Neither has a keyboard shortcut:
+both overwrite a file, and a chord pressed by accident would do it without a look at the
+canvas. The *Snapshot* menu offers them by name.
+
+A loose pair — pasted, dropped, or opened by URL (`SnapshotPreview.isLoosePair`) — is
+offered as **Keep Baseline** and **Keep Candidate** instead. Its candidate is usually a
+failure artifact in a temporary folder, so rejecting it would write over a file nobody looks
+at again. `keepBaseline()` writes nothing; `keepCandidate()` promotes. Both then leave the
+baseline on screen alone, through `closePane(.candidate)`.
+
+Which side is which is decided before the pair is drawn, by `LooseRoleResolver` in
+`Engine/Ingestion/`, from the files rather than their names, so no library's folder layout
+is assumed: a file Git tracks is the baseline (`git ls-files --error-unmatch`), and failing
+that, a file inside the open project when the other is outside it. That evidence outranks a
+log's labels, which are read out of prose. When neither applies and the source labelled
+nothing — a drop, an unmarked log — `looseRoleCertainty` is `.unknown`, and **nothing on
+screen may call either image the baseline**: every side label goes through
+`AppState.sideTitle(for:)`, which answers *Left* and *Right*, and the bar offers
+`keepLeft()` / `keepRight()`, which copy the kept image over the other because either may be
+the recorded file. A `gimdiff://compare` URL names its sides and is taken at its word.
 
 The origin is load-bearing. A comparison against `HEAD` holds a baseline `git show` wrote to
 a scratch file, so *accepting the candidate has nothing to write to*: the candidate already
@@ -279,7 +298,7 @@ review then stands in for the open project until it is closed.
   `gimdiff://open-pr`, and `gimdiff pr`. The sheet stays up while the fetch runs, so
   progress and failures (`gh` missing, not logged in, no access) are shown beside the field.
 - **The review is read-only.** Both panes carry the `pullRequest` origin, so the promotion
-  actions refuse them and the pane headers hide their arrows; deletion is refused too.
+  actions refuse them and the decision bar is hidden; deletion is refused too.
   Actions that open a file elsewhere — Preview, the Finder, the test source — are hidden:
   the files are scratch copies that disappear with the review.
 - **Every snapshot names its change.** `ChangeKindBadge` shows Added, Modified, Deleted, or
@@ -341,7 +360,7 @@ own structure or from bytes.
   is dropped. Accepting a candidate makes the *rendered* image equal the snapshot; without
   this rule, reading the same bundle again would offer the old reference as the candidate.
 - **The canvas.** A failing snapshot opens as `SnapshotPreview.testRunFailure`: the
-  candidate carries the `testRun` origin (never written to, so Revert is refused) and the
+  candidate carries the `testRun` origin (never written to, so Reject is refused) and the
   baseline is the working file (so Accept works and settles the failure in memory). Images
   that match nothing are listed under a synthetic suite, `AppState.testRunSuiteID`, which
   cannot be deleted and carries no source warning.

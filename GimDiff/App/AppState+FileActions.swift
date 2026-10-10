@@ -98,7 +98,7 @@ extension AppState {
 
     /// Why neither side of a pull request comparison can be written to.
     static let pullRequestPromotionObstacle = """
-        Both images were downloaded from a GitHub pull request for review. Accept or revert \
+        Both images were downloaded from a GitHub pull request for review. Accept or reject \
         the change on its branch; there is no file on disk here to overwrite.
         """
 
@@ -107,21 +107,32 @@ extension AppState {
     /// True for a committed baseline as well as a recorded one: the candidate is always the
     /// working file, and that is the side this writes to — except under pull request
     /// review, where the candidate is a downloaded copy as well.
-    var canRevertToBaseline: Bool {
-        guard let candidate = preview?.candidate, preview?.baseline != nil else { return false }
-        return candidate.isWritable
+    var canRevertToBaseline: Bool { candidateRevertObstacle == nil }
+
+    /// Why the candidate cannot be put back to the baseline, or `nil` when it can.
+    var candidateRevertObstacle: String? {
+        guard let candidate = preview?.candidate, preview?.baseline != nil else {
+            return "There is no comparison on screen to reject."
+        }
+        guard candidate.isWritable else {
+            return candidate.origin == .testRun ? Self.testRunRevertObstacle : Self.pullRequestPromotionObstacle
+        }
+        return nil
     }
 
     /// Accepts the candidate: copies it over the baseline on disk.
-    func promoteCandidateToBaseline() {
-        guard let candidate = preview?.candidate, let baseline = preview?.baseline else { return }
+    ///
+    /// - Returns: Whether the baseline was written.
+    @discardableResult
+    func promoteCandidateToBaseline() -> Bool {
+        guard let candidate = preview?.candidate, let baseline = preview?.baseline else { return false }
 
         if let obstacle = candidatePromotionObstacle {
             report(obstacle)
-            return
+            return false
         }
 
-        guard copy(contentsOf: candidate.fileURL, over: baseline.fileURL) else { return }
+        guard copy(contentsOf: candidate.fileURL, over: baseline.fileURL) else { return false }
 
         // The snapshot now holds what the run rendered, so the failure is settled. Settled
         // before the refresh, so the images reloaded are the ones left on the canvas rather
@@ -130,17 +141,69 @@ extension AppState {
             resolveTestRunFailure(snapshotID: snapshotID)
         }
         finishFileAction()
+        return true
     }
 
-    /// Discards the candidate: copies the baseline back over it on disk.
-    func revertCandidateToBaseline() {
-        guard let candidate = preview?.candidate, let baseline = preview?.baseline else { return }
-        guard candidate.isWritable else {
-            report(candidate.origin == .testRun ? Self.testRunRevertObstacle : Self.pullRequestPromotionObstacle)
-            return
+    // MARK: - Loose pairs
+
+    /// Whether the pair on screen is loose and nothing could tell which side is the
+    /// baseline, so neither may be called one.
+    var looseRolesAreUnknown: Bool {
+        preview?.isLoosePair == true && looseRoleCertainty == .unknown
+    }
+
+    /// What to call a pane on screen: its role, or its position when the roles are unknown.
+    func sideTitle(for pane: SnapshotPane) -> String {
+        guard looseRolesAreUnknown else { return pane.roleTitle }
+        return pane.role == .baseline ? "Left" : "Right"
+    }
+
+    /// Settles an undecided pair in favour of the left image: it is written over the right
+    /// one, and stays on screen on its own.
+    ///
+    /// Written rather than merely kept, unlike ``keepBaseline()``: with the sides unknown,
+    /// the right image may be the recorded snapshot, and keeping the left has to reach it.
+    func keepLeft() {
+        guard looseRolesAreUnknown, revertCandidateToBaseline() else { return }
+        closePane(.candidate)
+    }
+
+    /// Settles an undecided pair in favour of the right image: it is written over the left
+    /// one, and stays on screen on its own.
+    func keepRight() {
+        guard looseRolesAreUnknown, promoteCandidateToBaseline() else { return }
+        closePane(.baseline)
+    }
+
+    /// Settles a pasted pair in favour of the recorded file: nothing is written, and the
+    /// baseline stays on screen on its own.
+    func keepBaseline() {
+        guard preview?.isLoosePair == true, !looseRolesAreUnknown else { return }
+        closePane(.candidate)
+    }
+
+    /// Settles a pasted pair in favour of the candidate: it is written over the baseline,
+    /// which then stays on screen on its own, holding what was kept.
+    ///
+    /// A write that fails leaves the pair up, so the error banner is read against it.
+    func keepCandidate() {
+        guard preview?.isLoosePair == true, !looseRolesAreUnknown, promoteCandidateToBaseline() else { return }
+        closePane(.candidate)
+    }
+
+    /// Rejects the candidate: copies the baseline back over it on disk.
+    ///
+    /// - Returns: Whether the candidate was written.
+    @discardableResult
+    func revertCandidateToBaseline() -> Bool {
+        guard let candidate = preview?.candidate, let baseline = preview?.baseline else { return false }
+        if let obstacle = candidateRevertObstacle {
+            report(obstacle)
+            return false
         }
-        guard copy(contentsOf: baseline.fileURL, over: candidate.fileURL) else { return }
+        guard copy(contentsOf: baseline.fileURL, over: candidate.fileURL) else { return false }
         finishFileAction()
+        return true
     }
 
     /// Replaces `destination` with the bytes of `source`, leaving `source` where it is.
