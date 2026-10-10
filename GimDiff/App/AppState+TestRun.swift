@@ -12,11 +12,16 @@ import Foundation
 enum SidebarSource: Hashable, Sendable {
     /// The project as it stands on disk, against its working tree.
     case project
-    /// The snapshots the project's last test run failed on.
+    /// The snapshots one of the project's test runs failed on — the newest, unless another
+    /// was picked from the history.
     case testRun
 }
 
-/// The failures of the project's last test run, as a second view of the project.
+/// The failures of one of the project's test runs, as a second view of the project.
+///
+/// Every run Xcode still keeps is offered, newest first, and the newest is the one shown
+/// until somebody picks another. A picked run stays on screen when a newer one arrives;
+/// following the newest again is a matter of picking it.
 ///
 /// Nothing is read until the user switches to it: a project opens on its own status, and
 /// reading a run exports images through `xcresulttool`, which is not free. Once read, the
@@ -41,13 +46,28 @@ extension AppState {
         currentProject != nil && !isReviewingPullRequest
     }
 
-    /// Whether the sidebar can offer the last test run: the project is on disk and Xcode
-    /// has a run of it.
+    /// Whether the sidebar can offer a test run: the project is on disk and Xcode has a run
+    /// of it.
     var canShowTestRun: Bool {
-        isProjectOnDisk && latestTestRunBundle != nil
+        isProjectOnDisk && !testRunBundles.isEmpty
     }
 
-    /// Whether the Project / Last Test Run switch is on screen.
+    /// The newest result bundle Xcode has for the open project; `nil` when the project has
+    /// never been tested.
+    var latestTestRunBundle: URL? {
+        testRunBundles.first?.url
+    }
+
+    /// The run the test run view shows, or would show if switched to: the one picked from
+    /// the history while it still exists, the newest otherwise.
+    var selectedTestRunBundle: TestRunBundle? {
+        if let pinned = pinnedTestRunBundleURL, let bundle = testRunBundles.first(where: { $0.url == pinned }) {
+            return bundle
+        }
+        return testRunBundles.first
+    }
+
+    /// Whether the Project / Test Run switch is on screen.
     ///
     /// Only when there is a run to switch to — a control with one usable side is noise — but
     /// kept while the run is up, so a run that disappears from under it still has a way back.
@@ -57,21 +77,21 @@ extension AppState {
 
     // MARK: - Locating
 
-    /// Looks for a run of the open project, without reading it.
+    /// Looks for the runs of the open project, without reading any of them.
     ///
-    /// Cheap enough to do on every load — one property list per workspace Xcode has built —
-    /// and all the switch needs to know whether to appear.
+    /// Cheap enough to do on every load — one property list per workspace Xcode has built,
+    /// and one per run — and all the switch and the run picker need to know.
     func locateTestRun() {
         testRunLocateTask?.cancel()
         guard isProjectOnDisk, let project = currentProject else {
-            latestTestRunBundle = nil
+            testRunBundles = []
             return
         }
 
         testRunLocateTask = Task { [testResultLocator] in
-            let bundle = await Self.latestBundle(of: project, locator: testResultLocator)
+            let bundles = await Self.bundles(of: project, locator: testResultLocator)
             guard !Task.isCancelled, currentProject?.rootURL == project.rootURL else { return }
-            latestTestRunBundle = bundle
+            testRunBundles = bundles
         }
     }
 
@@ -85,7 +105,7 @@ extension AppState {
         return (isReadingTestRun && testRun == nil) || testRunError != nil || testRun?.isEmpty == true
     }
 
-    /// Lists what the last test run failed on, reading it first if it has not been read.
+    /// Lists what the selected test run failed on, reading it first if it has not been read.
     func showTestRun() {
         guard canShowTestRun, sidebarSource != .testRun else { return }
         sidebarSource = .testRun
@@ -96,6 +116,28 @@ extension AppState {
             refreshTestRun()
         } else {
             settleSelectionAfterSwitch()
+        }
+    }
+
+    /// Lists what the run in `bundle` failed on, in place of whichever run was read.
+    ///
+    /// Picking the newest run is not pinning it: the view then follows the newest again, so
+    /// the next run Xcode writes replaces it as it always did.
+    func showTestRun(from bundle: URL) {
+        guard isProjectOnDisk, testRunBundles.contains(where: { $0.url == bundle }) else { return }
+        pinnedTestRunBundleURL = bundle == latestTestRunBundle ? nil : bundle
+        guard testRun?.bundleURL != bundle else {
+            showTestRun()
+            return
+        }
+
+        discardTestRun()
+        // The candidate on the canvas was a copy out of the run just discarded.
+        if case .testRunFailure = preview { closePreview() }
+        if sidebarSource == .testRun {
+            refreshTestRun()
+        } else {
+            showTestRun()
         }
     }
 
@@ -135,7 +177,8 @@ extension AppState {
 
     // MARK: - Reading
 
-    /// Reads the newest run of the open project.
+    /// Reads the selected run of the open project: the one picked from the history, or the
+    /// newest when none was or the one picked has since been deleted.
     ///
     /// - Parameter settling: Whether to wait for the result folder to go quiet first, for a
     ///   refresh set off by a run that may still be writing.
@@ -157,13 +200,22 @@ extension AppState {
                 }
             }
 
-            let bundle = await Self.latestBundle(of: project, locator: testResultLocator)
-            if !Task.isCancelled { latestTestRunBundle = bundle }
-            guard let bundle else {
+            let bundles = await Self.bundles(of: project, locator: testResultLocator)
+            guard !Task.isCancelled else { return }
+            testRunBundles = bundles
+            if let pinned = pinnedTestRunBundleURL, !bundles.contains(where: { $0.url == pinned }) {
+                pinnedTestRunBundleURL = nil
+            }
+            guard let bundle = selectedTestRunBundle?.url else {
                 guard !Task.isCancelled else { return }
                 // The run the tree was showing has gone with its derived data.
                 discardTestRun()
                 testRunError = "Xcode has no test results for this project. Run its tests, then try again."
+                return
+            }
+            // A run picked from the history is finished; only the newest can still be growing.
+            if pinnedTestRunBundleURL != nil, testRun?.bundleURL == bundle {
+                isReadingTestRun = false
                 return
             }
 
@@ -194,14 +246,14 @@ extension AppState {
     /// The read in flight, if any, so a caller can wait for it.
     var currentTestRunRefresh: Task<Void, Never>? { testRunTask }
 
-    /// Off the main actor: finding the bundle reads a property list per workspace Xcode has
-    /// ever built.
+    /// Off the main actor: finding the bundles reads a property list per workspace Xcode
+    /// has ever built, and one per bundle.
     @concurrent
-    private static func latestBundle(
+    private static func bundles(
         of project: ProjectBundle,
         locator: any TestResultLocating
-    ) async -> URL? {
-        locator.latestResultBundle(forProjectAt: project.rootURL, gitRootURL: project.gitRootURL)
+    ) async -> [TestRunBundle] {
+        locator.resultBundles(forProjectAt: project.rootURL, gitRootURL: project.gitRootURL)
     }
 
     /// Off the main actor as well: matching reads the attached images and every snapshot
@@ -299,9 +351,9 @@ extension AppState {
 
     /// Answers a change where Xcode writes the project's result bundles.
     ///
-    /// On screen, the new run replaces the old one once it is written. Off screen, the old
-    /// one is only forgotten, so the next switch reads the new one without paying for a read
-    /// nobody may ask for.
+    /// On screen, the new run replaces the old one once it is written, unless an older run
+    /// was picked from the history, which stays. Off screen, the old one is only forgotten,
+    /// so the next switch reads the new one without paying for a read nobody may ask for.
     func testResultsChanged() {
         // A first run, or derived data deleted, is what shows or hides the switch.
         locateTestRun()
@@ -377,7 +429,7 @@ extension AppState {
     /// Refuses to delete an image the run attached, saying why.
     func refusesDeletionOfTestRunAttachments(in suiteID: String) -> Bool {
         guard suiteID == Self.testRunSuiteID else { return false }
-        report("These images were copied out of the last test run; there is nothing in the project to delete.")
+        report("These images were copied out of a test run; there is nothing in the project to delete.")
         return true
     }
 

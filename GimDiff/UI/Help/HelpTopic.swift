@@ -112,15 +112,18 @@ private extension HelpTopic {
                 keep.
                 """),
         ]),
-        HelpSection(title: "Failures from your last test run", blocks: [
+        HelpSection(title: "Failures from your test runs", blocks: [
             .text("""
                 A project opens on its own status. Switch the sidebar from **Project** to \
-                **Last Test Run** (or View ▸ Last Test Run) to read the newest run Xcode left \
-                in DerivedData: the sidebar then lists only the snapshots it failed on, and \
+                **Test Run** (or View ▸ Test Run) to read the newest run Xcode left in \
+                DerivedData; the menu under the switch (or View ▸ Test Runs) lists every run \
+                Xcode still keeps, to look at an older one instead. The sidebar lists only the \
+                snapshots the run failed on, and \
                 selecting one shows the image the test rendered against the recorded file. \
                 Use **Diff Mask** to see where they differ. **Accept Candidate** (⌘←) re-records the snapshot without \
                 running the test again. Switch back to **Project** at any time; the run stays \
-                read, and a new one is picked up as soon as Xcode finishes writing it.
+                read, and a new one is picked up as soon as Xcode finishes writing it — unless \
+                you picked an older run, which stays until you pick the newest again.
                 """),
         ]),
         HelpSection(title: "After re-running your tests", blocks: [

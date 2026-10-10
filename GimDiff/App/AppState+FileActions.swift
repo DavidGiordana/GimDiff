@@ -92,7 +92,7 @@ extension AppState {
 
     /// Why the candidate out of a test run cannot be written to.
     static let testRunRevertObstacle = """
-        The candidate is a copy of what the last test run rendered, not a file in the \
+        The candidate is a copy of what the test run rendered, not a file in the \
         project. Run the test again to replace it.
         """
 

@@ -59,6 +59,7 @@ struct DerivedDataLocatorTests {
         found?.resolvingSymlinksInPath().path == expected.resolvingSymlinksInPath().path
     }
 
+    private static let earliest = Date(timeIntervalSince1970: 500)
     private static let earlier = Date(timeIntervalSince1970: 1_000)
     private static let later = Date(timeIntervalSince1970: 2_000)
 
@@ -92,6 +93,28 @@ struct DerivedDataLocatorTests {
         let found = fixture.locator.latestResultBundle(forProjectAt: app, gitRootURL: nil)
 
         #expect(Self.isSamePlace(found, newest))
+    }
+
+    @Test("Every run of every workspace is listed, newest first")
+    func listsEveryRunNewestFirst() throws {
+        let fixture = try Fixture()
+        let repository = fixture.projects.appendingPathComponent("Repo")
+        let app = try fixture.addWorkspace("App-abc", at: repository.appendingPathComponent("App/App.xcworkspace").path)
+        let kit = try fixture.addWorkspace("Kit-def", at: repository.appendingPathComponent("Kit/Kit.xcodeproj").path)
+        let oldest = try fixture.addRun("Test-1", in: app, created: Self.earlier)
+        let newest = try fixture.addRun("Test-2", in: kit, created: Self.later)
+        let undated = try fixture.addRun("Test-3", in: app, created: nil)
+        // A bundle that records no date is dated by the volume.
+        try FileManager.default.setAttributes([.creationDate: Self.earliest], ofItemAtPath: undated.path)
+
+        let found = fixture.locator.resultBundles(forProjectAt: repository, gitRootURL: nil)
+
+        #expect(found.count == 3)
+        #expect(Self.isSamePlace(found.first?.url, newest))
+        #expect(Self.isSamePlace(found.dropFirst().first?.url, oldest))
+        #expect(Self.isSamePlace(found.last?.url, undated))
+        #expect(found.map(\.workspaceName) == ["Kit.xcodeproj", "App.xcworkspace", "App.xcworkspace"])
+        #expect(found.first?.createdAt == Self.later)
     }
 
     @Test("The newest run is taken across every workspace of the project")

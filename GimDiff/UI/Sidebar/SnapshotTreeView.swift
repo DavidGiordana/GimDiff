@@ -25,28 +25,39 @@ struct SnapshotTreeView: View {
         let rows = state.visibleRows
 
         VStack(spacing: 0) {
-            if let session = state.pullRequestSession {
-                PullRequestHeader(session: session, close: state.closePullRequestReview)
-                    .padding(.horizontal, 10)
-                    .padding(.top, 8)
-            } else if let rootURL = state.currentProject?.rootURL ?? state.loadingProjectURL {
-                ProjectHeader(rootURL: rootURL, project: state.currentProject, close: state.closeProject)
-                    .padding(.horizontal, 10)
-                    .padding(.top, 8)
-            }
+            // The space above the divider belongs to the block, not to whichever control
+            // happens to be last: the filter bar is hidden while a run is read, and the
+            // divider would otherwise close up under the run picker.
+            VStack(spacing: 0) {
+                if let session = state.pullRequestSession {
+                    PullRequestHeader(session: session, close: state.closePullRequestReview)
+                        .padding(.horizontal, 10)
+                        .padding(.top, 8)
+                } else if let rootURL = state.currentProject?.rootURL ?? state.loadingProjectURL {
+                    ProjectHeader(rootURL: rootURL, project: state.currentProject, close: state.closeProject)
+                        .padding(.horizontal, 10)
+                        .padding(.top, 8)
+                }
 
-            if state.showsSidebarSourcePicker {
-                SidebarSourcePicker()
-                    .padding(.horizontal, 10)
-                    .padding(.top, 8)
-            }
+                if state.showsSidebarSourcePicker {
+                    SidebarSourcePicker()
+                        .padding(.horizontal, 10)
+                        .padding(.top, 8)
+                }
 
-            if state.currentProject != nil, !state.isShowingTestRunPlaceholder {
-                SnapshotFilterBar(focus: $focus)
-                    .padding(.horizontal, 10)
-                    .padding(.top, 8)
-                    .padding(.bottom, 10)
+                if state.sidebarSource == .testRun, state.canShowTestRun {
+                    TestRunHistoryPicker()
+                        .padding(.horizontal, 10)
+                        .padding(.top, 6)
+                }
+
+                if state.currentProject != nil, !state.isShowingTestRunPlaceholder {
+                    SnapshotFilterBar(focus: $focus)
+                        .padding(.horizontal, 10)
+                        .padding(.top, 8)
+                }
             }
+            .padding(.bottom, 10)
 
             Divider()
 
@@ -262,20 +273,20 @@ private struct ProjectHeader: View {
     }
 }
 
-/// Switches the tree between the project as it stands and what its last test run failed on.
+/// Switches the tree between the project as it stands and what a test run failed on.
 private struct SidebarSourcePicker: View {
     @Environment(AppState.self) private var state
 
     var body: some View {
-        Picker("Show", selection: source) {
-            Text("Project").tag(SidebarSource.project)
-            Text("Last Test Run").tag(SidebarSource.testRun)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .controlSize(.small)
-        .help("Show the project's snapshots, or the ones its last test run in Xcode failed on")
-        .accessibilityIdentifier("SidebarSource")
+        FullWidthSegmentedPicker(
+            options: [
+                PickerOption(title: "Project", value: SidebarSource.project),
+                PickerOption(title: "Test Run", value: SidebarSource.testRun),
+            ],
+            selection: source,
+            help: "Show the project's snapshots, or the ones a test run in Xcode failed on",
+            accessibilityIdentifier: "SidebarSource"
+        )
     }
 
     /// Goes through ``AppState/showTestRun()`` rather than assigning: switching also reads
@@ -284,6 +295,41 @@ private struct SidebarSourcePicker: View {
         Binding(
             get: { state.sidebarSource },
             set: { $0 == .testRun ? state.showTestRun() : state.showProjectStatus() }
+        )
+    }
+}
+
+/// Picks which of the project's test runs the tree lists, newest first.
+private struct TestRunHistoryPicker: View {
+    @Environment(AppState.self) private var state
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text("Run")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            FullWidthPopUpPicker(
+                options: state.testRunBundles.map { bundle in
+                    PickerOption(
+                        title: TestRunBundleLabel.title(of: bundle, among: state.testRunBundles),
+                        value: bundle.url
+                    )
+                },
+                selection: bundle,
+                help: "Choose which of the test runs Xcode keeps for this project to show",
+                accessibilityLabel: "Run",
+                accessibilityIdentifier: "TestRunHistory"
+            )
+        }
+    }
+
+    /// Goes through ``AppState/showTestRun(from:)``, which reads the run picked and decides
+    /// whether it is pinned or the newest is followed.
+    private var bundle: Binding<URL?> {
+        Binding(
+            get: { state.selectedTestRunBundle?.url },
+            set: { url in url.map(state.showTestRun(from:)) }
         )
     }
 }
@@ -405,7 +451,7 @@ private struct CountPill: View {
     }
 }
 
-/// Marks a snapshot the last test run failed on, or a suite holding some.
+/// Marks a snapshot the test run failed on, or a suite holding some.
 private struct TestFailureBadge: View {
     /// How many failed, on a suite row; `nil` on the snapshot itself.
     var count: Int?
@@ -425,8 +471,8 @@ private struct TestFailureBadge: View {
     }
 
     private var explanation: String {
-        guard let count else { return "Failed in the last test run" }
-        return count == 1 ? "1 snapshot failed in the last test run" : "\(count) snapshots failed in the last test run"
+        guard let count else { return "Failed in the test run" }
+        return count == 1 ? "1 snapshot failed in the test run" : "\(count) snapshots failed in the test run"
     }
 }
 

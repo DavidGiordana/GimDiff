@@ -18,14 +18,21 @@ final class StubTestResults: TestResultReading, TestResultLocating, @unchecked S
     static let bundleURL = URL(fileURLWithPath: "/DerivedData/Demo-hash/Logs/Test/Run.xcresult")
 
     private let lock = NSLock()
-    private var storedReport: TestRunReport?
+    private var storedReports: [TestRunReport] = []
     private var storedDirectories: [URL] = []
     private var storedReadCount = 0
 
-    /// The run the stub reports, or `nil` for a project that has never been tested.
+    /// The newest run the stub reports, or `nil` for a project that has never been tested.
+    /// Setting it leaves that run as the only one.
     var report: TestRunReport? {
-        get { lock.withLock { storedReport } }
-        set { lock.withLock { storedReport = newValue } }
+        get { lock.withLock { storedReports.first } }
+        set { lock.withLock { storedReports = newValue.map { [$0] } ?? [] } }
+    }
+
+    /// Every run the stub reports, newest first.
+    var reports: [TestRunReport] {
+        get { lock.withLock { storedReports } }
+        set { lock.withLock { storedReports = newValue } }
     }
 
     var resultDirectories: [URL] {
@@ -38,8 +45,10 @@ final class StubTestResults: TestResultReading, TestResultLocating, @unchecked S
         lock.withLock { storedReadCount }
     }
 
-    func latestResultBundle(forProjectAt rootURL: URL, gitRootURL: URL?) -> URL? {
-        report?.bundleURL
+    func resultBundles(forProjectAt rootURL: URL, gitRootURL: URL?) -> [TestRunBundle] {
+        reports.map { report in
+            TestRunBundle(url: report.bundleURL, createdAt: report.startedAt, workspaceName: "Demo.xcodeproj")
+        }
     }
 
     func resultDirectories(forProjectAt rootURL: URL, gitRootURL: URL?) -> [URL] {
@@ -49,7 +58,7 @@ final class StubTestResults: TestResultReading, TestResultLocating, @unchecked S
     func report(forBundleAt bundle: URL) async throws -> TestRunReport {
         let report = lock.withLock {
             storedReadCount += 1
-            return storedReport
+            return storedReports.first { $0.bundleURL == bundle }
         }
         guard let report else { throw GimDiffError.unreadableTestResults(bundle) }
         return report

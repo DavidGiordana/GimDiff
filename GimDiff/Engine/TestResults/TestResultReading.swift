@@ -15,22 +15,30 @@ protocol TestResultReading: Sendable {
     func report(forBundleAt bundle: URL) async throws -> TestRunReport
 }
 
-/// Finds the result bundle of the last test run of a project.
+/// Finds the result bundles of a project's test runs.
 ///
 /// Xcode keeps those outside the project, in a folder named after a hash of the
 /// workspace's path, so locating one means reading Xcode's own bookkeeping. The engine
 /// only names the question.
 protocol TestResultLocating: Sendable {
-    /// The newest result bundle of any workspace belonging to the project, or `nil` when
-    /// none of them has been tested.
+    /// Every result bundle of every workspace belonging to the project, newest first, or
+    /// none when none of them has been tested.
     ///
     /// - Parameter gitRootURL: The working tree holding the project. A project opened on
     ///   one module's snapshot folder is tested through a workspace elsewhere in the
     ///   repository, and the working tree is what ties the two together.
-    func latestResultBundle(forProjectAt rootURL: URL, gitRootURL: URL?) -> URL?
+    func resultBundles(forProjectAt rootURL: URL, gitRootURL: URL?) -> [TestRunBundle]
 
     /// The folders a new run of the project would be written into, for watching.
     ///
     /// Only folders that exist: a workspace that has never been tested has nowhere yet.
     func resultDirectories(forProjectAt rootURL: URL, gitRootURL: URL?) -> [URL]
+}
+
+extension TestResultLocating {
+    /// The newest result bundle of any workspace belonging to the project, or `nil` when
+    /// none of them has been tested.
+    func latestResultBundle(forProjectAt rootURL: URL, gitRootURL: URL?) -> URL? {
+        resultBundles(forProjectAt: rootURL, gitRootURL: gitRootURL).first?.url
+    }
 }

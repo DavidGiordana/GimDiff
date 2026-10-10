@@ -133,7 +133,7 @@ struct TreeItemContextMenu: View {
     private func compareTitle(for snapshot: SnapshotItem) -> String {
         if state.isReviewingPullRequest { return "Compare with Base Branch" }
         if state.sidebarSource == .testRun, state.testRun?.isFailing(snapshotID: snapshot.id) == true {
-            return "Compare with Last Test Run"
+            return "Compare with Test Run"
         }
         return "Show Snapshot (with Git diff)"
     }

@@ -96,12 +96,15 @@ final class AppState {
     /// What the sidebar lists: the project as it stands, or what its last test run failed
     /// on. Changed through ``showProjectStatus()`` and ``showTestRun()``.
     var sidebarSource: SidebarSource = .project
-    /// What the last test run of the open project failed on, or `nil` until somebody asks
+    /// What the chosen test run of the open project failed on, or `nil` until somebody asks
     /// for it. See `AppState+TestRun`.
     private(set) var testRun: TestRunResults?
-    /// The newest result bundle Xcode has for the open project, found without reading it;
-    /// `nil` when the project has never been tested.
-    var latestTestRunBundle: URL?
+    /// Every result bundle Xcode has for the open project, newest first, found without
+    /// reading any of them; empty when the project has never been tested.
+    var testRunBundles: [TestRunBundle] = []
+    /// The run somebody picked from the history, or `nil` to follow the newest one — which
+    /// is what a project opens on, and what keeps a fresh run replacing the one on screen.
+    var pinnedTestRunBundleURL: URL?
     var testRunLocateTask: Task<Void, Never>?
     /// Whether the run is being read, so the sidebar can say so rather than stand empty.
     var isReadingTestRun = false
@@ -295,7 +298,8 @@ final class AppState {
         stopWatching()
         discardTestRun()
         testRunLocateTask?.cancel()
-        latestTestRunBundle = nil
+        testRunBundles = []
+        pinnedTestRunBundleURL = nil
         closePreview()
         currentProject = nil
         selectedRowID = nil
@@ -345,7 +349,8 @@ final class AppState {
         sidebarSource = .project
         selectedRowID = visibleRows.first?.id
         restartWatching()
-        latestTestRunBundle = nil
+        testRunBundles = []
+        pinnedTestRunBundleURL = nil
         locateTestRun()
     }
 

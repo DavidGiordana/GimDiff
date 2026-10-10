@@ -98,12 +98,21 @@ struct AppCommands: Commands {
 
             Divider()
 
-            // The sidebar's own Project / Last Test Run switch again, over the same state.
+            // The sidebar's own Project / Test Run switch again, over the same state.
             Picker("Sidebar Shows", selection: sidebarSource) {
                 Text("Project Status").tag(SidebarSource.project)
-                Text("Last Test Run").tag(SidebarSource.testRun)
+                Text("Test Run").tag(SidebarSource.testRun)
             }
             .pickerStyle(.inline)
+            .disabled(!state.canShowTestRun)
+
+            // And the sidebar's run picker, newest first.
+            Picker("Test Runs", selection: testRunBundle) {
+                ForEach(state.testRunBundles) { bundle in
+                    Text(TestRunBundleLabel.title(of: bundle, among: state.testRunBundles))
+                        .tag(Optional(bundle.url))
+                }
+            }
             .disabled(!state.canShowTestRun)
 
             Divider()
@@ -246,6 +255,15 @@ struct AppCommands: Commands {
         Binding(
             get: { state.sidebarSource },
             set: { $0 == .testRun ? state.showTestRun() : state.showProjectStatus() }
+        )
+    }
+
+    /// Shows the run picked through ``AppState/showTestRun(from:)``, switching the sidebar
+    /// to it when it was showing the project.
+    private var testRunBundle: Binding<URL?> {
+        Binding(
+            get: { state.selectedTestRunBundle?.url },
+            set: { url in url.map(state.showTestRun(from:)) }
         )
     }
 

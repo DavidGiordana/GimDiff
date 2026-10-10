@@ -49,24 +49,29 @@ struct DerivedDataLocator: TestResultLocating {
         return URL(fileURLWithPath: (custom as NSString).expandingTildeInPath, isDirectory: true)
     }
 
-    func latestResultBundle(forProjectAt rootURL: URL, gitRootURL: URL?) -> URL? {
+    func resultBundles(forProjectAt rootURL: URL, gitRootURL: URL?) -> [TestRunBundle] {
         workspaceFolders(forProjectAt: rootURL, gitRootURL: gitRootURL)
-            .flatMap(resultBundles(in:))
-            .max { $0.created < $1.created }?
-            .url
+            .flatMap { resultBundles(in: $0.folder, workspace: $0.workspace) }
+            // An undated bundle sorts last, and the name breaks ties so the order is stable.
+            .sorted { lhs, rhs in
+                let left = lhs.createdAt ?? .distantPast
+                let right = rhs.createdAt ?? .distantPast
+                return left != right ? left > right : lhs.url.path < rhs.url.path
+            }
     }
 
     func resultDirectories(forProjectAt rootURL: URL, gitRootURL: URL?) -> [URL] {
         workspaceFolders(forProjectAt: rootURL, gitRootURL: gitRootURL)
-            .map { $0.appendingPathComponent(Self.testLogsPath, isDirectory: true) }
+            .map { $0.folder.appendingPathComponent(Self.testLogsPath, isDirectory: true) }
             .filter { url in
                 var isDirectory: ObjCBool = false
                 return fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
             }
     }
 
-    /// The derived data folders of every workspace that builds the project.
-    private func workspaceFolders(forProjectAt rootURL: URL, gitRootURL: URL?) -> [URL] {
+    /// The derived data folders of every workspace that builds the project, with the
+    /// workspace each belongs to.
+    private func workspaceFolders(forProjectAt rootURL: URL, gitRootURL: URL?) -> [(folder: URL, workspace: URL)] {
         let root = Self.canonicalPath(of: rootURL)
         let gitRoot = gitRootURL.map(Self.canonicalPath(of:))
         let folders = (try? fileManager.contentsOfDirectory(
@@ -75,9 +80,11 @@ struct DerivedDataLocator: TestResultLocating {
             options: [.skipsHiddenFiles]
         )) ?? []
 
-        return folders.filter { folder in
-            guard let workspace = workspaceURL(of: folder) else { return false }
-            return Self.workspace(workspace, belongsToProjectAt: root, gitRoot: gitRoot)
+        return folders.compactMap { folder in
+            guard let workspace = workspaceURL(of: folder),
+                  Self.workspace(workspace, belongsToProjectAt: root, gitRoot: gitRoot)
+            else { return nil }
+            return (folder, workspace)
         }
     }
 
@@ -109,7 +116,7 @@ struct DerivedDataLocator: TestResultLocating {
 
     // MARK: - Result bundles
 
-    private func resultBundles(in folder: URL) -> [(url: URL, created: Date)] {
+    private func resultBundles(in folder: URL, workspace: URL) -> [TestRunBundle] {
         let logs = folder.appendingPathComponent(Self.testLogsPath, isDirectory: true)
         let entries = (try? fileManager.contentsOfDirectory(
             at: logs,
@@ -119,7 +126,13 @@ struct DerivedDataLocator: TestResultLocating {
 
         return entries
             .filter { $0.pathExtension.lowercased() == Self.resultBundleExtension }
-            .map { ($0, creationDate(ofBundle: $0)) }
+            .map { bundle in
+                TestRunBundle(
+                    url: bundle,
+                    createdAt: creationDate(ofBundle: bundle),
+                    workspaceName: workspace.lastPathComponent
+                )
+            }
     }
 
     /// When the run started, as the bundle records it.
@@ -127,12 +140,12 @@ struct DerivedDataLocator: TestResultLocating {
     /// Read from the bundle rather than from its name or the volume: the name's format is
     /// Xcode's to change, and a bundle copied or restored from a backup is dated by the
     /// volume from the day it was copied.
-    private func creationDate(ofBundle bundle: URL) -> Date {
+    private func creationDate(ofBundle bundle: URL) -> Date? {
         let info = bundle.appendingPathComponent(Self.resultInfoFileName)
         if let recorded = Self.propertyList(at: info)?[Self.resultCreationDateKey] as? Date {
             return recorded
         }
-        return (try? bundle.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? .distantPast
+        return (try? bundle.resourceValues(forKeys: [.creationDateKey]))?.creationDate
     }
 
     // MARK: - Reading

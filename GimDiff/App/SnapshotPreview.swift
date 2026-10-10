@@ -59,7 +59,7 @@ struct SnapshotPane: Identifiable, Equatable, Sendable {
         switch (role, origin) {
         case (.candidate, .pullRequest): "Pull Request Head"
         case (.baseline, .pullRequest): "Base Branch"
-        case (_, .testRun): "Last Test Run"
+        case (_, .testRun): "Test Run"
         case (.candidate, _): "Current"
         case (.baseline, .committedVersion): "Committed in Git"
         case (.baseline, .workingTree): "Recorded on Disk"

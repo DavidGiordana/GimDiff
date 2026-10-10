@@ -10,7 +10,7 @@ import Foundation
 import Testing
 @testable import GimDiff
 
-/// The last test run's failures, laid over the tree and acted on from the canvas.
+/// A test run's failures, laid over the tree and acted on from the canvas.
 @Suite("Test run failures")
 @MainActor
 struct TestRunTests {
@@ -68,7 +68,11 @@ struct TestRunTests {
         "R2": "menu recorded", "Y": "menu rendered", "N": "never recorded",
     ]
 
-    private func failure(_ identifier: String, images: [(id: String, contents: String)]) -> TestRunFailure {
+    private func failure(
+        _ identifier: String,
+        images: [(id: String, contents: String)],
+        scratch: URL = Self.scratch
+    ) -> TestRunFailure {
         TestRunFailure(
             id: identifier,
             name: String(identifier.split(separator: "/").last ?? ""),
@@ -80,7 +84,7 @@ struct TestRunTests {
                         TestRunImage(
                             id: image.id,
                             name: "attachment \(image.id)",
-                            fileURL: Self.scratch.appendingPathComponent("\(image.id).png")
+                            fileURL: scratch.appendingPathComponent("\(image.id).png")
                         )
                     }
                 ),
@@ -401,6 +405,113 @@ struct TestRunTests {
 
         #expect(attachments.isMissingSourceCode)
         #expect(!fixture.state.hasSourceWarning(attachments))
+    }
+
+    // MARK: - History
+
+    private static let olderBundle = URL(fileURLWithPath: "/DerivedData/Demo-hash/Logs/Test/Older.xcresult")
+    private static let olderScratch = URL(fileURLWithPath: "/scratch/older", isDirectory: true)
+
+    /// Adds a run older than the one `openWithFailures` sets up, which failed on `header`
+    /// alone, and locates both.
+    private func addOlderRun(to fixture: AppStateFixture) async {
+        let older = failure(
+            "AlphaTests/testHeader()",
+            images: [("R1", "header recorded"), ("O", "header rendered long ago")],
+            scratch: Self.olderScratch
+        )
+        for image in older.groups.flatMap(\.images) {
+            fixture.filesystem.stub(image.fileURL, contents: image.id == "R1" ? "header recorded" : "header rendered long ago")
+        }
+        fixture.filesystem.createDirectory(at: Self.olderScratch)
+        fixture.filesystem.createDirectory(at: Self.scratch)
+        fixture.testResults.reports.append(TestRunReport(
+            bundleURL: Self.olderBundle,
+            scratchDirectory: Self.olderScratch,
+            failures: [older]
+        ))
+        fixture.state.locateTestRun()
+        await fixture.state.currentTestRunLocate?.value
+    }
+
+    @Test("Every run is offered, newest first, and the newest is the one shown")
+    func offersEveryRunNewestFirst() async throws {
+        let fixture = await openWithFailures(switchingToRun: false)
+        await addOlderRun(to: fixture)
+
+        #expect(fixture.state.testRunBundles.map(\.url) == [StubTestResults.bundleURL, Self.olderBundle])
+        #expect(fixture.state.selectedTestRunBundle?.url == StubTestResults.bundleURL)
+
+        fixture.state.showTestRun()
+        await fixture.state.currentTestRunRefresh?.value
+
+        #expect(fixture.state.testRun?.bundleURL == StubTestResults.bundleURL)
+        #expect(fixture.state.pinnedTestRunBundleURL == nil)
+    }
+
+    @Test("Picking an older run lists what it failed on, and deletes the newer run's copies")
+    func picksOlderRun() async throws {
+        let fixture = await openWithFailures()
+        await addOlderRun(to: fixture)
+
+        fixture.state.showTestRun(from: Self.olderBundle)
+        await fixture.state.currentTestRunRefresh?.value
+
+        #expect(fixture.state.testRun?.bundleURL == Self.olderBundle)
+        #expect(fixture.state.selectedTestRunBundle?.url == Self.olderBundle)
+        #expect(fixture.rowDescriptions == ["AlphaTests", "AlphaTests/header"])
+        #expect(fixture.selectedRowDescription == "AlphaTests/header")
+        #expect(fixture.state.preview?.candidate?.fileURL == Self.olderScratch.appendingPathComponent("O.png"))
+        #expect(fixture.filesystem.removedPaths.contains(Self.scratch.path))
+    }
+
+    @Test("Picking a run while the project is shown switches to it")
+    func pickingSwitchesToRun() async throws {
+        let fixture = await openWithFailures(switchingToRun: false)
+        await addOlderRun(to: fixture)
+
+        fixture.state.showTestRun(from: Self.olderBundle)
+        await fixture.state.currentTestRunRefresh?.value
+
+        #expect(fixture.state.sidebarSource == .testRun)
+        #expect(fixture.state.testRun?.bundleURL == Self.olderBundle)
+        #expect(fixture.testResults.readCount == 1)
+    }
+
+    @Test("A picked run stays on screen when the results change, and the newest is followed again once picked")
+    func pinnedRunStays() async throws {
+        let fixture = await openWithFailures()
+        await addOlderRun(to: fixture)
+        fixture.state.showTestRun(from: Self.olderBundle)
+        await fixture.state.currentTestRunRefresh?.value
+        let reads = fixture.testResults.readCount
+
+        fixture.state.refreshTestRun()
+        await fixture.state.currentTestRunRefresh?.value
+
+        #expect(fixture.state.testRun?.bundleURL == Self.olderBundle)
+        #expect(fixture.testResults.readCount == reads)
+
+        fixture.state.showTestRun(from: StubTestResults.bundleURL)
+        await fixture.state.currentTestRunRefresh?.value
+
+        #expect(fixture.state.pinnedTestRunBundleURL == nil)
+        #expect(fixture.state.testRun?.bundleURL == StubTestResults.bundleURL)
+    }
+
+    @Test("A picked run that is deleted gives way to the newest")
+    func deletedPinnedRunFallsBack() async throws {
+        let fixture = await openWithFailures()
+        await addOlderRun(to: fixture)
+        fixture.state.showTestRun(from: Self.olderBundle)
+        await fixture.state.currentTestRunRefresh?.value
+
+        fixture.testResults.reports.removeLast()
+        fixture.state.refreshTestRun()
+        await fixture.state.currentTestRunRefresh?.value
+
+        #expect(fixture.state.pinnedTestRunBundleURL == nil)
+        #expect(fixture.state.testRun?.bundleURL == StubTestResults.bundleURL)
     }
 
     // MARK: - Lifetime

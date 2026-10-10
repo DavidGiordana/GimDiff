@@ -288,12 +288,17 @@ review then stands in for the open project until it is closed.
 
 ## Test run failures
 
-The sidebar has two views of an open project, switched by the *Project / Last Test Run*
+The sidebar has two views of an open project, switched by the *Project / Test Run*
 control under the project header (and View ▸ Sidebar Shows). `AppState.sidebarSource` holds
 which one is up; switch through `showTestRun()` and `showProjectStatus()`, never by assigning.
 
+- **Every run is offered; the newest is the default.** `testRunBundles` lists every bundle
+  of the project, newest first, and the menu under the switch (and View ▸ Test Runs) picks
+  one through `showTestRun(from:)`. Picking an older run sets `pinnedTestRunBundleURL`, and
+  a pinned run stays on screen when a newer one arrives; picking the newest clears the pin,
+  so the view follows new runs again. A pinned run that is deleted gives way to the newest.
 - **The switch appears only when there is a run.** `load(_:)` looks for the project's
-  newest bundle with `locateTestRun()` — a property list per workspace, no `xcresulttool` —
+  bundles with `locateTestRun()` — a property list per workspace and per run, no `xcresulttool` —
   and `showsSidebarSourcePicker` stays false until one is found. It stays up while the
   run's view is showing, so a run deleted from under it still has a way back. A project
   never tested has no `Logs/Test` folder to watch, so its first run appears on the next
