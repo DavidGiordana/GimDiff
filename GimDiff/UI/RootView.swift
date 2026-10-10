@@ -54,9 +54,12 @@ struct RootView: View {
             isPresented: acceptAllConfirmation,
             titleVisibility: .visible
         ) {
+            // The default, so ↩ confirms: the dialog is a pause before an action somebody
+            // already chose, and git still holds every baseline it replaces.
             Button("Accept All") {
                 state.acceptAllTestRunFailures()
             }
+            .keyboardShortcut(.defaultAction)
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("""
