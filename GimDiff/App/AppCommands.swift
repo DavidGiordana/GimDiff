@@ -242,8 +242,8 @@ struct AppCommands: Commands {
 
             // Unshortcut'd for the same reason, and more so: it overwrites every snapshot
             // the run failed on.
-            Button("Accept All Test Run Failures") {
-                state.acceptAllTestRunFailures()
+            Button("Accept All Test Run Failures…") {
+                state.requestAcceptAllTestRunFailures()
             }
             .disabled(state.acceptableTestRunFailuresCount == 0)
 

@@ -397,6 +397,22 @@ struct TestRunTests {
         #expect(!fixture.state.isFailingInTestRun(menu))
     }
 
+    @Test("Asking to accept all confirms first and writes nothing yet")
+    func acceptAllAsksFirst() async throws {
+        let fixture = await openWithFailures()
+        let header = try snapshot("header", in: fixture)
+
+        fixture.state.requestAcceptAllTestRunFailures()
+
+        #expect(fixture.state.isConfirmingAcceptAllTestRunFailures)
+        #expect(fixture.filesystem.contents(of: header.fileURL) == "header recorded")
+
+        fixture.state.acceptAllTestRunFailures()
+
+        #expect(!fixture.state.isConfirmingAcceptAllTestRunFailures)
+        #expect(fixture.filesystem.contents(of: header.fileURL) == "header rendered")
+    }
+
     @Test("Accepting all is not offered under the project's status")
     func acceptAllNeedsTheRunsView() async throws {
         let fixture = await openWithFailures()
@@ -404,6 +420,8 @@ struct TestRunTests {
         fixture.state.showProjectStatus()
 
         #expect(fixture.state.acceptableTestRunFailuresCount == 0)
+        fixture.state.requestAcceptAllTestRunFailures()
+        #expect(!fixture.state.isConfirmingAcceptAllTestRunFailures)
         fixture.state.acceptAllTestRunFailures()
 
         #expect(fixture.filesystem.contents(of: header.fileURL) == "header recorded")

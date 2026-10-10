@@ -154,6 +154,15 @@ extension AppState {
         return testRun?.failedSnapshotsCount ?? 0
     }
 
+    /// Asks before ``acceptAllTestRunFailures()``, which every route to it goes through.
+    ///
+    /// A single Accept overwrites the file on the canvas, which has just been looked at;
+    /// accepting them all overwrites files nobody may have opened, so it is confirmed first.
+    func requestAcceptAllTestRunFailures() {
+        guard acceptableTestRunFailuresCount > 0 else { return }
+        isConfirmingAcceptAllTestRunFailures = true
+    }
+
     /// Accepts every failure of the run on screen: copies what each test rendered over the
     /// snapshot it failed on.
     ///
@@ -163,6 +172,7 @@ extension AppState {
     /// replace. A write that fails keeps its snapshot listed, with the error on the banner,
     /// and does not hold back the others.
     func acceptAllTestRunFailures() {
+        isConfirmingAcceptAllTestRunFailures = false
         guard acceptableTestRunFailuresCount > 0, let testRun else { return }
 
         var accepted: Set<SnapshotItem.ID> = []

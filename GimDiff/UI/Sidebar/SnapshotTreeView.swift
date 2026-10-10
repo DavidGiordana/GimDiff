@@ -333,8 +333,8 @@ private struct TestRunHistoryPicker: View {
                 accessibilityIdentifier: "TestRunHistory"
             )
 
-            Button("Accept All") {
-                state.acceptAllTestRunFailures()
+            Button("Accept All…") {
+                state.requestAcceptAllTestRunFailures()
             }
             .controlSize(.small)
             .disabled(state.acceptableTestRunFailuresCount == 0)

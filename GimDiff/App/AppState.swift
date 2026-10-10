@@ -86,6 +86,8 @@ final class AppState {
     /// The window holds one sheet at a time, so the Open PR sheet takes precedence: a pull
     /// request arriving by URL or paste puts the help away rather than waiting behind it.
     var isHelpPresented = false
+    /// Whether the window is asking before every failure of the run is accepted.
+    var isConfirmingAcceptAllTestRunFailures = false
     /// What the sheet's field holds: a link, `owner/repo#123`, or a number.
     var pullRequestInput = ""
     private(set) var isFetchingPullRequest = false

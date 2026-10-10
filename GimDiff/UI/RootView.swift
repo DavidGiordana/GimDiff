@@ -49,6 +49,35 @@ struct RootView: View {
         .sheet(isPresented: helpSheet) {
             HelpView()
         }
+        .confirmationDialog(
+            acceptAllTitle,
+            isPresented: acceptAllConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Accept All") {
+                state.acceptAllTestRunFailures()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("""
+            What the test run rendered replaces each snapshot's baseline on disk. Images \
+            that match no snapshot are left alone.
+            """)
+        }
+    }
+
+    private var acceptAllTitle: String {
+        let count = state.acceptableTestRunFailuresCount
+        return count == 1
+            ? "Accept the failing snapshot?"
+            : "Accept all \(count.formatted()) failing snapshots?"
+    }
+
+    private var acceptAllConfirmation: Binding<Bool> {
+        Binding(
+            get: { state.isConfirmingAcceptAllTestRunFailures },
+            set: { state.isConfirmingAcceptAllTestRunFailures = $0 }
+        )
     }
 
     private var helpSheet: Binding<Bool> {
