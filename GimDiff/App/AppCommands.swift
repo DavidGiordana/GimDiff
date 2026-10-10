@@ -264,6 +264,11 @@ struct AppCommands: Commands {
             }
             .disabled(state.discardableSelection.isEmpty)
 
+            Button("Discard All Changes in Project…") {
+                state.requestDiscardAllGitChanges()
+            }
+            .disabled(state.discardableProjectSnapshots.isEmpty)
+
             Button(state.selectedSnapshot == nil ? "Move Snapshots Folder to Trash" : "Move Snapshot to Trash") {
                 state.deleteSelection()
             }

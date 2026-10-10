@@ -41,6 +41,33 @@ extension AppState {
         discardGitChanges(of: discardableSelection)
     }
 
+    /// Every snapshot of the project Discard All would restore, listed once each.
+    ///
+    /// Empty under the test run's view: that view lists failures, not changes, so a button
+    /// over it would act on rows nobody can see.
+    var discardableProjectSnapshots: [SnapshotItem] {
+        guard sidebarSource == .project else { return [] }
+        var seen: Set<SnapshotItem.ID> = []
+        return (currentProject?.suites ?? [])
+            .flatMap(discardableSnapshots(in:))
+            .filter { seen.insert($0.id).inserted }
+    }
+
+    /// Asks before ``discardAllGitChanges()``, which every route to it goes through.
+    ///
+    /// Git keeps no copy of a change that was never staged, so nothing would bring back what
+    /// a stray click threw away.
+    func requestDiscardAllGitChanges() {
+        guard !discardableProjectSnapshots.isEmpty else { return }
+        isConfirmingDiscardAllGitChanges = true
+    }
+
+    /// Restores every modified snapshot of the project to what `HEAD` holds.
+    func discardAllGitChanges() {
+        isConfirmingDiscardAllGitChanges = false
+        discardGitChanges(of: discardableProjectSnapshots)
+    }
+
     /// Restores `snapshots` to what `HEAD` holds, dropping staged and unstaged changes alike.
     ///
     /// The badges are cleared in memory as soon as git succeeds, rather than on the status

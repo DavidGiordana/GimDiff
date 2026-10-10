@@ -88,6 +88,8 @@ final class AppState {
     var isHelpPresented = false
     /// Whether the window is asking before every failure of the run is accepted.
     var isConfirmingAcceptAllTestRunFailures = false
+    /// Whether the window is asking before every changed snapshot of the project is restored.
+    var isConfirmingDiscardAllGitChanges = false
     /// What the sheet's field holds: a link, `owner/repo#123`, or a number.
     var pullRequestInput = ""
     private(set) var isFetchingPullRequest = false

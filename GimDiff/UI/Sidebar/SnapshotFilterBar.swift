@@ -90,6 +90,14 @@ struct SnapshotFilterBar: View {
                     }
 
                     Spacer()
+
+                    if !state.discardableProjectSnapshots.isEmpty {
+                        Button("Discard All…") {
+                            state.requestDiscardAllGitChanges()
+                        }
+                        .help("Restore every modified snapshot of the project to the committed version")
+                        .accessibilityIdentifier("DiscardAllGitChanges")
+                    }
                 }
                 .toggleStyle(.button)
                 .controlSize(.small)

@@ -91,4 +91,72 @@ struct DiscardChangesTests {
         #expect(fixture.rowDescriptions == ["BetaTests"])
         #expect(fixture.selectedRowDescription == "BetaTests")
     }
+
+    // MARK: - The whole project
+
+    /// Changes in both suites: `header` and `menu` modified, `toolbar` untracked.
+    private static func changesInBothSuites() -> ProjectBundle {
+        ProjectBundle(
+            rootURL: AppStateFixture.root,
+            gitRootURL: AppStateFixture.root,
+            suites: [
+                AppStateFixture.suite(
+                    named: "AlphaTests",
+                    hasSourceCode: true,
+                    snapshots: [("header", .modified), ("footer", .unmodified)]
+                ),
+                AppStateFixture.suite(
+                    named: "BetaTests",
+                    hasSourceCode: true,
+                    snapshots: [("toolbar", .untracked), ("menu", .modified)]
+                ),
+            ]
+        )
+    }
+
+    @Test("Discarding all asks first, then restores every modified snapshot of the project")
+    func discardsTheWholeProject() async throws {
+        let bundle = Self.changesInBothSuites()
+        // The status read that follows the discard must still see the untracked snapshot.
+        let toolbar = try #require(bundle.suites.flatMap(\.snapshots).first { $0.name == "toolbar" })
+        var git = StubGitService()
+        git.statuses = [toolbar.fileURL.standardizedFileURL: .untracked]
+        let fixture = AppStateFixture(bundle: bundle, gitService: git)
+        let header = try snapshot("header", in: fixture)
+        let menu = try snapshot("menu", in: fixture)
+        #expect(fixture.state.discardableProjectSnapshots.map(\.name) == ["header", "menu"])
+
+        fixture.state.requestDiscardAllGitChanges()
+
+        #expect(fixture.state.isConfirmingDiscardAllGitChanges)
+        #expect(fixture.gitService.discarded.recorded.isEmpty)
+
+        fixture.state.discardAllGitChanges()
+        await fixture.state.currentDiscard?.value
+        await fixture.state.currentGitStatusRefresh?.value
+
+        #expect(!fixture.state.isConfirmingDiscardAllGitChanges)
+        #expect(Set(fixture.gitService.discarded.recorded) == [header.fileURL, menu.fileURL])
+        #expect(try snapshot("header", in: fixture).gitStatus == .unmodified)
+        #expect(try snapshot("menu", in: fixture).gitStatus == .unmodified)
+        #expect(try snapshot("toolbar", in: fixture).gitStatus == .untracked)
+        #expect(fixture.state.discardableProjectSnapshots.isEmpty)
+    }
+
+    @Test("Nothing modified means nothing to confirm")
+    func discardAllNeedsAChange() throws {
+        let untrackedOnly = ProjectBundle(
+            rootURL: AppStateFixture.root,
+            gitRootURL: AppStateFixture.root,
+            suites: [
+                AppStateFixture.suite(named: "BetaTests", hasSourceCode: true, snapshots: [("toolbar", .untracked)]),
+            ]
+        )
+        let fixture = AppStateFixture(bundle: untrackedOnly)
+
+        fixture.state.requestDiscardAllGitChanges()
+
+        #expect(fixture.state.discardableProjectSnapshots.isEmpty)
+        #expect(!fixture.state.isConfirmingDiscardAllGitChanges)
+    }
 }

@@ -64,6 +64,36 @@ struct RootView: View {
             that match no snapshot are left alone.
             """)
         }
+        .confirmationDialog(
+            discardAllTitle,
+            isPresented: discardAllConfirmation,
+            titleVisibility: .visible
+        ) {
+            // Destructive, unlike Accept All: a change that was never staged is gone for good.
+            Button("Discard All", role: .destructive) {
+                state.discardAllGitChanges()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("""
+            Every modified snapshot goes back to the committed version. Changes that were \
+            never committed cannot be recovered. Untracked snapshots are left alone.
+            """)
+        }
+    }
+
+    private var discardAllTitle: String {
+        let count = state.discardableProjectSnapshots.count
+        return count == 1
+            ? "Discard the changes to 1 snapshot?"
+            : "Discard the changes to \(count.formatted()) snapshots?"
+    }
+
+    private var discardAllConfirmation: Binding<Bool> {
+        Binding(
+            get: { state.isConfirmingDiscardAllGitChanges },
+            set: { state.isConfirmingDiscardAllGitChanges = $0 }
+        )
     }
 
     private var acceptAllTitle: String {
