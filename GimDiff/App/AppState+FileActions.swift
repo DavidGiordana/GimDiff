@@ -122,12 +122,14 @@ extension AppState {
         }
 
         guard copy(contentsOf: candidate.fileURL, over: baseline.fileURL) else { return }
-        finishFileAction()
 
-        // The snapshot now holds what the run rendered, so the failure is settled.
+        // The snapshot now holds what the run rendered, so the failure is settled. Settled
+        // before the refresh, so the images reloaded are the ones left on the canvas rather
+        // than the run's copy, which may be gone.
         if case let .testRunFailure(_, snapshotID, _) = preview {
             resolveTestRunFailure(snapshotID: snapshotID)
         }
+        finishFileAction()
     }
 
     /// Discards the candidate: copies the baseline back over it on disk.

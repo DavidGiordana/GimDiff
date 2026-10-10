@@ -21,7 +21,8 @@ struct TestRunTests {
     /// `header` and `menu` and attached one image that belongs to nothing.
     private func openWithFailures(
         resultDirectories: [URL] = [],
-        switchingToRun: Bool = true
+        switchingToRun: Bool = true,
+        attachingUnmatched: Bool = true
     ) async -> AppStateFixture {
         let fixture = AppStateFixture()
         fixture.testResults.resultDirectories = resultDirectories
@@ -33,16 +34,19 @@ struct TestRunTests {
             }
         }
 
+        var failures = [
+            failure("AlphaTests/testHeader()", images: [
+                ("R1", "header recorded"), ("X", "header rendered"), ("D", "header difference"),
+            ]),
+            failure("BetaTests/testMenu()", images: [("R2", "menu recorded"), ("Y", "menu rendered")]),
+        ]
+        if attachingUnmatched {
+            failures.append(failure("BetaTests/testNew()", images: [("N", "never recorded")]))
+        }
         fixture.testResults.report = TestRunReport(
             bundleURL: StubTestResults.bundleURL,
             scratchDirectory: Self.scratch,
-            failures: [
-                failure("AlphaTests/testHeader()", images: [
-                    ("R1", "header recorded"), ("X", "header rendered"), ("D", "header difference"),
-                ]),
-                failure("BetaTests/testMenu()", images: [("R2", "menu recorded"), ("Y", "menu rendered")]),
-                failure("BetaTests/testNew()", images: [("N", "never recorded")]),
-            ]
+            failures: failures
         )
         for failure in fixture.testResults.report?.failures ?? [] {
             for image in failure.groups.flatMap(\.images) {
@@ -312,6 +316,33 @@ struct TestRunTests {
 
         #expect(fixture.selectedRowDescription == "BetaTests")
         #expect(!fixture.rowDescriptions.contains("AlphaTests/header"))
+    }
+
+    @Test("Accepting a failure while the selection rests on a suite shows the accepted snapshot")
+    func acceptingLeavesTheSettledSnapshot() async throws {
+        let fixture = await openWithFailures()
+        let header = try snapshot("header", in: fixture)
+        fixture.state.selectRow(withID: fixture.rowID("AlphaTests/header"))
+
+        fixture.state.promoteCandidateToBaseline()
+
+        #expect(fixture.state.preview == .single(header))
+    }
+
+    @Test("Accepting the last failure closes the canvas instead of reloading the run's copy")
+    func acceptingTheLastFailureClosesTheCanvas() async throws {
+        let fixture = await openWithFailures(attachingUnmatched: false)
+        fixture.state.selectRow(withID: fixture.rowID("AlphaTests/header"))
+        fixture.state.promoteCandidateToBaseline()
+        fixture.state.selectRow(withID: fixture.rowID("BetaTests/menu"))
+
+        fixture.state.promoteCandidateToBaseline()
+
+        #expect(fixture.state.testRun?.isEmpty == true)
+        #expect(fixture.state.isShowingTestRunPlaceholder)
+        #expect(!fixture.filesystem.fileExists(at: Self.scratch))
+        #expect(fixture.state.preview == nil)
+        #expect(fixture.state.lastError == nil)
     }
 
     @Test("There is nothing to revert onto an image copied out of the run")

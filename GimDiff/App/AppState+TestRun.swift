@@ -429,8 +429,15 @@ extension AppState {
         let rows = visibleRows
         if let selected = selectedRowID, !rows.contains(where: { $0.id == selected }) {
             selectRow(withID: Self.survivor(of: selected, among: rowsBefore, in: rows))
-        } else if let snapshot = projectSnapshot(withID: snapshotID) {
+        }
+
+        // The canvas must not stay on the failure just settled: its candidate is a copy in
+        // the run's scratch folder, which is deleted once the run has nothing left to show.
+        guard case let .testRunFailure(_, shownID, _) = preview, shownID == snapshotID else { return }
+        if !isShowingTestRunPlaceholder, let snapshot = projectSnapshot(withID: snapshotID) {
             setPreview(.single(snapshot))
+        } else {
+            closePreview()
         }
     }
 }
