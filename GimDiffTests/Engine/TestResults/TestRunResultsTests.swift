@@ -88,4 +88,18 @@ struct TestRunResultsTests {
         #expect(results.differences.map(\.id) == ["b", "c"])
         #expect(!results.isEmpty)
     }
+
+    @Test("Resolving several snapshots keeps what matched nothing")
+    func resolvesSeveralSnapshots() {
+        var results = results([
+            difference("a", snapshotID: "/active.png", candidates: [image("X")]),
+            difference("b", snapshotID: "/frozen.png", candidates: [image("Y")]),
+            difference("c", snapshotID: nil, candidates: [image("N")]),
+        ])
+
+        results.resolve(snapshotIDs: ["/active.png", "/frozen.png"])
+
+        #expect(results.failedSnapshotsCount == 0)
+        #expect(results.differences.map(\.id) == ["c"])
+    }
 }

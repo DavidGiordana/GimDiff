@@ -240,6 +240,13 @@ struct AppCommands: Commands {
                 .disabled(!state.canRevertToBaseline)
             }
 
+            // Unshortcut'd for the same reason, and more so: it overwrites every snapshot
+            // the run failed on.
+            Button("Accept All Test Run Failures") {
+                state.acceptAllTestRunFailures()
+            }
+            .disabled(state.acceptableTestRunFailuresCount == 0)
+
             Divider()
 
             Button("Clear Canvas") {

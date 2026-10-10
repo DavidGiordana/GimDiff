@@ -144,6 +144,40 @@ extension AppState {
         return true
     }
 
+    // MARK: - Test runs
+
+    /// How many snapshots Accept All would re-record: every one the run on screen failed on.
+    ///
+    /// Zero outside the run's view, so the action is only offered where its effect is listed.
+    var acceptableTestRunFailuresCount: Int {
+        guard sidebarSource == .testRun else { return 0 }
+        return testRun?.failedSnapshotsCount ?? 0
+    }
+
+    /// Accepts every failure of the run on screen: copies what each test rendered over the
+    /// snapshot it failed on.
+    ///
+    /// Each snapshot takes the image its canvas opens on — the first its test attached
+    /// besides the baseline — so accepting them all is accepting each one as shown. Images
+    /// that matched no snapshot are left alone: there is no file of the project for them to
+    /// replace. A write that fails keeps its snapshot listed, with the error on the banner,
+    /// and does not hold back the others.
+    func acceptAllTestRunFailures() {
+        guard acceptableTestRunFailuresCount > 0, let testRun else { return }
+
+        var accepted: Set<SnapshotItem.ID> = []
+        for snapshot in currentProject?.suites.flatMap(\.snapshots) ?? [] where !accepted.contains(snapshot.id) {
+            guard let candidate = testRun.candidates(forSnapshotID: snapshot.id).first,
+                  copy(contentsOf: candidate.fileURL, over: snapshot.fileURL)
+            else { continue }
+            accepted.insert(snapshot.id)
+        }
+
+        guard !accepted.isEmpty else { return }
+        resolveTestRunFailures(snapshotIDs: accepted)
+        finishFileAction()
+    }
+
     // MARK: - Loose pairs
 
     /// Whether the pair on screen is loose and nothing could tell which side is the

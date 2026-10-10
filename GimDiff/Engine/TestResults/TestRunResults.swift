@@ -63,7 +63,12 @@ struct TestRunResults: Sendable, Equatable {
 
     /// Forgets everything the run said about one snapshot, once it has been acted on.
     mutating func resolve(snapshotID: SnapshotItem.ID) {
-        differences.removeAll { $0.baseline?.snapshotID == snapshotID }
+        resolve(snapshotIDs: [snapshotID])
+    }
+
+    /// Forgets everything the run said about several snapshots at once.
+    mutating func resolve(snapshotIDs: Set<SnapshotItem.ID>) {
+        differences.removeAll { $0.baseline.map { snapshotIDs.contains($0.snapshotID) } ?? false }
         candidatesBySnapshotID = Self.candidates(in: differences)
     }
 

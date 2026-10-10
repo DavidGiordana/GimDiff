@@ -471,9 +471,15 @@ extension AppState {
     /// The snapshot is settled and leaves the run's list, so the selection moves on — to the
     /// next failure, which is where somebody accepting them one by one is going.
     func resolveTestRunFailure(snapshotID: String) {
+        resolveTestRunFailures(snapshotIDs: [snapshotID])
+    }
+
+    /// Takes several snapshots out of the run's failures at once, moving the selection and
+    /// the canvas a single time rather than once per snapshot.
+    func resolveTestRunFailures(snapshotIDs: Set<String>) {
         let rowsBefore = visibleRows
         if var updated = testRun {
-            updated.resolve(snapshotID: snapshotID)
+            updated.resolve(snapshotIDs: snapshotIDs)
             setTestRun(updated)
             if updated.isEmpty { Self.removeScratch(of: updated, filesystem: filesystem) }
         }
@@ -485,8 +491,8 @@ extension AppState {
 
         // The canvas must not stay on the failure just settled: its candidate is a copy in
         // the run's scratch folder, which is deleted once the run has nothing left to show.
-        guard case let .testRunFailure(_, shownID, _) = preview, shownID == snapshotID else { return }
-        if !isShowingTestRunPlaceholder, let snapshot = projectSnapshot(withID: snapshotID) {
+        guard case let .testRunFailure(_, shownID, _) = preview, snapshotIDs.contains(shownID) else { return }
+        if !isShowingTestRunPlaceholder, let snapshot = projectSnapshot(withID: shownID) {
             setPreview(.single(snapshot))
         } else {
             closePreview()

@@ -349,6 +349,66 @@ struct TestRunTests {
         #expect(fixture.state.lastError == nil)
     }
 
+    @Test("Accepting all re-records every failing snapshot and leaves the unmatched images")
+    func acceptsAllFailures() async throws {
+        let fixture = await openWithFailures()
+        let header = try snapshot("header", in: fixture)
+        let menu = try snapshot("menu", in: fixture)
+        fixture.state.showSnapshot(header, withGitDiff: true)
+        #expect(fixture.state.acceptableTestRunFailuresCount == 2)
+
+        fixture.state.acceptAllTestRunFailures()
+
+        #expect(fixture.filesystem.contents(of: header.fileURL) == "header rendered")
+        #expect(fixture.filesystem.contents(of: menu.fileURL) == "menu rendered")
+        #expect(fixture.state.lastError == nil)
+        #expect(fixture.state.testRun?.failedSnapshotsCount == 0)
+        #expect(fixture.state.acceptableTestRunFailuresCount == 0)
+        #expect(fixture.rowDescriptions.allSatisfy { $0.hasPrefix(Self.unmatchedSuite) })
+        // The canvas no longer points into the run's scratch folder.
+        #expect(fixture.state.preview == .single(header))
+    }
+
+    @Test("Accepting all when only failures are listed closes the canvas and deletes the copies")
+    func acceptingAllWithoutUnmatchedClosesTheCanvas() async throws {
+        let fixture = await openWithFailures(attachingUnmatched: false)
+        fixture.state.selectRow(withID: fixture.rowID("AlphaTests/header"))
+
+        fixture.state.acceptAllTestRunFailures()
+
+        #expect(fixture.state.isShowingTestRunPlaceholder)
+        #expect(!fixture.filesystem.fileExists(at: Self.scratch))
+        #expect(fixture.state.preview == nil)
+    }
+
+    @Test("A write that fails keeps its snapshot listed while the others are accepted")
+    func acceptingAllSurvivesAFailedWrite() async throws {
+        let fixture = await openWithFailures()
+        let header = try snapshot("header", in: fixture)
+        let menu = try snapshot("menu", in: fixture)
+        try fixture.filesystem.removeItem(at: Self.scratch.appendingPathComponent("X.png"))
+
+        fixture.state.acceptAllTestRunFailures()
+
+        #expect(fixture.state.lastError != nil)
+        #expect(fixture.filesystem.contents(of: header.fileURL) == "header recorded")
+        #expect(fixture.filesystem.contents(of: menu.fileURL) == "menu rendered")
+        #expect(fixture.state.isFailingInTestRun(header))
+        #expect(!fixture.state.isFailingInTestRun(menu))
+    }
+
+    @Test("Accepting all is not offered under the project's status")
+    func acceptAllNeedsTheRunsView() async throws {
+        let fixture = await openWithFailures()
+        let header = try snapshot("header", in: fixture)
+        fixture.state.showProjectStatus()
+
+        #expect(fixture.state.acceptableTestRunFailuresCount == 0)
+        fixture.state.acceptAllTestRunFailures()
+
+        #expect(fixture.filesystem.contents(of: header.fileURL) == "header recorded")
+    }
+
     @Test("There is nothing to revert onto an image copied out of the run")
     func refusesRevert() async throws {
         let fixture = await openWithFailures()

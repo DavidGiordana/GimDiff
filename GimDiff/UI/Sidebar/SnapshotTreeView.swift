@@ -332,6 +332,14 @@ private struct TestRunHistoryPicker: View {
                 accessibilityLabel: "Run",
                 accessibilityIdentifier: "TestRunHistory"
             )
+
+            Button("Accept All") {
+                state.acceptAllTestRunFailures()
+            }
+            .controlSize(.small)
+            .disabled(state.acceptableTestRunFailuresCount == 0)
+            .help("Record what the run rendered as the baseline of every snapshot it failed on")
+            .accessibilityIdentifier("AcceptAllTestRunFailures")
         }
     }
 

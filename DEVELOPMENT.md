@@ -364,6 +364,10 @@ own structure or from bytes.
   baseline is the working file (so Accept works and settles the failure in memory). Images
   that match nothing are listed under a synthetic suite, `AppState.testRunSuiteID`, which
   cannot be deleted and carries no source warning.
+- **Accepting them all.** *Accept All* beside the run picker (and Snapshot ▸ Accept All Test
+  Run Failures, deliberately unshortcut'd) runs `acceptAllTestRunFailures()`: every failing
+  snapshot takes the candidate its canvas opens on, unmatched images are left, and a write
+  that fails keeps its snapshot listed without holding back the rest.
 - **Refreshing.** The watcher also watches each workspace's `Logs/Test`; see above for what
   an event there does in each view. A re-read waits for the folder to be quiet for a
   second, because a bundle is written for as long as the run lasts. The scratch folder is
