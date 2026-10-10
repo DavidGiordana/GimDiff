@@ -43,24 +43,28 @@ struct DefaultIngestionService: IngestionService {
 
         let baseline: ImageReference
         let candidate: ImageReference
+        let rolesAreStated: Bool
         let baselineIndex = references.firstIndex { $0.role == .baseline }
         let candidateIndex = references.firstIndex { $0.role == .candidate }
 
         if let baselineIndex, let candidateIndex, baselineIndex != candidateIndex {
             baseline = references[baselineIndex]
             candidate = references[candidateIndex]
+            rolesAreStated = true
         } else {
             // Unlabelled logs print the committed reference first and the image the failing
             // run produced second.
             baseline = references[0]
             candidate = references[1]
+            rolesAreStated = false
         }
 
         return IngestionPayload(
             candidateURL: candidate.url,
             baselineURL: baseline.url,
             candidateTag: candidate.tag,
-            baselineTag: baseline.tag
+            baselineTag: baseline.tag,
+            rolesAreStated: rolesAreStated
         )
     }
 
@@ -92,7 +96,9 @@ struct DefaultIngestionService: IngestionService {
             baselineURL: Self.value(for: Self.baselineParameterNames, in: parameters)
                 .map(Self.fileURL(from:)),
             candidateTag: Self.value(for: Self.candidateTagParameterNames, in: parameters),
-            baselineTag: Self.value(for: Self.baselineTagParameterNames, in: parameters)
+            baselineTag: Self.value(for: Self.baselineTagParameterNames, in: parameters),
+            // A URL names each side by its parameter.
+            rolesAreStated: true
         )
     }
 

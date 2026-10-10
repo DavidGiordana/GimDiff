@@ -29,6 +29,14 @@ struct GitCommandTests {
         ])
     }
 
+    @Test("The tracking check fails on an untracked path, and keeps it behind --")
+    func lsFilesArguments() {
+        let path = URL(fileURLWithPath: "/tmp/My Repo/--force.png")
+        #expect(GitCommand.lsFilesErrorUnmatch(path: path, in: repository).arguments == [
+            "ls-files", "--error-unmatch", "--", "/tmp/My Repo/--force.png",
+        ])
+    }
+
     @Test("Branch lookup uses the abbreviated ref")
     func currentBranchArguments() {
         #expect(GitCommand.currentBranch(in: repository).arguments == [

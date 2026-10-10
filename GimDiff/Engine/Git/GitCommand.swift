@@ -42,6 +42,11 @@ enum GitCommand {
         )
     }
 
+    /// Succeeds when `path` is a file Git tracks, and fails when it is not.
+    static func lsFilesErrorUnmatch(path: URL, in directory: URL) -> Command {
+        command(["ls-files", "--error-unmatch", "--", path.path], in: directory)
+    }
+
     /// Restores `paths` to their committed state.
     static func checkout(paths: [URL], in directory: URL) -> Command {
         command(["checkout", "--"] + paths.map(\.path), in: directory)

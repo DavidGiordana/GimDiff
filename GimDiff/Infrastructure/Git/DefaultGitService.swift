@@ -103,6 +103,19 @@ struct DefaultGitService: GitService {
         return result.trimmedOutput
     }
 
+    func isTracked(_ fileURL: URL, repositoryRoot: URL) async -> Bool? {
+        guard let result = try? await runner.run(
+            GitCommand.lsFilesErrorUnmatch(path: fileURL, in: repositoryRoot)
+        ) else { return nil }
+        // `--error-unmatch` exits 1 for a path Git does not track; anything else is git
+        // failing to answer, not an answer.
+        switch result.exitCode {
+        case 0: return true
+        case 1: return false
+        default: return nil
+        }
+    }
+
     func extractCommittedVersion(
         ofFileAt relativePath: String,
         repositoryRoot: URL,

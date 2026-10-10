@@ -32,4 +32,10 @@ protocol GitService: Sendable {
 
     /// The URL the remote called `name` fetches from, such as `git@github.com:owner/repo.git`.
     func remoteURL(named name: String, repositoryRoot: URL) async throws -> String
+
+    /// Whether Git tracks the file at `fileURL`, or `nil` when Git could not be asked.
+    ///
+    /// `nil` is kept apart from `false` on purpose: a failure to run git says nothing about
+    /// the file, and a caller deciding something from the answer must not read it as one.
+    func isTracked(_ fileURL: URL, repositoryRoot: URL) async -> Bool?
 }

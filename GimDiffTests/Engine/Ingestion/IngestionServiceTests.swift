@@ -69,6 +69,25 @@ struct ClipboardIngestionTests {
         ))
         #expect(payload.candidateTag == "Failure")
         #expect(payload.baselineTag == "Reference")
+        #expect(payload.rolesAreStated)
+    }
+
+    @Test("A swift-snapshot-testing diff states its sides with − and +")
+    func diffMarkersStateTheSides() throws {
+        let log = """
+        failed - Snapshot "active" does not match reference.
+
+        @−
+        "file:///Users/david/Dev/Demo/__Snapshots__/CardsTests/testCard.active.png"
+        @+
+        "file:///Users/david/Library/Developer/CoreSimulator/tmp/CardsTests/testCard.active.png"
+        """
+
+        let payload = try #require(service.parseClipboardText(log))
+
+        #expect(payload.baselineURL?.path.contains("__Snapshots__") == true)
+        #expect(payload.candidateURL.path.contains("CoreSimulator") == true)
+        #expect(payload.rolesAreStated)
     }
 
     @Test("An unlabelled pair is read as reference first, new image second")
@@ -81,6 +100,7 @@ struct ClipboardIngestionTests {
         #expect(payload.candidateURL == URL(fileURLWithPath: "/tmp/home.png"))
         #expect(payload.baselineTag == nil)
         #expect(payload.candidateTag == nil)
+        #expect(payload.rolesAreStated == false)
     }
 
     @Test("A single path becomes the candidate, with no baseline")

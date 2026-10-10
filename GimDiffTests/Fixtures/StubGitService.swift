@@ -19,6 +19,15 @@ struct StubGitService: GitService {
     var statusFails = false
     /// URL returned for every remote, or `nil` to act as though the repository has none.
     var remoteURL: String?
+    /// Files ``isTracked(_:repositoryRoot:)`` answers `true` for.
+    var trackedFiles: Set<URL> = []
+    /// When true, ``isTracked(_:repositoryRoot:)`` cannot answer, as when git fails to run.
+    var trackingFails = false
+
+    func isTracked(_ fileURL: URL, repositoryRoot: URL) async -> Bool? {
+        guard !trackingFails else { return nil }
+        return trackedFiles.contains(fileURL.standardizedFileURL)
+    }
 
     func findRepositoryRoot(for folderURL: URL) async -> URL? {
         repositoryRoot
