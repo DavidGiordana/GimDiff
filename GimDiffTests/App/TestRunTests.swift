@@ -381,6 +381,37 @@ struct TestRunTests {
         #expect(fixture.state.preview == nil)
     }
 
+    @Test("Discarding what Accept All wrote brings the failures back")
+    func discardingAcceptedFailuresRestoresThem() async throws {
+        let fixture = await openWithFailures()
+        let header = try snapshot("header", in: fixture)
+        let menu = try snapshot("menu", in: fixture)
+
+        fixture.state.acceptAllTestRunFailures()
+        await fixture.state.currentGitStatusRefresh?.value
+        // What the status read after a real accept would report.
+        fixture.state.applyGitStatuses([header.fileURL: .modified, menu.fileURL: .modified])
+        #expect(fixture.state.testRun?.failedSnapshotsCount == 0)
+
+        fixture.state.showProjectStatus()
+        // What `git restore` would leave behind.
+        fixture.filesystem.stub(header.fileURL, contents: "header recorded")
+        fixture.filesystem.stub(menu.fileURL, contents: "menu recorded")
+        fixture.state.discardAllGitChanges()
+        await fixture.state.currentDiscard?.value
+        #expect(fixture.state.testRun == nil)
+
+        // Reading the bundle again exports its attachments again.
+        for image in fixture.testResults.report?.failures.flatMap(\.groups).flatMap(\.images) ?? [] {
+            fixture.filesystem.stub(image.fileURL, contents: contents[image.id] ?? "")
+        }
+        fixture.state.showTestRun()
+        await fixture.state.currentTestRunRefresh?.value
+        #expect(fixture.testResults.readCount == 2)
+        #expect(fixture.state.testRun?.failedSnapshotsCount == 2)
+        #expect(fixture.state.isFailingInTestRun(header))
+    }
+
     @Test("A write that fails keeps its snapshot listed while the others are accepted")
     func acceptingAllSurvivesAFailedWrite() async throws {
         let fixture = await openWithFailures()

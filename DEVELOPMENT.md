@@ -359,6 +359,9 @@ own structure or from bytes.
 - **Staleness is by date.** A step whose matched snapshot was written after the run began
   is dropped. Accepting a candidate makes the *rendered* image equal the snapshot; without
   this rule, reading the same bundle again would offer the old reference as the candidate.
+  A snapshot Git reports unmodified is exempt: discarding an accepted candidate rewrites the
+  file but puts back the reference, so the failure is offered again. Discarding a change
+  forgets the run read so far for the same reason, and the next switch reads it again.
 - **The canvas.** A failing snapshot opens as `SnapshotPreview.testRunFailure`: the
   candidate carries the `testRun` origin (never written to, so Reject is refused) and the
   baseline is the working file (so Accept works and settles the failure in memory). Images

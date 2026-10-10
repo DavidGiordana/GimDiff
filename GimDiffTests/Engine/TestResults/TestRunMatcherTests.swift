@@ -224,6 +224,38 @@ struct TestRunMatcherTests {
         #expect(found.isEmpty)
     }
 
+    @Test("A snapshot written since the run began but back at HEAD is matched again")
+    func matchesSnapshotRestoredToHEAD() throws {
+        // The candidate was accepted and the change then discarded: the snapshot holds the
+        // reference the run compared against, though it was written after the run began.
+        let cards = suite("CardsTests", snapshots: ["testArtwork.png": "recorded"])
+        filesystem.setModificationDate(Self.runStart.addingTimeInterval(60), at: cards.snapshots[0].fileURL)
+        let images = [image("X", contents: "recorded"), image("Y", contents: "rendered")]
+
+        let found = try TestRunMatcher(filesystem: filesystem).differences(
+            in: report(startedAt: Self.runStart, groups: [images]),
+            against: ProjectBundle(rootURL: project, gitRootURL: project, suites: [cards])
+        )
+
+        #expect(found.map(\.baseline?.fileURL) == [cards.snapshots[0].fileURL])
+        #expect(found.first?.candidates.map(\.id) == ["Y"])
+    }
+
+    @Test("A snapshot written since the run began and changed in Git has nothing left to say")
+    func dropsAcceptedSnapshotInRepository() throws {
+        var cards = suite("CardsTests", snapshots: ["testArtwork.png": "rendered"])
+        cards.snapshots[0].gitStatus = .modified
+        filesystem.setModificationDate(Self.runStart.addingTimeInterval(60), at: cards.snapshots[0].fileURL)
+        let images = [image("X", contents: "recorded"), image("Y", contents: "rendered")]
+
+        let found = try TestRunMatcher(filesystem: filesystem).differences(
+            in: report(startedAt: Self.runStart, groups: [images]),
+            against: ProjectBundle(rootURL: project, gitRootURL: project, suites: [cards])
+        )
+
+        #expect(found.isEmpty)
+    }
+
     @Test("Without a date for the run, nothing is taken as stale")
     func keepsEverythingWithoutRunDate() throws {
         let cards = suite("CardsTests", snapshots: ["testArtwork.png": "recorded"])

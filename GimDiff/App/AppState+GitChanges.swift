@@ -109,7 +109,21 @@ extension AppState {
             setPreview(.single(snapshot))
         }
 
+        rereadTestRunAfterDiscarding()
         invalidateLoadedImages()
         refreshGitStatus()
+    }
+
+    /// Forgets the run read so far, so the failures an accept settled can come back.
+    ///
+    /// Accepting takes a failure out of the run in memory, and nothing short of reading the
+    /// bundle again puts it back. Under the project's view the read waits for the next
+    /// switch, as it does when a new run arrives.
+    private func rereadTestRunAfterDiscarding() {
+        guard testRun != nil else { return }
+        discardTestRun()
+        // The candidate on the canvas was a copy out of the run just discarded.
+        if case .testRunFailure = preview { closePreview() }
+        if sidebarSource == .testRun { refreshTestRun() }
     }
 }

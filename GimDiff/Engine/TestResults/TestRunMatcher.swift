@@ -58,13 +58,20 @@ struct TestRunMatcher: Sendable {
     /// - Throws: `CancellationError`, checked once per failed test.
     func differences(in report: TestRunReport, against project: ProjectBundle) throws -> [TestRunDifference] {
         var index = SnapshotIndex(project: project, filesystem: filesystem)
+        let restored = Self.snapshotsAtHEAD(in: project)
         var differences: [TestRunDifference] = []
 
         for failure in report.failures {
             try Task.checkCancellation()
             for group in failure.groups {
                 differences.append(
-                    contentsOf: self.differences(in: group, of: failure, since: report.startedAt, index: &index)
+                    contentsOf: self.differences(
+                        in: group,
+                        of: failure,
+                        since: report.startedAt,
+                        restored: restored,
+                        index: &index
+                    )
                 )
             }
         }
@@ -76,6 +83,7 @@ struct TestRunMatcher: Sendable {
         in group: TestRunImageGroup,
         of failure: TestRunFailure,
         since runStart: Date?,
+        restored: Set<URL>,
         index: inout SnapshotIndex
     ) -> [TestRunDifference] {
         let attached = group.images.compactMap { image -> (image: TestRunImage, data: Data)? in
@@ -110,8 +118,12 @@ struct TestRunMatcher: Sendable {
         // A snapshot written after the run began is not the file the run compared against.
         // The usual way there is accepting the candidate, which leaves the *rendered* image
         // equal to the snapshot and would otherwise turn the old reference into the
-        // candidate. Whatever the step had to say has been overtaken, so it says nothing.
-        guard !matches.contains(where: { isWritten($0.baseline.fileURL, after: runStart) }) else {
+        // candidate. Whatever the step had to say has been overtaken, so it says nothing —
+        // unless Git says the file is back at `HEAD`: an accepted candidate that was then
+        // discarded holds the reference the run compared against once more.
+        guard !matches.contains(where: { match in
+            !restored.contains(match.baseline.fileURL) && isWritten(match.baseline.fileURL, after: runStart)
+        }) else {
             return []
         }
 
@@ -137,6 +149,14 @@ struct TestRunMatcher: Sendable {
                 candidates: candidates
             )
         }
+    }
+
+    /// The snapshots Git has nothing against, when the project is a repository.
+    ///
+    /// Outside one every snapshot reads as unmodified, which says nothing, so none counts.
+    private static func snapshotsAtHEAD(in project: ProjectBundle) -> Set<URL> {
+        guard project.gitRootURL != nil else { return [] }
+        return Set(project.suites.flatMap(\.snapshots).filter { $0.gitStatus == .unmodified }.map(\.fileURL))
     }
 
     private func isWritten(_ file: URL, after runStart: Date?) -> Bool {
