@@ -54,8 +54,12 @@ enum SnapshotImageLoader {
               size > 0
         else { return .unavailable }
 
+        // Decoded here, on the background task that calls this, rather than left lazy: a
+        // lazy image is decoded the first time it is drawn, which is during the render on
+        // the main thread — 5 to 10 ms per full-screen snapshot, twice per comparison.
+        let options = [kCGImageSourceShouldCacheImmediately: true] as CFDictionary
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+              let image = CGImageSourceCreateImageAtIndex(source, 0, options)
         else { return .unavailable }
 
         let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
