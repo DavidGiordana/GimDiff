@@ -23,6 +23,7 @@ enum GimDiffCLI {
     Subcommands:
       \(ScanCommand.name.padded)\(ScanCommand.summary)
       \(DiffCommand.name.padded)\(DiffCommand.summary)
+      \(TestRunCommand.name.padded)\(TestRunCommand.summary)
       \(ParseClipboardCommand.name.padded)\(ParseClipboardCommand.summary)
       \(PullRequestCommand.name.padded)\(PullRequestCommand.summary)
 
@@ -77,6 +78,14 @@ enum GimDiffCLI {
                 valueOptions: DiffCommand.valueOptions,
                 console: console,
                 body: DiffCommand.run
+            )
+        case TestRunCommand.name:
+            await run(
+                Array(tokens.dropFirst()),
+                usage: TestRunCommand.usage,
+                valueOptions: TestRunCommand.valueOptions,
+                console: console,
+                body: TestRunCommand.run
             )
         case ParseClipboardCommand.name:
             await run(

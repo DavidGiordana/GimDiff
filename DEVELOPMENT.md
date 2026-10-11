@@ -407,11 +407,19 @@ into the tool from the same folders the app compiles them from.
 ```
 gimdiff scan <project-path> [--json]
 gimdiff diff <candidate> <baseline> [--out <mask.png>] [--tolerance <ΔE>] [--json]
+gimdiff test-run <project-path> [--result <bundle>] [--out <folder>] [--tolerance <ΔE>] [--json]
 gimdiff parse-clipboard [--input "<log text>"] [--json]
 gimdiff pr <url-or-number>             # hands a GitHub pull request to the running app
 gimdiff <project-path>                 # hands the path to the running app
 gimdiff <candidate> <baseline>         # hands one comparison to the running app
 ```
+
+`test-run` is the sidebar's Test Run view for a build machine. It reads the newest bundle in
+DerivedData, or the one `--result` names, through the same `XcresultReader` and
+`TestRunMatcher` the app uses, and `TestRunExport` in `Engine/` flattens the result into
+entries with file names safe on any volume — the part that is unit tested, since the CLI
+target has no tests of its own. `--out` writes a baseline, candidate, and mask per failure
+for CI to keep as artifacts.
 
 Exit codes are part of the contract, because a build script needs to tell a difference from
 a failure: `0` nothing to report, `1` the images or the project differ, `2` the command

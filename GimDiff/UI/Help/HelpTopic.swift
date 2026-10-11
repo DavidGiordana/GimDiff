@@ -347,6 +347,7 @@ private extension HelpTopic {
                 gimdiff pr <url-or-number>
                 gimdiff scan <project-path> [--json]
                 gimdiff diff <candidate> <baseline> [--out <mask.png>] [--tolerance <ΔE>] [--json]
+                gimdiff test-run <project-path> [--result <bundle>] [--out <folder>] [--tolerance <ΔE>] [--json]
                 gimdiff parse-clipboard [--input "<log text>"] [--json]
                 """),
             .text("""
