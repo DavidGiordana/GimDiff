@@ -45,7 +45,7 @@ struct PullRequestReviewTests {
         let snapshotRows = fixture.state.visibleRows.filter(\.isSnapshot)
         let firstSnapshot = try #require(snapshotRows.first)
         #expect(fixture.state.selectedRowID == firstSnapshot.id)
-        #expect(fixture.state.preview?.snapshotID == firstSnapshot.snapshot?.id)
+        #expect(fixture.state.canvas.preview?.snapshotID == firstSnapshot.snapshot?.id)
     }
 
     @Test("A failed fetch keeps the sheet up with the reason, and the project untouched")
@@ -133,7 +133,7 @@ struct PullRequestReviewTests {
 
         fixture.selectSnapshot(Self.snapshotPath)
 
-        let preview = try #require(fixture.state.preview)
+        let preview = try #require(fixture.state.canvas.preview)
         #expect(preview.candidate?.fileURL == change.candidateURL)
         #expect(preview.baseline?.fileURL == change.baselineURL)
         #expect(preview.panes.allSatisfy { $0.origin == .pullRequest && !$0.isWritable })
@@ -190,7 +190,7 @@ struct PullRequestReviewTests {
 
         fixture.selectSnapshot("Tests/Snapshots/HomeTests/testAdded.png")
 
-        let preview = try #require(fixture.state.preview)
+        let preview = try #require(fixture.state.canvas.preview)
         #expect(!preview.isComparison)
         #expect(preview.panes.map(\.role) == [.candidate])
         #expect(preview.candidate?.origin == .pullRequest)
@@ -205,7 +205,7 @@ struct PullRequestReviewTests {
 
         fixture.selectSnapshot("Tests/Snapshots/HomeTests/testGone.png")
 
-        let preview = try #require(fixture.state.preview)
+        let preview = try #require(fixture.state.canvas.preview)
         #expect(preview.panes.map(\.role) == [.baseline])
         #expect(preview.baseline?.origin == .pullRequest)
         #expect(preview.baseline?.roleSubtitle == "Base Branch")
@@ -222,7 +222,7 @@ struct PullRequestReviewTests {
 
         fixture.state.showSnapshot(snapshot, withGitDiff: false)
 
-        let preview = try #require(fixture.state.preview)
+        let preview = try #require(fixture.state.canvas.preview)
         #expect(preview.panes.map(\.role) == [.candidate])
         #expect(preview.candidate?.origin == .pullRequest)
     }
@@ -235,7 +235,7 @@ struct PullRequestReviewTests {
 
         fixture.state.closePane(.candidate)
 
-        let preview = try #require(fixture.state.preview)
+        let preview = try #require(fixture.state.canvas.preview)
         #expect(preview.panes.map(\.role) == [.baseline])
         #expect(preview.baseline?.origin == .pullRequest)
         #expect(preview.snapshotID == Self.snapshotPath)
@@ -283,7 +283,7 @@ struct PullRequestReviewTests {
         fixture.state.closePullRequestReview()
 
         #expect(fixture.state.currentProject == nil)
-        #expect(fixture.state.preview == nil)
+        #expect(fixture.state.canvas.preview == nil)
         #expect(fixture.filesystem.removedPaths.count == 1)
     }
 

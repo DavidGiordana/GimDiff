@@ -22,19 +22,19 @@ extension AppState {
     /// The file names have not changed, so nothing about the preview tells a view that a
     /// test run rewrote the bytes behind them. This is what says so.
     func refreshPreviewImages() {
-        invalidateLoadedImages()
+        canvas.invalidateLoadedImages()
         refreshGitStatus()
-        updateDiffReport()
+        canvas.updateDiffReport()
     }
 
     // MARK: - Panes
 
     /// Drops one side of a comparison, leaving the other on screen on its own.
     func closePane(_ role: SnapshotPane.Role) {
-        guard let survivor = preview?.panes.first(where: { $0.role != role }),
-              preview?.isComparison == true
+        guard let survivor = canvas.preview?.panes.first(where: { $0.role != role }),
+              canvas.preview?.isComparison == true
         else {
-            closePreview()
+            canvas.close()
             return
         }
 
@@ -44,11 +44,11 @@ extension AppState {
         // makes it a file of the project.
         guard survivor.origin != .testRun else {
             let item = SnapshotItem(
-                id: preview?.snapshotID,
+                id: canvas.preview?.snapshotID,
                 name: testRuns.imageName(at: survivor.fileURL) ?? name,
                 fileURL: survivor.fileURL
             )
-            setPreview(.testRunAttachment(item))
+            canvas.show(.testRunAttachment(item))
             return
         }
 
@@ -56,12 +56,12 @@ extension AppState {
         // file on disk the user may act on. It keeps the snapshot's identifier too, so the
         // canvas can still say what the pull request did to it.
         guard survivor.origin != .pullRequest else {
-            let item = SnapshotItem(id: preview?.snapshotID, name: name, fileURL: survivor.fileURL)
-            setPreview(.pullRequestSide(item, role: survivor.role))
+            let item = SnapshotItem(id: canvas.preview?.snapshotID, name: name, fileURL: survivor.fileURL)
+            canvas.show(.pullRequestSide(item, role: survivor.role))
             return
         }
 
-        setPreview(.single(SnapshotItem(name: name, fileURL: survivor.fileURL)))
+        canvas.show(.single(SnapshotItem(name: name, fileURL: survivor.fileURL)))
     }
 
     // MARK: - Promotion
@@ -72,7 +72,7 @@ extension AppState {
     /// Overwriting that would succeed and change nothing anybody could see, which is worse
     /// than refusing, so the reason is spelled out instead.
     var candidatePromotionObstacle: String? {
-        guard let baseline = preview?.baseline else {
+        guard let baseline = canvas.preview?.baseline else {
             return "There is no baseline on screen to overwrite."
         }
         guard baseline.origin != .pullRequest else {
@@ -80,7 +80,7 @@ extension AppState {
         }
         guard baseline.isWritable else {
             return """
-            The baseline on screen was read out of \(Self.comparisonGitRef) and exists only \
+            The baseline on screen was read out of \(CanvasModel.comparisonGitRef) and exists only \
             for this comparison. The candidate is already the file on disk — commit it to \
             make it the recorded baseline.
             """
@@ -111,7 +111,7 @@ extension AppState {
 
     /// Why the candidate cannot be put back to the baseline, or `nil` when it can.
     var candidateRevertObstacle: String? {
-        guard let candidate = preview?.candidate, preview?.baseline != nil else {
+        guard let candidate = canvas.preview?.candidate, canvas.preview?.baseline != nil else {
             return "There is no comparison on screen to reject."
         }
         guard candidate.isWritable else {
@@ -126,7 +126,7 @@ extension AppState {
     /// - Returns: Whether the baseline was written.
     @discardableResult
     func promoteCandidateToBaseline(actionName: String = "Accept Candidate") -> Bool {
-        guard let candidate = preview?.candidate, let baseline = preview?.baseline else { return false }
+        guard let candidate = canvas.preview?.candidate, let baseline = canvas.preview?.baseline else { return false }
 
         if let obstacle = candidatePromotionObstacle {
             report(obstacle)
@@ -143,7 +143,7 @@ extension AppState {
         // The snapshot now holds what the run rendered, so the failure is settled. Settled
         // before the refresh, so the images reloaded are the ones left on the canvas rather
         // than the run's copy, which may be gone.
-        if case let .testRunFailure(_, snapshotID, _) = preview {
+        if case let .testRunFailure(_, snapshotID, _) = canvas.preview {
             resolveTestRunFailure(snapshotID: snapshotID)
         }
         finishFileAction()
@@ -203,39 +203,27 @@ extension AppState {
 
     // MARK: - Loose pairs
 
-    /// Whether the pair on screen is loose and nothing could tell which side is the
-    /// baseline, so neither may be called one.
-    var looseRolesAreUnknown: Bool {
-        preview?.isLoosePair == true && looseRoleCertainty == .unknown
-    }
-
-    /// What to call a pane on screen: its role, or its position when the roles are unknown.
-    func sideTitle(for pane: SnapshotPane) -> String {
-        guard looseRolesAreUnknown else { return pane.roleTitle }
-        return pane.role == .baseline ? "Left" : "Right"
-    }
-
     /// Settles an undecided pair in favour of the left image: it is written over the right
     /// one, and stays on screen on its own.
     ///
     /// Written rather than merely kept, unlike ``keepBaseline()``: with the sides unknown,
     /// the right image may be the recorded snapshot, and keeping the left has to reach it.
     func keepLeft() {
-        guard looseRolesAreUnknown, revertCandidateToBaseline(actionName: "Keep Left") else { return }
+        guard canvas.looseRolesAreUnknown, revertCandidateToBaseline(actionName: "Keep Left") else { return }
         closePane(.candidate)
     }
 
     /// Settles an undecided pair in favour of the right image: it is written over the left
     /// one, and stays on screen on its own.
     func keepRight() {
-        guard looseRolesAreUnknown, promoteCandidateToBaseline(actionName: "Keep Right") else { return }
+        guard canvas.looseRolesAreUnknown, promoteCandidateToBaseline(actionName: "Keep Right") else { return }
         closePane(.baseline)
     }
 
     /// Settles a pasted pair in favour of the recorded file: nothing is written, and the
     /// baseline stays on screen on its own.
     func keepBaseline() {
-        guard preview?.isLoosePair == true, !looseRolesAreUnknown else { return }
+        guard canvas.preview?.isLoosePair == true, !canvas.looseRolesAreUnknown else { return }
         closePane(.candidate)
     }
 
@@ -244,8 +232,8 @@ extension AppState {
     ///
     /// A write that fails leaves the pair up, so the error banner is read against it.
     func keepCandidate() {
-        guard preview?.isLoosePair == true,
-              !looseRolesAreUnknown,
+        guard canvas.preview?.isLoosePair == true,
+              !canvas.looseRolesAreUnknown,
               promoteCandidateToBaseline(actionName: "Keep Candidate")
         else { return }
         closePane(.candidate)
@@ -257,7 +245,7 @@ extension AppState {
     /// - Returns: Whether the candidate was written.
     @discardableResult
     func revertCandidateToBaseline(actionName: String = "Reject Candidate") -> Bool {
-        guard let candidate = preview?.candidate, let baseline = preview?.baseline else { return false }
+        guard let candidate = canvas.preview?.candidate, let baseline = canvas.preview?.baseline else { return false }
         if let obstacle = candidateRevertObstacle {
             report(obstacle)
             return false
@@ -304,7 +292,7 @@ extension AppState {
 
     /// The suite that recorded the image on screen, when the preview came from a scan.
     var previewSuite: SnapshotSuite? {
-        guard let snapshotID = preview?.snapshotID else { return nil }
+        guard let snapshotID = canvas.preview?.snapshotID else { return nil }
         return currentProject?.suites.first { suite in
             suite.snapshots.contains { $0.id == snapshotID }
         }
@@ -317,43 +305,4 @@ extension AppState {
         }
         openTestSource(for: suite)
     }
-
-    // MARK: - Diff mask
-
-    /// Measures the two panes against each other, or clears the measurement.
-    ///
-    /// Driven by the canvas rather than by every mutation that could invalidate it: the
-    /// comparison decodes both images, so it runs when the mask is actually on screen and
-    /// not on the chance that it might be.
-    func updateDiffReport() {
-        diffTask?.cancel()
-
-        guard diffMode == .difference,
-              let candidate = preview?.candidate,
-              let baseline = preview?.baseline
-        else {
-            setDiffReport(nil)
-            return
-        }
-
-        setDiffReport(nil, isComputing: true)
-        diffTask = Task { [imageDiff, diffTolerance] in
-            do {
-                let measured = try await imageDiff.compare(
-                    candidateURL: candidate.fileURL,
-                    baselineURL: baseline.fileURL,
-                    tolerance: diffTolerance
-                )
-                guard !Task.isCancelled else { return }
-                setDiffReport(measured)
-            } catch {
-                guard !Task.isCancelled else { return }
-                setDiffReport(nil)
-                report(error)
-            }
-        }
-    }
-
-    /// The pixel comparison in flight, if any, so a caller can wait for it.
-    var currentDiffComparison: Task<Void, Never>? { diffTask }
 }

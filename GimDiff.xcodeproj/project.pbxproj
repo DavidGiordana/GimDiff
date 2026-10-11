@@ -49,6 +49,7 @@
 				"App/AppState+TestRun.swift",
 				"App/AppState+Undo.swift",
 				"App/AppState+Watching.swift",
+				App/CanvasModel.swift,
 				App/GimDiffApp.swift,
 				App/PullRequestReviewModel.swift,
 				App/SnapshotPreview.swift,

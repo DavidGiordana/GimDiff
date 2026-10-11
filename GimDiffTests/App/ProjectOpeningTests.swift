@@ -168,7 +168,7 @@ struct ProjectOpeningTests {
         #expect(state.currentProject?.rootURL == fixture.url)
 
         state.openPath(fixture.fileURL("Tests/__Snapshots__/ButtonTests/button.1.png"))
-        #expect(state.preview?.title == "button.1")
+        #expect(state.canvas.preview?.title == "button.1")
     }
 
     @Test("A path that is neither a folder nor an image is reported")
@@ -179,7 +179,7 @@ struct ProjectOpeningTests {
 
         state.openPath(fixture.fileURL("Package.swift"))
 
-        #expect(state.preview == nil)
+        #expect(state.canvas.preview == nil)
         #expect(state.lastError?.contains("Package.swift") == true)
     }
 
@@ -191,10 +191,10 @@ struct ProjectOpeningTests {
         let failure = URL(fileURLWithPath: "/tmp/failure.png")
 
         state.openPaths([reference, failure])
-        await state.currentLooseRoleResolution?.value
+        await state.canvas.currentLooseRoleResolution?.value
 
-        guard case let .comparison(pair, snapshotID, title, baselineOrigin) = state.preview else {
-            Issue.record("Expected a comparison, got \(String(describing: state.preview))")
+        guard case let .comparison(pair, snapshotID, title, baselineOrigin) = state.canvas.preview else {
+            Issue.record("Expected a comparison, got \(String(describing: state.canvas.preview))")
             return
         }
         #expect(pair.reference.url == reference)
@@ -204,7 +204,7 @@ struct ProjectOpeningTests {
         // Two loose files are both on disk, so both promotion actions apply to them.
         #expect(baselineOrigin == .workingTree)
         // Neither file stands apart and a drop labels nothing, so the order is only a guess.
-        #expect(state.looseRoleCertainty == .unknown)
+        #expect(state.canvas.looseRoleCertainty == .unknown)
     }
 
     @Test("An empty drop changes nothing")
@@ -214,7 +214,7 @@ struct ProjectOpeningTests {
 
         state.openPaths([])
 
-        #expect(state.preview == nil)
+        #expect(state.canvas.preview == nil)
         #expect(state.lastError == nil)
     }
 
@@ -239,7 +239,7 @@ struct ProjectOpeningTests {
         #expect(state.visibleRows.isEmpty)
         #expect(state.selectedRowID == nil)
         #expect(state.expandedSuiteIDs.isEmpty)
-        #expect(state.preview == nil)
+        #expect(state.canvas.preview == nil)
         #expect(state.isFiltering == false)
         #expect(state.isLoading == false)
     }
@@ -284,8 +284,8 @@ struct ProjectOpeningTests {
 
         state.handle(url)
 
-        #expect(state.preview?.isComparison == true)
-        #expect(state.preview?.title == "b")
+        #expect(state.canvas.preview?.isComparison == true)
+        #expect(state.canvas.preview?.title == "b")
     }
 
     @Test("A gimdiff:// URL GimDiff cannot read is reported rather than ignored")

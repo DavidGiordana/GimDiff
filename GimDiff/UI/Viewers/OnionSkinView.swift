@@ -51,7 +51,7 @@ struct OnionSkinView: View {
         .task(id: ReloadKey(baseline: baseline.fileURL.path, candidate: candidate.fileURL.path, token: reloadToken)) {
             await loadImages()
         }
-        .onChange(of: state.canvasViewRequest) { _, request in
+        .onChange(of: state.canvas.viewRequest) { _, request in
             if case let .fadeOnionSkin(opacity)? = request?.command {
                 candidateOpacity = opacity
             }
@@ -77,16 +77,16 @@ struct OnionSkinView: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
-            Text(state.sideTitle(for: baseline))
+            Text(state.canvas.sideTitle(for: baseline))
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
             Slider(value: $candidateOpacity, in: 0...1)
                 .frame(maxWidth: 280)
-                .accessibilityLabel("\(state.sideTitle(for: candidate)) Opacity")
+                .accessibilityLabel("\(state.canvas.sideTitle(for: candidate)) Opacity")
                 .accessibilityValue("\(Int((candidateOpacity * 100).rounded())) percent")
 
-            Text(state.sideTitle(for: candidate))
+            Text(state.canvas.sideTitle(for: candidate))
                 .font(.callout)
                 .foregroundStyle(.secondary)
 

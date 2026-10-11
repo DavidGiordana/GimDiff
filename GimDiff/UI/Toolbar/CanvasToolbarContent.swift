@@ -67,27 +67,27 @@ struct CanvasToolbarContent: ToolbarContent {
             } label: {
                 Label("Refresh", systemImage: "arrow.clockwise")
             }
-            .disabled(state.preview == nil)
+            .disabled(state.canvas.preview == nil)
             .help("Read the images on screen off disk again (⌘R)")
 
             Button {
-                state.closePreview()
+                state.canvas.close()
             } label: {
                 Label("Clear", systemImage: "xmark")
             }
-            .disabled(state.preview == nil)
+            .disabled(state.canvas.preview == nil)
             .help("Clear the canvas (⌘L)")
         }
     }
 
     private var hasBothImages: Bool {
-        state.preview?.isComparison == true
+        state.canvas.preview?.isComparison == true
     }
 
     private var comparison: Binding<DiffMode> {
         Binding(
-            get: { state.diffMode },
-            set: { state.diffMode = $0 }
+            get: { state.canvas.diffMode },
+            set: { state.canvas.diffMode = $0 }
         )
     }
 }

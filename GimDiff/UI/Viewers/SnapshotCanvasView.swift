@@ -38,7 +38,7 @@ struct SnapshotCanvasView: View {
     /// Whether the two panes on screen move together: only side by side, the one mode that
     /// draws them in two viewers.
     private var panesAreLinked: Bool {
-        state.linksPanes && preview?.isComparison == true && state.diffMode == .sideBySide
+        state.canvas.linksPanes && preview?.isComparison == true && state.canvas.diffMode == .sideBySide
     }
 
     /// The chosen panel colour, but only while there is a panel to put it behind.
@@ -109,7 +109,7 @@ struct SnapshotCanvasView: View {
     @ViewBuilder
     private var comparisonSurface: some View {
         if let candidate = preview?.candidate, let baseline = preview?.baseline {
-            switch state.diffMode {
+            switch state.canvas.diffMode {
             case .sideBySide:
                 // A gap rather than a hairline: a thin full-height seam between two panes is
                 // how macOS draws a split view's divider, and it was read as one to drag.
@@ -123,7 +123,7 @@ struct SnapshotCanvasView: View {
                     SnapshotSplitSliderView(
                         leading: baseline,
                         trailing: candidate,
-                        reloadToken: state.imageReloadToken,
+                        reloadToken: state.canvas.imageReloadToken,
                         matte: imageMatte
                     )
                 }
@@ -131,10 +131,10 @@ struct SnapshotCanvasView: View {
             case .difference:
                 combined(candidate: candidate, baseline: baseline) {
                     DiffMaskView(
-                        report: state.diffReport,
-                        isComputing: state.isComputingDiff,
+                        report: state.canvas.diffReport,
+                        isComputing: state.canvas.isComputingDiff,
                         candidateURL: candidate.fileURL,
-                        reloadToken: state.imageReloadToken,
+                        reloadToken: state.canvas.imageReloadToken,
                         matte: imageMatte
                     )
                 }
@@ -144,7 +144,7 @@ struct SnapshotCanvasView: View {
                     OnionSkinView(
                         baseline: baseline,
                         candidate: candidate,
-                        reloadToken: state.imageReloadToken,
+                        reloadToken: state.canvas.imageReloadToken,
                         matte: imageMatte
                     )
                 }
@@ -159,12 +159,12 @@ struct SnapshotCanvasView: View {
             Divider()
             SnapshotImageViewer(
                 fileURL: pane.fileURL,
-                reloadToken: state.imageReloadToken,
+                reloadToken: state.canvas.imageReloadToken,
                 matte: imageMatte,
                 link: panesAreLinked ? $linkedTransform : nil,
                 seedsLink: pane.role == .baseline
             ) {
-                if preview?.isComparison == true, state.diffMode == .sideBySide {
+                if preview?.isComparison == true, state.canvas.diffMode == .sideBySide {
                     LinkPanesButton()
                 }
             }
@@ -200,7 +200,7 @@ struct SnapshotCanvasView: View {
     /// Names the mode in the window's subtitle, so a screenshot says what it is showing.
     private var subtitle: String {
         guard preview?.isComparison == true else { return "" }
-        return state.diffMode.title
+        return state.canvas.diffMode.title
     }
 }
 
@@ -209,13 +209,13 @@ struct LinkPanesButton: View {
     @Environment(AppState.self) private var state
 
     var body: some View {
-        @Bindable var state = state
-        Toggle(isOn: $state.linksPanes) {
+        @Bindable var canvas = state.canvas
+        Toggle(isOn: $canvas.linksPanes) {
             Image(systemName: "link")
         }
         .toggleStyle(.button)
         .buttonStyle(.borderless)
-        .help(state.linksPanes
+        .help(state.canvas.linksPanes
             ? "Zoom and move each pane on its own"
             : "Zoom and move both panes together")
         .accessibilityLabel("Link Panes")
@@ -238,19 +238,19 @@ struct SnapshotPaneHeader: View {
             }
             .buttonStyle(.borderless)
             .help("Close this pane")
-            .accessibilityLabel("Close \(state.sideTitle(for: pane))")
+            .accessibilityLabel("Close \(state.canvas.sideTitle(for: pane))")
 
             // A pair whose sides nobody could tell apart is named by position only:
             // calling either image the baseline would be a guess dressed as a fact.
-            if state.looseRolesAreUnknown {
+            if state.canvas.looseRolesAreUnknown {
                 PositionBadge(isLeft: pane.role == .baseline)
             } else {
                 RoleBadge(pane: pane)
             }
 
             // Once per preview rather than once per pane: both panes are the same change.
-            if let change = state.pullRequestReview.change(forSnapshotID: state.preview?.snapshotID),
-               pane.id == state.preview?.panes.first?.id {
+            if let change = state.pullRequestReview.change(forSnapshotID: state.canvas.preview?.snapshotID),
+               pane.id == state.canvas.preview?.panes.first?.id {
                 ChangeKindBadge(kind: change.kind)
             }
 
@@ -356,12 +356,12 @@ struct SnapshotDecisionBar: View {
         VStack(spacing: 0) {
             Divider()
             HStack(spacing: 12) {
-                if state.looseRolesAreUnknown {
+                if state.canvas.looseRolesAreUnknown {
                     note(Self.undecidedNote)
                     Spacer(minLength: 8)
                     positionButtons
-                } else if state.preview?.isLoosePair == true {
-                    if let reason = Self.reason(for: state.looseRoleCertainty) {
+                } else if state.canvas.preview?.isLoosePair == true {
+                    if let reason = Self.reason(for: state.canvas.looseRoleCertainty) {
                         note(reason)
                     }
                     Spacer(minLength: 8)

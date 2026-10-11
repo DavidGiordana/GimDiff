@@ -141,7 +141,7 @@ struct TestRunTests {
         let fixture = await openWithFailures()
 
         #expect(fixture.selectedRowDescription == "AlphaTests/header")
-        #expect(fixture.state.preview?.candidate?.origin == .testRun)
+        #expect(fixture.state.canvas.preview?.candidate?.origin == .testRun)
     }
 
     @Test("Switching back lists the whole project again, and the run is kept")
@@ -155,12 +155,12 @@ struct TestRunTests {
         #expect(!fixture.rowDescriptions.contains { $0.hasPrefix(Self.unmatchedSuite) })
         // The header row is still selected, and is shown the way the project shows it.
         #expect(fixture.selectedRowDescription == "AlphaTests/header")
-        #expect(fixture.state.preview?.candidate?.origin == .workingTree)
+        #expect(fixture.state.canvas.preview?.candidate?.origin == .workingTree)
 
         fixture.state.showTestRun()
         await fixture.state.testRuns.currentRead?.value
         #expect(fixture.testResults.readCount == 1)
-        #expect(fixture.state.preview?.candidate?.origin == .testRun)
+        #expect(fixture.state.canvas.preview?.candidate?.origin == .testRun)
     }
 
     @Test("The project's filters are put away under the run")
@@ -254,11 +254,11 @@ struct TestRunTests {
 
         fixture.state.showSnapshot(header, withGitDiff: true)
 
-        #expect(fixture.state.preview?.candidate?.fileURL == Self.scratch.appendingPathComponent("X.png"))
-        #expect(fixture.state.preview?.candidate?.origin == .testRun)
-        #expect(fixture.state.preview?.baseline?.fileURL == header.fileURL)
-        #expect(fixture.state.preview?.baseline?.origin == .workingTree)
-        #expect(fixture.state.preview?.snapshotID == header.id)
+        #expect(fixture.state.canvas.preview?.candidate?.fileURL == Self.scratch.appendingPathComponent("X.png"))
+        #expect(fixture.state.canvas.preview?.candidate?.origin == .testRun)
+        #expect(fixture.state.canvas.preview?.baseline?.fileURL == header.fileURL)
+        #expect(fixture.state.canvas.preview?.baseline?.origin == .workingTree)
+        #expect(fixture.state.canvas.preview?.snapshotID == header.id)
         // D is the difference picture attached after the rendering; the diff mask replaces it.
         #expect(fixture.state.testRunCandidatesOnScreen.map(\.name) == ["attachment X"])
     }
@@ -272,8 +272,8 @@ struct TestRunTests {
 
         fixture.state.selectTestRunCandidate(other)
 
-        #expect(fixture.state.preview?.candidate?.fileURL == other.fileURL)
-        #expect(fixture.state.preview?.baseline?.fileURL == (try snapshot("header", in: fixture)).fileURL)
+        #expect(fixture.state.canvas.preview?.candidate?.fileURL == other.fileURL)
+        #expect(fixture.state.canvas.preview?.baseline?.fileURL == (try snapshot("header", in: fixture)).fileURL)
     }
 
     @Test("Under the project's status, a failing snapshot opens the way any other does")
@@ -284,7 +284,7 @@ struct TestRunTests {
 
         fixture.state.showSnapshot(header, withGitDiff: true)
 
-        #expect(fixture.state.preview?.candidate?.origin == .workingTree)
+        #expect(fixture.state.canvas.preview?.candidate?.origin == .workingTree)
     }
 
     @Test("Without the diff, a failing snapshot shows on its own")
@@ -294,7 +294,7 @@ struct TestRunTests {
 
         fixture.state.showSnapshot(header, withGitDiff: false)
 
-        #expect(fixture.state.preview == .single(header))
+        #expect(fixture.state.canvas.preview == .single(header))
     }
 
     @Test("Accepting the candidate re-records the snapshot and settles its failure")
@@ -330,7 +330,7 @@ struct TestRunTests {
 
         fixture.state.promoteCandidateToBaseline()
 
-        #expect(fixture.state.preview == .single(header))
+        #expect(fixture.state.canvas.preview == .single(header))
     }
 
     @Test("Accepting the last failure closes the canvas instead of reloading the run's copy")
@@ -345,7 +345,7 @@ struct TestRunTests {
         #expect(fixture.state.testRuns.results?.isEmpty == true)
         #expect(fixture.state.isShowingTestRunPlaceholder)
         #expect(!fixture.filesystem.fileExists(at: Self.scratch))
-        #expect(fixture.state.preview == nil)
+        #expect(fixture.state.canvas.preview == nil)
         #expect(fixture.state.lastError == nil)
     }
 
@@ -366,7 +366,7 @@ struct TestRunTests {
         #expect(fixture.state.acceptableTestRunFailuresCount == 0)
         #expect(fixture.rowDescriptions.allSatisfy { $0.hasPrefix(Self.unmatchedSuite) })
         // The canvas no longer points into the run's scratch folder.
-        #expect(fixture.state.preview == .single(header))
+        #expect(fixture.state.canvas.preview == .single(header))
     }
 
     @Test("Accepting all when only failures are listed closes the canvas and deletes the copies")
@@ -378,7 +378,7 @@ struct TestRunTests {
 
         #expect(fixture.state.isShowingTestRunPlaceholder)
         #expect(!fixture.filesystem.fileExists(at: Self.scratch))
-        #expect(fixture.state.preview == nil)
+        #expect(fixture.state.canvas.preview == nil)
     }
 
     @Test("Discarding what Accept All wrote brings the failures back")
@@ -500,12 +500,12 @@ struct TestRunTests {
 
         fixture.state.closePane(.baseline)
 
-        guard case let .testRunAttachment(item) = fixture.state.preview else {
-            Issue.record("Expected the candidate on its own, got \(String(describing: fixture.state.preview))")
+        guard case let .testRunAttachment(item) = fixture.state.canvas.preview else {
+            Issue.record("Expected the candidate on its own, got \(String(describing: fixture.state.canvas.preview))")
             return
         }
         #expect(item.name == "attachment X")
-        #expect(fixture.state.preview?.candidate?.origin == .testRun)
+        #expect(fixture.state.canvas.preview?.candidate?.origin == .testRun)
     }
 
     // MARK: - Unmatched attachments
@@ -518,8 +518,8 @@ struct TestRunTests {
         let file = Self.scratch.appendingPathComponent("N.png")
 
         fixture.state.selectRow(withID: rowID)
-        #expect(fixture.state.preview?.candidate?.fileURL == file)
-        #expect(fixture.state.preview?.isComparison == false)
+        #expect(fixture.state.canvas.preview?.candidate?.fileURL == file)
+        #expect(fixture.state.canvas.preview?.isComparison == false)
         #expect(!fixture.state.canPromoteCandidate)
 
         fixture.state.deleteSelection()
@@ -592,7 +592,7 @@ struct TestRunTests {
         #expect(fixture.state.testRuns.selectedBundle?.url == Self.olderBundle)
         #expect(fixture.rowDescriptions == ["AlphaTests", "AlphaTests/header"])
         #expect(fixture.selectedRowDescription == "AlphaTests/header")
-        #expect(fixture.state.preview?.candidate?.fileURL == Self.olderScratch.appendingPathComponent("O.png"))
+        #expect(fixture.state.canvas.preview?.candidate?.fileURL == Self.olderScratch.appendingPathComponent("O.png"))
         #expect(fixture.filesystem.removedPaths.contains(Self.scratch.path))
     }
 

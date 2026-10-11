@@ -128,11 +128,11 @@ struct KeyboardNavigationTests {
         fixture.select("AlphaTests/footer")
 
         fixture.state.togglePreview()
-        #expect(fixture.state.preview?.snapshotID != nil)
-        #expect(fixture.state.preview?.title == "footer")
+        #expect(fixture.state.canvas.preview?.snapshotID != nil)
+        #expect(fixture.state.canvas.preview?.title == "footer")
 
         fixture.state.togglePreview()
-        #expect(fixture.state.preview == nil)
+        #expect(fixture.state.canvas.preview == nil)
     }
 
     @Test("Moving the selection onto a snapshot shows it")
@@ -144,7 +144,7 @@ struct KeyboardNavigationTests {
         fixture.state.selectRow(withID: rowID)
 
         #expect(fixture.selectedRowDescription == "AlphaTests/footer")
-        #expect(fixture.state.preview?.title == "footer")
+        #expect(fixture.state.canvas.preview?.title == "footer")
     }
 
     @Test("Moving the selection onto a suite leaves the canvas alone")
@@ -155,7 +155,7 @@ struct KeyboardNavigationTests {
 
         fixture.state.selectRow(withID: fixture.rowID("BetaTests"))
 
-        #expect(fixture.state.preview?.title == "footer")
+        #expect(fixture.state.canvas.preview?.title == "footer")
     }
 
     @Test("Right arrow into a snapshot shows it")
@@ -166,7 +166,7 @@ struct KeyboardNavigationTests {
 
         fixture.state.expandOrDescend()
 
-        #expect(fixture.state.preview?.title == "toolbar")
+        #expect(fixture.state.canvas.preview?.title == "toolbar")
     }
 
     @Test("Space on a suite row opens and closes the suite instead")
@@ -246,7 +246,7 @@ struct KeyboardNavigationTests {
 
         #expect(fixture.selectedRowDescription == "AlphaTests/header")
         #expect(fixture.state.isExpanded(suiteWithID: fixture.suiteID("AlphaTests")))
-        #expect(fixture.state.preview?.snapshotID == fixture.state.selectedSnapshot?.id)
+        #expect(fixture.state.canvas.preview?.snapshotID == fixture.state.selectedSnapshot?.id)
     }
 
     @Test("Next Change skips unchanged snapshots and wraps round at the bottom")

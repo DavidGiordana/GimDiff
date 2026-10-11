@@ -31,13 +31,13 @@ struct ProjectMergeTests {
         let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
         fixture.expand("AlphaTests")
         fixture.state.selectRow(withID: fixture.rowID("AlphaTests/footer"))
-        let preview = fixture.state.preview
+        let preview = fixture.state.canvas.preview
 
         fixture.state.merge(AppStateFixture.twoSuites())
 
         #expect(fixture.selectedRowDescription == "AlphaTests/footer")
         #expect(fixture.state.isExpanded(suiteWithID: fixture.suiteID("AlphaTests")))
-        #expect(fixture.state.preview == preview)
+        #expect(fixture.state.canvas.preview == preview)
     }
 
     @Test("New snapshots arrive around a selection, open suites, and canvas that all stay put")
@@ -55,7 +55,7 @@ struct ProjectMergeTests {
             "AlphaTests", "AlphaTests/header", "AlphaTests/footer", "AlphaTests/sidebar", "BetaTests",
         ])
         #expect(fixture.selectedRowDescription == "AlphaTests/footer")
-        #expect(fixture.state.preview?.title == "footer")
+        #expect(fixture.state.canvas.preview?.title == "footer")
     }
 
     @Test("A selected snapshot that is gone hands the selection to the row below and closes its pane")
@@ -67,7 +67,7 @@ struct ProjectMergeTests {
         fixture.state.merge(pruned(AppStateFixture.twoSuites()) { $0 == "AlphaTests/footer" })
 
         #expect(fixture.selectedRowDescription == "AlphaTests/sidebar")
-        #expect(fixture.state.preview == nil)
+        #expect(fixture.state.canvas.preview == nil)
     }
 
     @Test("With nothing below it, the selection moves to the row above")
@@ -103,7 +103,7 @@ struct ProjectMergeTests {
 
         fixture.state.merge(pruned(AppStateFixture.twoSuites()) { $0 == "BetaTests" })
 
-        #expect(fixture.state.preview?.title == "header")
+        #expect(fixture.state.canvas.preview?.title == "header")
         #expect(fixture.selectedRowDescription == "AlphaTests/header")
     }
 
@@ -157,7 +157,7 @@ struct BackgroundRefreshTests {
         _ = defaults
         let shown = try #require(state.visibleRows.last)
         state.selectRow(withID: shown.id)
-        let preview = state.preview
+        let preview = state.canvas.preview
 
         let added = try fixture.write("\(Self.buttonSuite)/button.3.png")
         await state.projectFilesChanged([ProjectFileEvent(url: added)])
@@ -165,7 +165,7 @@ struct BackgroundRefreshTests {
 
         #expect(state.currentProject?.suites.first?.snapshots.count == 3)
         #expect(state.selectedRowID == shown.id)
-        #expect(state.preview == preview)
+        #expect(state.canvas.preview == preview)
         #expect(state.isLoading == false)
         #expect(state.lastError == nil)
     }
@@ -185,7 +185,7 @@ struct BackgroundRefreshTests {
 
         #expect(state.currentProject?.suites.first?.snapshots.count == 1)
         #expect(state.selectedRowID == rows.last?.id)
-        #expect(state.preview == nil)
+        #expect(state.canvas.preview == nil)
     }
 
     @Test("Events delivered by the watcher reach the project on their own")
@@ -259,14 +259,14 @@ struct BackgroundRefreshTests {
         let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
         fixture.expand("AlphaTests")
         fixture.state.selectRow(withID: fixture.rowID("AlphaTests/footer"))
-        let token = fixture.state.imageReloadToken
+        let token = fixture.state.canvas.imageReloadToken
 
         let footer = AppStateFixture.root.appendingPathComponent("Snapshots/AlphaTests/footer.png")
         await fixture.state.projectFilesChanged([ProjectFileEvent(url: footer)])
         await fixture.state.currentBackgroundRefresh?.value
 
-        #expect(fixture.state.imageReloadToken == token + 1)
-        #expect(fixture.state.preview?.title == "footer")
+        #expect(fixture.state.canvas.imageReloadToken == token + 1)
+        #expect(fixture.state.canvas.preview?.title == "footer")
         #expect(fixture.selectedRowDescription == "AlphaTests/footer")
     }
 
@@ -275,13 +275,13 @@ struct BackgroundRefreshTests {
         let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
         fixture.expand("AlphaTests")
         fixture.state.selectRow(withID: fixture.rowID("AlphaTests/footer"))
-        let token = fixture.state.imageReloadToken
+        let token = fixture.state.canvas.imageReloadToken
 
         let sidebar = AppStateFixture.root.appendingPathComponent("Snapshots/AlphaTests/sidebar.png")
         await fixture.state.projectFilesChanged([ProjectFileEvent(url: sidebar)])
         await fixture.state.currentBackgroundRefresh?.value
 
-        #expect(fixture.state.imageReloadToken == token)
+        #expect(fixture.state.canvas.imageReloadToken == token)
     }
 
     // MARK: - Git
@@ -297,7 +297,7 @@ struct BackgroundRefreshTests {
             defaults: defaults.defaults
         )
         state.load(AppStateFixture.twoSuites())
-        let token = state.imageReloadToken
+        let token = state.canvas.imageReloadToken
 
         let head = AppStateFixture.root.appendingPathComponent(".git/HEAD")
         await state.projectFilesChanged([ProjectFileEvent(url: head)])
@@ -305,7 +305,7 @@ struct BackgroundRefreshTests {
 
         let statuses = state.currentProject?.suites.first?.snapshots.map(\.gitStatus)
         #expect(statuses == [.unmodified, .modified, .unmodified])
-        #expect(state.imageReloadToken == token)
+        #expect(state.canvas.imageReloadToken == token)
     }
 
     @Test("A project below the top of its repository watches the Git directory above it too")

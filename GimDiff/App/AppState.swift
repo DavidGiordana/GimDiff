@@ -18,14 +18,8 @@ import Observation
 final class AppState {
     /// `UserDefaults` key the recent project list is persisted under.
     static let recentProjectsKey = "recent_projects"
-    /// `UserDefaults` key the diff mask's tolerance is remembered under, as a ΔE.
-    static let diffToleranceKey = "diff_tolerance_delta_e"
-    /// `UserDefaults` key Link Panes is remembered under.
-    static let linksPanesKey = "links_panes"
     /// How many folders the recent list keeps before it starts forgetting the oldest.
     static let recentProjectsLimit = 12
-    /// Commit-ish a snapshot is compared against when its Git diff is shown.
-    static let comparisonGitRef = "HEAD"
 
     // MARK: - Project
 
@@ -49,47 +43,10 @@ final class AppState {
 
     // MARK: - Detail
 
-    private(set) var preview: SnapshotPreview?
-    var diffMode: DiffMode = .sideBySide
+    /// The pair on screen and how it is compared. Which image a row puts there is decided
+    /// here, in ``showSnapshot(_:withGitDiff:)``.
+    let canvas: CanvasModel
     var isSidebarVisible = true
-    /// Pixel comparison of the two panes, recomputed whenever the diff mask is on.
-    private(set) var diffReport: ImageDiffReport?
-    /// Whether that comparison is in flight, so the footer can say so rather than go blank.
-    private(set) var isComputingDiff = false
-    /// How far apart two pixels may be before the diff mask paints them.
-    ///
-    /// Remembered across launches: it describes the renderer a project's tests run on,
-    /// which does not change from one snapshot to the next.
-    var diffTolerance: DiffTolerance = .exact {
-        didSet {
-            guard diffTolerance != oldValue else { return }
-            defaults.set(diffTolerance.maximumDeltaE, forKey: Self.diffToleranceKey)
-            updateDiffReport()
-        }
-    }
-    /// Whether the two side-by-side panes zoom and pan together.
-    ///
-    /// Off by default, because the panes' independence is the point when one is held at 1:1
-    /// on a detail while the other stays fitted. Remembered once turned on, as a way of
-    /// working rather than a property of one comparison.
-    var linksPanes = false {
-        didSet { defaults.set(linksPanes, forKey: Self.linksPanesKey) }
-    }
-    /// How the sides of a loose pair were chosen, while one is on screen.
-    ///
-    /// `nil` for anything else: a snapshot's own comparison has sides the project gave it.
-    private(set) var looseRoleCertainty: LooseRoleCertainty?
-    /// Bumped to make the canvas read its images off disk again.
-    ///
-    /// A counter rather than a flag because the file name never changes: nothing about the
-    /// URL tells a view that the bytes behind it were rewritten by a test run.
-    private(set) var imageReloadToken = 0
-    /// The last View menu command addressed to the canvas's own controls.
-    ///
-    /// Display mode, zoom, and the onion skin's fade belong to the views that draw them, so
-    /// the menu cannot set them directly; it posts a request each of those views carries
-    /// out. The serial makes the same command twice in a row two requests.
-    private(set) var canvasViewRequest: CanvasViewRequest?
     /// The window's undo manager, which every file GimDiff writes registers its way back on.
     ///
     /// The window's rather than one of GimDiff's own, so Edit ▸ Undo, ⌘Z, and the filter
@@ -140,14 +97,9 @@ final class AppState {
     private let workspace: WorkspaceService
     private let defaults: UserDefaults
     private var scanTask: Task<Void, Never>?
-    private var gitDiffTask: Task<Void, Never>?
-    /// Held so a second diff request supersedes the first rather than racing it.
-    var diffTask: Task<Void, Never>?
     var gitStatusTask: Task<Void, Never>?
     /// The `git restore` in flight, so a caller can wait for it.
     var discardTask: Task<Void, Never>?
-    /// Deciding the sides of a pasted or dropped pair, before it is shown.
-    private var looseRoleTask: Task<Void, Never>?
     /// The loop reading the watcher's events. Kept out of observation so it stays a plain
     /// stored property, which is what lets `deinit` reach it.
     @ObservationIgnored var watchTask: Task<Void, Never>?
@@ -199,9 +151,9 @@ final class AppState {
         )
         self.defaults = defaults
         recentProjects = Self.loadRecentProjects(from: defaults)
-        diffTolerance = DiffTolerance(maximumDeltaE: defaults.double(forKey: Self.diffToleranceKey))
-        linksPanes = defaults.bool(forKey: Self.linksPanesKey)
+        canvas = CanvasModel(imageDiff: self.imageDiff, gitService: git, defaults: defaults)
         pullRequestReview.reportError = { [weak self] error in self?.report(error) }
+        canvas.reportError = { [weak self] error in self?.report(error) }
     }
 
     deinit {
@@ -222,7 +174,7 @@ final class AppState {
             case let .open(folder):
                 openProject(at: folder)
             case let .compare(reference, failure):
-                showComparison(reference: reference, failure: failure, certainty: .stated)
+                canvas.showComparison(reference: reference, failure: failure, certainty: .stated)
             case let .openPullRequest(input):
                 openPullRequest(input)
             }
@@ -236,7 +188,7 @@ final class AppState {
         if filesystem.isDirectory(at: url) {
             openProject(at: url)
         } else if url.isImageFile {
-            setPreview(.single(Self.looseSnapshot(at: url)))
+            canvas.show(.single(Self.looseSnapshot(at: url)))
         } else {
             lastError = "“\(url.lastPathComponent)” is neither a folder nor an image GimDiff can open."
         }
@@ -323,7 +275,7 @@ final class AppState {
         stopWatching()
         discardTestRun()
         testRuns.reset()
-        closePreview()
+        canvas.close()
         currentProject = nil
         selectedRowID = nil
         expandedSuiteIDs = []
@@ -363,7 +315,7 @@ final class AppState {
         forgetFileUndo()
         currentProject = bundle
         loadingProjectURL = nil
-        setPreview(nil)
+        canvas.show(nil)
         // A project with one suite is a suite, so there is nothing to be gained by making
         // the user open it. Several suites start closed, which is the useful overview.
         expandedSuiteIDs = bundle.suites.count == 1 ? Set(bundle.suites.map(\.id)) : []
@@ -401,10 +353,10 @@ final class AppState {
         }
 
         // An attachment of the test run was never in the scan, and is not gone for that.
-        if let shown = preview?.snapshotID,
+        if let shown = canvas.preview?.snapshotID,
            !TestRunModel.isAttachment(snapshotID: shown),
            !bundle.suites.contains(where: { $0.snapshots.contains { $0.id == shown } }) {
-            closePreview()
+            canvas.close()
         }
     }
 
@@ -593,7 +545,7 @@ final class AppState {
     /// single image while git extracts it again.
     private func previewSelectedSnapshot() {
         guard case let .snapshot(snapshot, _) = selectedRow,
-              preview?.snapshotID != snapshot.id
+              canvas.preview?.snapshotID != snapshot.id
         else { return }
         showSnapshot(snapshot, withGitDiff: true)
     }
@@ -695,8 +647,8 @@ final class AppState {
     func togglePreview() {
         switch selectedRow {
         case let .snapshot(snapshot, _):
-            if preview?.snapshotID == snapshot.id {
-                preview = nil
+            if canvas.preview?.snapshotID == snapshot.id {
+                canvas.show(nil)
             } else {
                 showSnapshot(snapshot, withGitDiff: true)
             }
@@ -755,13 +707,10 @@ final class AppState {
 
     // MARK: - Preview pane
 
-    /// Shows one snapshot, against its committed version when it has one.
-    ///
-    /// The image is put on screen immediately and upgraded to a comparison once git has
-    /// written the committed file out: extracting it spawns a process, and waiting for that
-    /// before drawing anything would make every selection feel slow.
+    /// Shows one snapshot: what a pull request did to it, what a test run rendered for it,
+    /// or the file against its committed version when it has one.
     func showSnapshot(_ snapshot: SnapshotItem, withGitDiff: Bool) {
-        gitDiffTask?.cancel()
+        canvas.cancelCommittedVersion()
 
         if let change = pullRequestReview.change(forSnapshotID: snapshot.id) {
             showPullRequestChange(change, of: snapshot, withBaseline: withGitDiff)
@@ -769,7 +718,7 @@ final class AppState {
         }
 
         guard !TestRunModel.isAttachment(snapshotID: snapshot.id) else {
-            setPreview(.testRunAttachment(snapshot))
+            canvas.show(.testRunAttachment(snapshot))
             return
         }
 
@@ -781,31 +730,7 @@ final class AppState {
             return
         }
 
-        setPreview(.single(snapshot))
-
-        guard withGitDiff,
-              snapshot.gitStatus == .modified,
-              let gitRoot = currentProject?.gitRootURL,
-              let relativePath = Self.relativePath(of: snapshot.fileURL, under: gitRoot)
-        else { return }
-
-        gitDiffTask = Task { [gitService] in
-            // An untracked or newly added snapshot has nothing at HEAD to compare with, so
-            // a failure here is ordinary: the image stays on screen on its own.
-            guard let committed = try? await gitService.extractCommittedVersion(
-                ofFileAt: relativePath,
-                repositoryRoot: gitRoot,
-                gitRef: Self.comparisonGitRef
-            ) else { return }
-
-            guard !Task.isCancelled, preview?.snapshotID == snapshot.id else { return }
-            setPreview(.comparison(
-                SnapshotPair(reference: committed, failure: snapshot.fileURL),
-                snapshotID: snapshot.id,
-                title: snapshot.displayName,
-                baselineOrigin: .committedVersion
-            ))
-        }
+        canvas.showWithCommittedVersion(snapshot, gitRoot: withGitDiff ? currentProject?.gitRootURL : nil)
     }
 
     /// Shows what a pull request did to one snapshot.
@@ -820,7 +745,7 @@ final class AppState {
     ) {
         switch (change.candidateURL, change.baselineURL) {
         case let (candidate?, baseline?) where withBaseline:
-            setPreview(.comparison(
+            canvas.show(.comparison(
                 SnapshotPair(reference: baseline, failure: candidate),
                 snapshotID: snapshot.id,
                 title: snapshot.displayName,
@@ -829,93 +754,25 @@ final class AppState {
         case let (candidate?, _):
             var head = snapshot
             head.fileURL = candidate
-            setPreview(.pullRequestSide(head, role: .candidate))
+            canvas.show(.pullRequestSide(head, role: .candidate))
         case let (nil, baseline?):
             var base = snapshot
             base.fileURL = baseline
-            setPreview(.pullRequestSide(base, role: .baseline))
+            canvas.show(.pullRequestSide(base, role: .baseline))
         case (nil, nil):
-            setPreview(nil)
+            canvas.show(nil)
         }
     }
 
-    /// Shows two loose images side by side, from a drop, the clipboard, or a URL.
-    ///
-    /// - Parameter certainty: How the sides were chosen. A caller that named them — a
-    ///   `gimdiff://compare` URL — leaves the default.
-    func showComparison(reference: URL, failure: URL, certainty: LooseRoleCertainty = .stated) {
-        gitDiffTask?.cancel()
-        setPreview(.comparison(
-            SnapshotPair(reference: reference, failure: failure),
-            snapshotID: nil,
-            title: failure.deletingPathExtension().lastPathComponent,
-            baselineOrigin: .workingTree
-        ))
-        looseRoleCertainty = certainty
-    }
-
-    /// Shows a pasted or dropped pair once ``LooseRoleResolver`` has looked at the files.
-    ///
-    /// The pair is shown only after: drawing it in the source's order first and swapping
-    /// it a moment later would put a baseline label on the wrong image, however briefly.
+    /// Shows a pasted or dropped pair once its sides are decided, with the open project as
+    /// one of the clues to which file is the recorded snapshot.
     func showLooseComparison(baseline: URL, candidate: URL, rolesAreStated: Bool) {
-        looseRoleTask?.cancel()
-        let resolver = LooseRoleResolver(gitService: gitService)
-        let projectRoot = currentProject?.rootURL
-        looseRoleTask = Task {
-            let resolution = await resolver.resolve(
-                baseline: baseline,
-                candidate: candidate,
-                rolesAreStated: rolesAreStated,
-                projectRoot: projectRoot
-            )
-            guard !Task.isCancelled else { return }
-            showComparison(
-                reference: resolution.baselineURL,
-                failure: resolution.candidateURL,
-                certainty: resolution.certainty
-            )
-        }
-    }
-
-    /// The side decision in flight for a pasted or dropped pair, if any.
-    var currentLooseRoleResolution: Task<Void, Never>? { looseRoleTask }
-
-    func closePreview() {
-        gitDiffTask?.cancel()
-        setPreview(nil)
-    }
-
-    // MARK: - Mutation seams
-
-    /// Replaces what the canvas is showing, dropping anything measured about the last pair.
-    ///
-    /// Every route into ``preview`` runs through here, including the ones in
-    /// `AppState+FileActions`: a report left over from the previous pair would otherwise
-    /// keep describing it under the new one's images.
-    ///
-    /// ``diffMode`` deliberately survives. Stepping through a folder of snapshots in curtain
-    /// mode should stay in curtain mode; the canvas falls back to a single pane on its own
-    /// when the new preview has only one image.
-    func setPreview(_ newValue: SnapshotPreview?) {
-        diffTask?.cancel()
-        // Whatever the canvas shows next, a pair still being decided is no longer wanted.
-        looseRoleTask?.cancel()
-        looseRoleCertainty = nil
-        preview = newValue
-        diffReport = nil
-        isComputingDiff = false
-    }
-
-    /// Publishes the result of a pixel comparison, or that one is under way.
-    func setDiffReport(_ report: ImageDiffReport?, isComputing: Bool = false) {
-        diffReport = report
-        isComputingDiff = isComputing
-    }
-
-    /// Makes every view holding a decoded image read it off disk again.
-    func invalidateLoadedImages() {
-        imageReloadToken += 1
+        canvas.showLooseComparison(
+            baseline: baseline,
+            candidate: candidate,
+            rolesAreStated: rolesAreStated,
+            projectRoot: currentProject?.rootURL
+        )
     }
 
     func report(_ error: any Error) {
@@ -949,9 +806,6 @@ final class AppState {
 
     /// The Git status task in flight, if any, so a caller can wait for it.
     var currentGitStatusRefresh: Task<Void, Never>? { gitStatusTask }
-
-    /// The committed-version extraction in flight, if any, so a caller can wait for it.
-    var currentGitDiff: Task<Void, Never>? { gitDiffTask }
 
     func applyGitStatuses(_ statuses: [URL: GitFileStatus]) {
         guard let suites = currentProject?.suites else { return }
@@ -992,7 +846,7 @@ final class AppState {
         }
 
         guard let baseline = payload.baselineURL else {
-            setPreview(.single(Self.looseSnapshot(at: payload.candidateURL)))
+            canvas.show(.single(Self.looseSnapshot(at: payload.candidateURL)))
             return
         }
 
@@ -1069,7 +923,7 @@ final class AppState {
     /// Whether the canvas already shows the selected snapshot, so Space would close it.
     var isShowingSelectedSnapshot: Bool {
         guard let snapshot = selectedSnapshot else { return false }
-        return preview?.snapshotID == snapshot.id
+        return canvas.preview?.snapshotID == snapshot.id
     }
 
     /// What Copy Name puts on the clipboard: the suite's name or the snapshot's, as the row reads.
@@ -1098,30 +952,6 @@ final class AppState {
     /// What showing a snapshot on its own is called, in the menu bar and on the row alike.
     var showAloneActionTitle: String {
         isReviewingPullRequest ? "Show Pull Request Version Only" : "Show Snapshot without Git Diff"
-    }
-
-    // MARK: - Canvas view commands
-
-    /// Whether anything on screen has the display mode and zoom the View menu drives: a
-    /// single image, a side-by-side pair, or the diff mask. The curtain and the onion skin
-    /// draw both images in one fixed frame.
-    var canvasHasZoomableImages: Bool {
-        guard let preview else { return false }
-        guard preview.isComparison else { return true }
-        return diffMode == .sideBySide || diffMode == .difference
-    }
-
-    /// Whether the onion skin is on screen for the View menu's fade commands to reach.
-    var canvasShowsOnionSkin: Bool {
-        preview?.isComparison == true && diffMode == .onionSkin
-    }
-
-    /// Hands `command` to whichever canvas views it applies to.
-    func requestCanvasView(_ command: CanvasViewCommand) {
-        canvasViewRequest = CanvasViewRequest(
-            serial: (canvasViewRequest?.serial ?? 0) + 1,
-            command: command
-        )
     }
 
     func showSelectedSnapshot(withGitDiff: Bool) {
@@ -1232,8 +1062,8 @@ final class AppState {
     private func finishDeletion(replacement: String?, removedSnapshotIDs: Set<String>) {
         projectEdits += 1
         selectedRowID = replacement
-        if let shown = preview?.snapshotID, removedSnapshotIDs.contains(shown) {
-            closePreview()
+        if let shown = canvas.preview?.snapshotID, removedSnapshotIDs.contains(shown) {
+            canvas.close()
         }
     }
 

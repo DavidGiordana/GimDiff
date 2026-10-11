@@ -48,11 +48,11 @@ struct LinkedPanesTests {
     func linkIsRemembered() {
         let defaults = TemporaryDefaults()
         let first = AppState(watcher: StubProjectWatcher(), defaults: defaults.defaults)
-        #expect(first.linksPanes == false)
+        #expect(first.canvas.linksPanes == false)
 
-        first.linksPanes = true
+        first.canvas.linksPanes = true
 
         let second = AppState(watcher: StubProjectWatcher(), defaults: defaults.defaults)
-        #expect(second.linksPanes)
+        #expect(second.canvas.linksPanes)
     }
 }

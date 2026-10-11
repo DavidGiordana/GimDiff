@@ -32,7 +32,7 @@ struct FileActionsTests {
             gitService: StubGitService(),
             defaults: defaults.defaults
         )
-        state.showComparison(reference: Self.baselineURL, failure: Self.candidateURL)
+        state.canvas.showComparison(reference: Self.baselineURL, failure: Self.candidateURL)
         return (state, filesystem, defaults)
     }
 
@@ -41,7 +41,7 @@ struct FileActionsTests {
     @Test("Accepting the candidate writes it over the baseline and leaves the candidate alone")
     func promotesTheCandidate() {
         let fixture = loosePair()
-        let tokenBefore = fixture.state.imageReloadToken
+        let tokenBefore = fixture.state.canvas.imageReloadToken
 
         fixture.state.promoteCandidateToBaseline()
 
@@ -50,7 +50,7 @@ struct FileActionsTests {
         // the canvas is still pointing at.
         #expect(fixture.filesystem.contents(of: Self.candidateURL) == "candidate-bytes")
         #expect(fixture.state.lastError == nil)
-        #expect(fixture.state.imageReloadToken == tokenBefore + 1)
+        #expect(fixture.state.canvas.imageReloadToken == tokenBefore + 1)
     }
 
     @Test("Reverting writes the baseline back over the candidate")
@@ -96,15 +96,15 @@ struct FileActionsTests {
     @Test("A pasted pair is decided by keeping a side; a snapshot's comparison is not")
     func recognisesALoosePair() {
         let fixture = loosePair()
-        #expect(fixture.state.preview?.isLoosePair == true)
+        #expect(fixture.state.canvas.preview?.isLoosePair == true)
 
-        fixture.state.setPreview(.comparison(
+        fixture.state.canvas.show(.comparison(
             SnapshotPair(reference: Self.baselineURL, failure: Self.candidateURL),
             snapshotID: "header",
             title: "header",
             baselineOrigin: .workingTree
         ))
-        #expect(fixture.state.preview?.isLoosePair == false)
+        #expect(fixture.state.canvas.preview?.isLoosePair == false)
     }
 
     @Test("Keeping the baseline writes nothing and leaves the baseline on screen alone")
@@ -115,8 +115,8 @@ struct FileActionsTests {
 
         #expect(fixture.filesystem.contents(of: Self.baselineURL) == "baseline-bytes")
         #expect(fixture.filesystem.contents(of: Self.candidateURL) == "candidate-bytes")
-        #expect(fixture.state.preview?.isComparison == false)
-        #expect(fixture.state.preview?.panes.map(\.fileURL) == [Self.baselineURL])
+        #expect(fixture.state.canvas.preview?.isComparison == false)
+        #expect(fixture.state.canvas.preview?.panes.map(\.fileURL) == [Self.baselineURL])
     }
 
     @Test("Keeping the candidate writes it over the baseline, which then stands alone")
@@ -126,8 +126,8 @@ struct FileActionsTests {
         fixture.state.keepCandidate()
 
         #expect(fixture.filesystem.contents(of: Self.baselineURL) == "candidate-bytes")
-        #expect(fixture.state.preview?.isComparison == false)
-        #expect(fixture.state.preview?.panes.map(\.fileURL) == [Self.baselineURL])
+        #expect(fixture.state.canvas.preview?.isComparison == false)
+        #expect(fixture.state.canvas.preview?.panes.map(\.fileURL) == [Self.baselineURL])
         #expect(fixture.state.lastError == nil)
     }
 
@@ -142,11 +142,11 @@ struct FileActionsTests {
             defaults: defaults.defaults
         )
         // The candidate is named but was never written, so the copy has no source.
-        state.showComparison(reference: Self.baselineURL, failure: Self.candidateURL)
+        state.canvas.showComparison(reference: Self.baselineURL, failure: Self.candidateURL)
 
         state.keepCandidate()
 
-        #expect(state.preview?.isComparison == true)
+        #expect(state.canvas.preview?.isComparison == true)
         #expect(state.lastError != nil)
     }
 
@@ -155,25 +155,25 @@ struct FileActionsTests {
     @Test("A pair nothing could tell apart is named by position, not by role")
     func namesAnUndecidedPairByPosition() throws {
         let fixture = loosePair()
-        fixture.state.showComparison(
+        fixture.state.canvas.showComparison(
             reference: Self.baselineURL,
             failure: Self.candidateURL,
             certainty: .unknown
         )
 
-        let preview = try #require(fixture.state.preview)
-        #expect(fixture.state.looseRolesAreUnknown)
-        #expect(preview.panes.map(fixture.state.sideTitle(for:)) == ["Left", "Right"])
+        let preview = try #require(fixture.state.canvas.preview)
+        #expect(fixture.state.canvas.looseRolesAreUnknown)
+        #expect(preview.panes.map(fixture.state.canvas.sideTitle(for:)) == ["Left", "Right"])
 
         // Keeping "the baseline" would be acting on a guess, so it is not on offer.
         fixture.state.keepBaseline()
-        #expect(fixture.state.preview?.isComparison == true)
+        #expect(fixture.state.canvas.preview?.isComparison == true)
     }
 
     @Test("Keeping the left image writes it over the right one, which may be the recorded file")
     func keepsTheLeftImage() {
         let fixture = loosePair()
-        fixture.state.showComparison(
+        fixture.state.canvas.showComparison(
             reference: Self.baselineURL,
             failure: Self.candidateURL,
             certainty: .unknown
@@ -182,13 +182,13 @@ struct FileActionsTests {
         fixture.state.keepLeft()
 
         #expect(fixture.filesystem.contents(of: Self.candidateURL) == "baseline-bytes")
-        #expect(fixture.state.preview?.panes.map(\.fileURL) == [Self.baselineURL])
+        #expect(fixture.state.canvas.preview?.panes.map(\.fileURL) == [Self.baselineURL])
     }
 
     @Test("Keeping the right image writes it over the left one and leaves it on screen")
     func keepsTheRightImage() {
         let fixture = loosePair()
-        fixture.state.showComparison(
+        fixture.state.canvas.showComparison(
             reference: Self.baselineURL,
             failure: Self.candidateURL,
             certainty: .unknown
@@ -197,9 +197,9 @@ struct FileActionsTests {
         fixture.state.keepRight()
 
         #expect(fixture.filesystem.contents(of: Self.baselineURL) == "candidate-bytes")
-        #expect(fixture.state.preview?.panes.map(\.fileURL) == [Self.candidateURL])
+        #expect(fixture.state.canvas.preview?.panes.map(\.fileURL) == [Self.candidateURL])
         // The pair is decided; the image left on screen is no longer one of two unknowns.
-        #expect(fixture.state.looseRolesAreUnknown == false)
+        #expect(fixture.state.canvas.looseRolesAreUnknown == false)
     }
 
     @Test("A pasted pair whose files tell them apart is shown the right way round")
@@ -216,12 +216,12 @@ struct FileActionsTests {
             candidate: Self.baselineURL,
             rolesAreStated: false
         )
-        await state.currentLooseRoleResolution?.value
+        await state.canvas.currentLooseRoleResolution?.value
 
-        #expect(state.preview?.baseline?.fileURL == Self.baselineURL)
-        #expect(state.preview?.candidate?.fileURL == Self.candidateURL)
-        #expect(state.looseRoleCertainty == .inferred(.trackedByGit, swapped: true))
-        #expect(state.preview.map { $0.panes.map(state.sideTitle(for:)) } == ["Baseline", "Candidate"])
+        #expect(state.canvas.preview?.baseline?.fileURL == Self.baselineURL)
+        #expect(state.canvas.preview?.candidate?.fileURL == Self.candidateURL)
+        #expect(state.canvas.looseRoleCertainty == .inferred(.trackedByGit, swapped: true))
+        #expect(state.canvas.preview.map { $0.panes.map(state.canvas.sideTitle(for:)) } == ["Baseline", "Candidate"])
     }
 
     @Test("Neither action leaves the staging file behind")
@@ -264,7 +264,7 @@ struct FileActionsTests {
             gitService: StubGitService(),
             defaults: defaults.defaults
         )
-        state.setPreview(.comparison(
+        state.canvas.show(.comparison(
             SnapshotPair(reference: committed, failure: Self.candidateURL),
             snapshotID: nil,
             title: "header",
@@ -294,7 +294,7 @@ struct FileActionsTests {
             defaults: defaults.defaults
         )
         // The candidate is named but was never written, so the copy has no source.
-        state.showComparison(reference: Self.baselineURL, failure: Self.candidateURL)
+        state.canvas.showComparison(reference: Self.baselineURL, failure: Self.candidateURL)
 
         state.promoteCandidateToBaseline()
 
@@ -310,11 +310,11 @@ struct FileActionsTests {
 
         fixture.state.closePane(.baseline)
 
-        #expect(fixture.state.preview?.isComparison == false)
-        #expect(fixture.state.preview?.candidate?.fileURL == Self.candidateURL)
+        #expect(fixture.state.canvas.preview?.isComparison == false)
+        #expect(fixture.state.canvas.preview?.candidate?.fileURL == Self.candidateURL)
 
         fixture.state.closePane(.candidate)
-        #expect(fixture.state.preview == nil)
+        #expect(fixture.state.canvas.preview == nil)
     }
 
     @Test("Closing the candidate promotes the baseline to the only pane")
@@ -323,7 +323,7 @@ struct FileActionsTests {
 
         fixture.state.closePane(.candidate)
 
-        #expect(fixture.state.preview?.candidate?.fileURL == Self.baselineURL)
+        #expect(fixture.state.canvas.preview?.candidate?.fileURL == Self.baselineURL)
     }
 
     // MARK: - Roles
@@ -332,10 +332,10 @@ struct FileActionsTests {
     func describesEachRole() {
         let fixture = loosePair()
 
-        #expect(fixture.state.preview?.candidate?.roleTitle == "Candidate")
-        #expect(fixture.state.preview?.candidate?.roleSubtitle == "Current")
-        #expect(fixture.state.preview?.baseline?.roleTitle == "Baseline")
-        #expect(fixture.state.preview?.baseline?.roleSubtitle == "Recorded on Disk")
+        #expect(fixture.state.canvas.preview?.candidate?.roleTitle == "Candidate")
+        #expect(fixture.state.canvas.preview?.candidate?.roleSubtitle == "Current")
+        #expect(fixture.state.canvas.preview?.baseline?.roleTitle == "Baseline")
+        #expect(fixture.state.canvas.preview?.baseline?.roleSubtitle == "Recorded on Disk")
 
         let committed = SnapshotPane(
             role: .baseline,
@@ -350,6 +350,6 @@ struct FileActionsTests {
     func ordersThePanes() {
         let fixture = loosePair()
 
-        #expect(fixture.state.preview?.panes.map(\.role) == [.baseline, .candidate])
+        #expect(fixture.state.canvas.preview?.panes.map(\.role) == [.baseline, .candidate])
     }
 }

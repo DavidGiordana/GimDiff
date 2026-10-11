@@ -124,7 +124,7 @@ struct SnapshotImageViewer<Accessory: View>: View {
                 publishToLink()
             }
         }
-        .onChange(of: state.canvasViewRequest) { _, request in
+        .onChange(of: state.canvas.viewRequest) { _, request in
             if let request { perform(request.command) }
         }
         .onChange(of: scale) { publishToLink() }

@@ -21,7 +21,7 @@ struct DetailView: View {
 
     var body: some View {
         SnapshotCanvasView(
-            preview: state.preview,
+            preview: state.canvas.preview,
             panelBackground: panelBackground,
             imageMatte: imageMatte
         )
@@ -40,8 +40,8 @@ struct DetailView: View {
         }
         // The mask is measured when it is asked for and not before: the comparison decodes
         // both images in full, which is not something to spend on every selection.
-        .onChange(of: state.diffMode) { state.updateDiffReport() }
-        .onChange(of: state.preview) { state.updateDiffReport() }
+        .onChange(of: state.canvas.diffMode) { state.canvas.updateDiffReport() }
+        .onChange(of: state.canvas.preview) { state.canvas.updateDiffReport() }
     }
 }
 

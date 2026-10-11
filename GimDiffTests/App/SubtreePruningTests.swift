@@ -97,11 +97,11 @@ struct SubtreePruningTests {
         fixture.expand("AlphaTests")
         fixture.select("AlphaTests/footer")
         fixture.state.togglePreview()
-        #expect(fixture.state.preview != nil)
+        #expect(fixture.state.canvas.preview != nil)
 
         fixture.state.deleteSelection()
 
-        #expect(fixture.state.preview == nil)
+        #expect(fixture.state.canvas.preview == nil)
     }
 
     @Test("Deleting a suite closes a preview standing on any of its snapshots")
@@ -114,7 +114,7 @@ struct SubtreePruningTests {
         fixture.select("AlphaTests")
         fixture.state.deleteSelection()
 
-        #expect(fixture.state.preview == nil)
+        #expect(fixture.state.canvas.preview == nil)
     }
 
     @Test("A preview of another snapshot survives the deletion")
@@ -127,7 +127,7 @@ struct SubtreePruningTests {
         fixture.select("AlphaTests/footer")
         fixture.state.deleteSelection()
 
-        #expect(fixture.state.preview?.title == "header")
+        #expect(fixture.state.canvas.preview?.title == "header")
     }
 
     @Test("A deletion that fails reports the error and changes nothing")

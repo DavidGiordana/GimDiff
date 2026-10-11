@@ -61,10 +61,10 @@ struct PromotionIntegrationTests {
         let state = state(for: repository, item: item, defaults: defaults)
 
         state.showSnapshot(item, withGitDiff: true)
-        await state.currentGitDiff?.value
+        await state.canvas.currentGitDiff?.value
 
-        #expect(state.preview?.isComparison == true)
-        #expect(state.preview?.baseline?.origin == .committedVersion)
+        #expect(state.canvas.preview?.isComparison == true)
+        #expect(state.canvas.preview?.baseline?.origin == .committedVersion)
         // Nothing on disk answers to "the baseline" here, so the promotion is refused.
         #expect(state.canPromoteCandidate == false)
 
@@ -87,7 +87,7 @@ struct PromotionIntegrationTests {
         state.undoManager = undo
 
         state.showSnapshot(item, withGitDiff: true)
-        await state.currentGitDiff?.value
+        await state.canvas.currentGitDiff?.value
         state.revertCandidateToBaseline()
         #expect(try Data(contentsOf: item.fileURL) == Self.committedBytes)
         #expect(undo.undoActionName == "Reject Candidate")
@@ -108,16 +108,16 @@ struct PromotionIntegrationTests {
         let state = state(for: repository, item: item, defaults: defaults)
 
         state.showSnapshot(item, withGitDiff: true)
-        await state.currentGitDiff?.value
-        #expect(state.preview?.isComparison == true)
+        await state.canvas.currentGitDiff?.value
+        #expect(state.canvas.preview?.isComparison == true)
 
         state.discardGitChanges(of: [item])
         await state.currentDiscard?.value
 
         #expect(try Data(contentsOf: item.fileURL) == Self.committedBytes)
         #expect(state.lastError == nil)
-        #expect(state.preview?.isComparison == false)
-        #expect(state.preview?.snapshotID == item.id)
+        #expect(state.canvas.preview?.isComparison == false)
+        #expect(state.canvas.preview?.snapshotID == item.id)
 
         await state.currentGitStatusRefresh?.value
         #expect(state.currentProject?.hasGitDiff == false)
@@ -134,7 +134,7 @@ struct PromotionIntegrationTests {
 
         let defaults = TemporaryDefaults()
         let state = AppState(defaults: defaults.defaults)
-        state.showComparison(reference: baseline, failure: candidate)
+        state.canvas.showComparison(reference: baseline, failure: candidate)
 
         #expect(state.canPromoteCandidate)
         state.promoteCandidateToBaseline()

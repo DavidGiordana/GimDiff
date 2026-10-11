@@ -52,10 +52,10 @@ struct SnapshotSplitSliderView: View {
                         Rectangle().frame(width: max(0, splitX))
                     }
 
-                badge(state.sideTitle(for: leading).uppercased(), alignment: .topLeading, in: proxy.size)
+                badge(state.canvas.sideTitle(for: leading).uppercased(), alignment: .topLeading, in: proxy.size)
                     .opacity(splitPosition < Self.badgeVisibilityMargin ? 0 : 1)
 
-                badge(state.sideTitle(for: trailing).uppercased(), alignment: .topTrailing, in: proxy.size)
+                badge(state.canvas.sideTitle(for: trailing).uppercased(), alignment: .topTrailing, in: proxy.size)
                     .opacity(splitPosition > 1 - Self.badgeVisibilityMargin ? 0 : 1)
 
                 Rectangle()

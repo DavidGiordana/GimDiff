@@ -111,14 +111,14 @@ extension AppState {
         }
 
         // A comparison against `HEAD` would now hold two identical images.
-        if let shown = preview?.snapshotID, snapshotIDs.contains(shown),
-           preview?.baseline?.origin == .committedVersion,
+        if let shown = canvas.preview?.snapshotID, snapshotIDs.contains(shown),
+           canvas.preview?.baseline?.origin == .committedVersion,
            let snapshot = currentProject?.suites.lazy.flatMap(\.snapshots).first(where: { $0.id == shown }) {
-            setPreview(.single(snapshot))
+            canvas.show(.single(snapshot))
         }
 
         rereadTestRunAfterDiscarding()
-        invalidateLoadedImages()
+        canvas.invalidateLoadedImages()
         refreshGitStatus()
     }
 
@@ -131,7 +131,7 @@ extension AppState {
         guard testRuns.results != nil else { return }
         discardTestRun()
         // The candidate on the canvas was a copy out of the run just discarded.
-        if case .testRunFailure = preview { closePreview() }
+        if case .testRunFailure = canvas.preview { canvas.close() }
         if sidebarSource == .testRun { refreshTestRun() }
     }
 }

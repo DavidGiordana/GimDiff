@@ -139,61 +139,61 @@ struct AppCommands: Commands {
 
             // The toolbar's comparison picker again: both write ``AppState/diffMode``, so a
             // picker over it here is the same control.
-            Picker("Comparison", selection: binding(\.diffMode)) {
+            Picker("Comparison", selection: binding(\.canvas.diffMode)) {
                 Text("Side by Side").tag(DiffMode.sideBySide)
                 Text("Split View").tag(DiffMode.curtain)
                 Text("Onion Skin").tag(DiffMode.onionSkin)
                 Text("Diff Mask").tag(DiffMode.difference)
             }
             .pickerStyle(.inline)
-            .disabled(state.preview?.isComparison != true)
+            .disabled(state.canvas.preview?.isComparison != true)
 
             // The diff mask footer's tolerance menu again. Enabled with any comparison, not
             // only under the mask: it is remembered, and set before switching to it.
-            Picker("Diff Tolerance", selection: binding(\.diffTolerance)) {
+            Picker("Diff Tolerance", selection: binding(\.canvas.diffTolerance)) {
                 ForEach(DiffTolerance.presets, id: \.self) { preset in
                     Text(preset.title).tag(preset)
                 }
             }
-            .disabled(state.preview?.isComparison != true)
+            .disabled(state.canvas.preview?.isComparison != true)
 
             Divider()
 
             // The footer controls of each pane, applied to every pane on screen at once.
             // ⌘0 is Collapse Sidebar's, so resetting the zoom goes without a shortcut.
             Menu("Image Size") {
-                Button("Fit") { state.requestCanvasView(.fit) }
-                Button("Actual Size (1:1)") { state.requestCanvasView(.actualSize) }
-                Button("Free") { state.requestCanvasView(.free) }
+                Button("Fit") { state.canvas.requestView(.fit) }
+                Button("Actual Size (1:1)") { state.canvas.requestView(.actualSize) }
+                Button("Free") { state.canvas.requestView(.free) }
             }
-            .disabled(!state.canvasHasZoomableImages)
+            .disabled(!state.canvas.hasZoomableImages)
 
-            Button("Zoom In") { state.requestCanvasView(.zoomIn) }
+            Button("Zoom In") { state.canvas.requestView(.zoomIn) }
                 .keyboardShortcut("=", modifiers: .command)
-                .disabled(!state.canvasHasZoomableImages)
-            Button("Zoom Out") { state.requestCanvasView(.zoomOut) }
+                .disabled(!state.canvas.hasZoomableImages)
+            Button("Zoom Out") { state.canvas.requestView(.zoomOut) }
                 .keyboardShortcut("-", modifiers: .command)
-                .disabled(!state.canvasHasZoomableImages)
-            Button("Centre and Reset Zoom") { state.requestCanvasView(.resetZoom) }
-                .disabled(!state.canvasHasZoomableImages)
+                .disabled(!state.canvas.hasZoomableImages)
+            Button("Centre and Reset Zoom") { state.canvas.requestView(.resetZoom) }
+                .disabled(!state.canvas.hasZoomableImages)
 
             // The link button in each side-by-side pane's footer.
-            Toggle("Link Panes", isOn: binding(\.linksPanes))
-                .disabled(state.preview?.isComparison != true || state.diffMode != .sideBySide)
+            Toggle("Link Panes", isOn: binding(\.canvas.linksPanes))
+                .disabled(state.canvas.preview?.isComparison != true || state.canvas.diffMode != .sideBySide)
 
             // The onion skin's slider, at the three places worth going to by name.
             Menu("Onion Skin") {
                 Button("\(onionSideTitle(.baseline)) Only") {
-                    state.requestCanvasView(.fadeOnionSkin(to: 0))
+                    state.canvas.requestView(.fadeOnionSkin(to: 0))
                 }
                 Button("Both Equally") {
-                    state.requestCanvasView(.fadeOnionSkin(to: OnionSkinView.defaultOpacity))
+                    state.canvas.requestView(.fadeOnionSkin(to: OnionSkinView.defaultOpacity))
                 }
                 Button("\(onionSideTitle(.candidate)) Only") {
-                    state.requestCanvasView(.fadeOnionSkin(to: 1))
+                    state.canvas.requestView(.fadeOnionSkin(to: 1))
                 }
             }
-            .disabled(!state.canvasShowsOnionSkin)
+            .disabled(!state.canvas.showsOnionSkin)
 
             Divider()
 
@@ -295,7 +295,7 @@ struct AppCommands: Commands {
             Divider()
 
             // The same two choices the bar under the canvas offers, in the same words.
-            if state.looseRolesAreUnknown {
+            if state.canvas.looseRolesAreUnknown {
                 Button("Keep Left") {
                     state.keepLeft()
                 }
@@ -303,7 +303,7 @@ struct AppCommands: Commands {
                 Button("Keep Right") {
                     state.keepRight()
                 }
-            } else if state.preview?.isLoosePair == true {
+            } else if state.canvas.preview?.isLoosePair == true {
                 Button("Keep Baseline") {
                     state.keepBaseline()
                 }
@@ -344,19 +344,19 @@ struct AppCommands: Commands {
             Divider()
 
             // Each pane header's close button.
-            if state.preview?.isComparison == true, let panes = state.preview?.panes {
+            if state.canvas.preview?.isComparison == true, let panes = state.canvas.preview?.panes {
                 ForEach(panes) { pane in
-                    Button("Close \(state.sideTitle(for: pane))") {
+                    Button("Close \(state.canvas.sideTitle(for: pane))") {
                         state.closePane(pane.role)
                     }
                 }
             }
 
             Button("Clear Canvas") {
-                state.closePreview()
+                state.canvas.close()
             }
             .keyboardShortcut("l", modifiers: .command)
-            .disabled(state.preview == nil)
+            .disabled(state.canvas.preview == nil)
 
             Divider()
 
@@ -410,7 +410,7 @@ struct AppCommands: Commands {
     /// The image in the candidate pane, switched through ``AppState/selectTestRunCandidate(_:)``.
     private var testRunCandidate: Binding<URL?> {
         Binding(
-            get: { state.preview?.candidate?.fileURL },
+            get: { state.canvas.preview?.candidate?.fileURL },
             set: { url in
                 guard let candidate = state.testRunCandidatesOnScreen.first(where: { $0.fileURL == url })
                 else { return }
@@ -421,10 +421,10 @@ struct AppCommands: Commands {
 
     /// What the onion skin calls one side, which is its position when the roles are unknown.
     private func onionSideTitle(_ role: SnapshotPane.Role) -> String {
-        guard let pane = state.preview?.panes.first(where: { $0.role == role }) else {
+        guard let pane = state.canvas.preview?.panes.first(where: { $0.role == role }) else {
             return role == .baseline ? "Baseline" : "Candidate"
         }
-        return state.sideTitle(for: pane)
+        return state.canvas.sideTitle(for: pane)
     }
 
     /// No colour, then the toolbar's presets in the same order.

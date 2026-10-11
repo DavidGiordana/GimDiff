@@ -56,7 +56,7 @@ struct MenuActionsTests {
 
         fixture.state.showSelectedSnapshot(withGitDiff: false)
 
-        #expect(fixture.state.preview?.snapshotID == fixture.state.selectedSnapshot?.id)
+        #expect(fixture.state.canvas.preview?.snapshotID == fixture.state.selectedSnapshot?.id)
         #expect(fixture.state.isShowingSelectedSnapshot)
     }
 
@@ -67,7 +67,7 @@ struct MenuActionsTests {
 
         fixture.state.showSelectedSnapshot(withGitDiff: true)
 
-        #expect(fixture.state.preview == nil)
+        #expect(fixture.state.canvas.preview == nil)
     }
 
     @Test("The project view names the show actions after the Git diff")
@@ -85,22 +85,22 @@ struct MenuActionsTests {
         let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
         fixture.expand("AlphaTests")
         fixture.select("AlphaTests/footer")
-        #expect(fixture.state.canvasHasZoomableImages == false)
+        #expect(fixture.state.canvas.hasZoomableImages == false)
 
         fixture.state.showSelectedSnapshot(withGitDiff: false)
 
-        #expect(fixture.state.canvasHasZoomableImages)
-        #expect(fixture.state.canvasShowsOnionSkin == false)
+        #expect(fixture.state.canvas.hasZoomableImages)
+        #expect(fixture.state.canvas.showsOnionSkin == false)
     }
 
     @Test("Repeating a canvas command is still a new request")
     func canvasRequestsAreNumbered() throws {
         let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
 
-        fixture.state.requestCanvasView(.zoomIn)
-        let first = try #require(fixture.state.canvasViewRequest)
-        fixture.state.requestCanvasView(.zoomIn)
-        let second = try #require(fixture.state.canvasViewRequest)
+        fixture.state.canvas.requestView(.zoomIn)
+        let first = try #require(fixture.state.canvas.viewRequest)
+        fixture.state.canvas.requestView(.zoomIn)
+        let second = try #require(fixture.state.canvas.viewRequest)
 
         #expect(first.command == .zoomIn)
         #expect(second.command == .zoomIn)

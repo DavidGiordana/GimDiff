@@ -32,7 +32,7 @@ struct CanvasDiffTests {
             imageDiff: imageDiff,
             defaults: defaults.defaults
         )
-        state.showComparison(reference: Self.baselineURL, failure: Self.candidateURL)
+        state.canvas.showComparison(reference: Self.baselineURL, failure: Self.candidateURL)
         return state
     }
 
@@ -43,17 +43,17 @@ struct CanvasDiffTests {
         let defaults = TemporaryDefaults()
         let state = state(imageDiff: StubImageDiffService(), defaults: defaults)
 
-        state.updateDiffReport()
-        await state.currentDiffComparison?.value
-        #expect(state.diffReport == nil)
-        #expect(state.isComputingDiff == false)
+        state.canvas.updateDiffReport()
+        await state.canvas.currentDiffComparison?.value
+        #expect(state.canvas.diffReport == nil)
+        #expect(state.canvas.isComputingDiff == false)
 
-        state.diffMode = .difference
-        state.updateDiffReport()
-        await state.currentDiffComparison?.value
+        state.canvas.diffMode = .difference
+        state.canvas.updateDiffReport()
+        await state.canvas.currentDiffComparison?.value
 
-        #expect(state.diffReport?.differentPixelCount == 100)
-        #expect(state.isComputingDiff == false)
+        #expect(state.canvas.diffReport?.differentPixelCount == 100)
+        #expect(state.canvas.isComputingDiff == false)
     }
 
     @Test("Turning the mask back off drops the measurement with it")
@@ -61,14 +61,14 @@ struct CanvasDiffTests {
         let defaults = TemporaryDefaults()
         let state = state(imageDiff: StubImageDiffService(), defaults: defaults)
 
-        state.diffMode = .difference
-        state.updateDiffReport()
-        await state.currentDiffComparison?.value
-        #expect(state.diffReport != nil)
+        state.canvas.diffMode = .difference
+        state.canvas.updateDiffReport()
+        await state.canvas.currentDiffComparison?.value
+        #expect(state.canvas.diffReport != nil)
 
-        state.diffMode = .sideBySide
-        state.updateDiffReport()
-        #expect(state.diffReport == nil)
+        state.canvas.diffMode = .sideBySide
+        state.canvas.updateDiffReport()
+        #expect(state.canvas.diffReport == nil)
     }
 
     @Test("A new preview cannot be left describing the pair before it")
@@ -76,13 +76,13 @@ struct CanvasDiffTests {
         let defaults = TemporaryDefaults()
         let state = state(imageDiff: StubImageDiffService(), defaults: defaults)
 
-        state.diffMode = .difference
-        state.updateDiffReport()
-        await state.currentDiffComparison?.value
-        #expect(state.diffReport != nil)
+        state.canvas.diffMode = .difference
+        state.canvas.updateDiffReport()
+        await state.canvas.currentDiffComparison?.value
+        #expect(state.canvas.diffReport != nil)
 
         state.openPath(Self.candidateURL)
-        #expect(state.diffReport == nil)
+        #expect(state.canvas.diffReport == nil)
     }
 
     @Test("A comparison that cannot be made reaches the error banner")
@@ -91,12 +91,12 @@ struct CanvasDiffTests {
         let diff = StubImageDiffService(failure: GimDiffError.unreadableImage(Self.candidateURL))
         let state = state(imageDiff: diff, defaults: defaults)
 
-        state.diffMode = .difference
-        state.updateDiffReport()
-        await state.currentDiffComparison?.value
+        state.canvas.diffMode = .difference
+        state.canvas.updateDiffReport()
+        await state.canvas.currentDiffComparison?.value
 
-        #expect(state.diffReport == nil)
-        #expect(state.isComputingDiff == false)
+        #expect(state.canvas.diffReport == nil)
+        #expect(state.canvas.isComputingDiff == false)
         #expect(state.lastError != nil)
     }
 

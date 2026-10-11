@@ -94,7 +94,7 @@ extension AppState {
 
         discardTestRun()
         // The candidate on the canvas was a copy out of the run just discarded.
-        if case .testRunFailure = preview { closePreview() }
+        if case .testRunFailure = canvas.preview { canvas.close() }
         if sidebarSource == .testRun {
             refreshTestRun()
         } else {
@@ -133,7 +133,7 @@ extension AppState {
         if selectedRow != nil, sidebarSource == .project { return }
 
         selectRow(withID: rows.first(where: \.isSnapshot)?.id ?? rows.first?.id)
-        if selectedRow == nil { closePreview() }
+        if selectedRow == nil { canvas.close() }
     }
 
     // MARK: - Reading
@@ -178,9 +178,9 @@ extension AppState {
         }
 
         // The canvas follows a snapshot whose standing changed, but only if it is on one.
-        guard let shownID = preview?.snapshotID else { return }
+        guard let shownID = canvas.preview?.snapshotID else { return }
         if TestRunModel.isAttachment(snapshotID: shownID) {
-            if !rows.contains(where: { $0.snapshot?.id == shownID }) { closePreview() }
+            if !rows.contains(where: { $0.snapshot?.id == shownID }) { canvas.close() }
         } else if let snapshot = projectSnapshot(withID: shownID), previewFollowsTestRun(snapshot) {
             showSnapshot(snapshot, withGitDiff: true)
         }
@@ -190,7 +190,7 @@ extension AppState {
     /// failure the run no longer has, or none where it now has one.
     private func previewFollowsTestRun(_ snapshot: SnapshotItem) -> Bool {
         let candidates = testRuns.results?.candidates(forSnapshotID: snapshot.id) ?? []
-        switch preview {
+        switch canvas.preview {
         case let .testRunFailure(pair, _, _):
             return !candidates.contains { $0.fileURL == pair.failure.url }
         case .single:
@@ -208,8 +208,8 @@ extension AppState {
     /// one of them.
     func discardTestRun() {
         guard testRuns.forgetResults() else { return }
-        if let shown = preview?.snapshotID, TestRunModel.isAttachment(snapshotID: shown) {
-            closePreview()
+        if let shown = canvas.preview?.snapshotID, TestRunModel.isAttachment(snapshotID: shown) {
+            canvas.close()
         }
     }
 
@@ -254,7 +254,7 @@ extension AppState {
 
     /// Shows `snapshot` against one of the images its test attached.
     func showTestRunCandidate(_ candidate: TestRunImage, against snapshot: SnapshotItem) {
-        setPreview(.testRunFailure(
+        canvas.show(.testRunFailure(
             SnapshotPair(reference: snapshot.fileURL, failure: candidate.fileURL),
             snapshotID: snapshot.id,
             title: snapshot.displayName
@@ -264,14 +264,14 @@ extension AppState {
     /// Every image the snapshot on screen was attached with, for the candidate pane to
     /// switch between.
     var testRunCandidatesOnScreen: [TestRunImage] {
-        guard case let .testRunFailure(_, snapshotID, _) = preview else { return [] }
+        guard case let .testRunFailure(_, snapshotID, _) = canvas.preview else { return [] }
         return testRuns.results?.candidates(forSnapshotID: snapshotID) ?? []
     }
 
     /// Puts another of the attached images in the candidate pane.
     func selectTestRunCandidate(_ candidate: TestRunImage) {
-        guard case let .testRunFailure(pair, snapshotID, title) = preview else { return }
-        setPreview(.testRunFailure(
+        guard case let .testRunFailure(pair, snapshotID, title) = canvas.preview else { return }
+        canvas.show(.testRunFailure(
             SnapshotPair(reference: pair.reference.url, failure: candidate.fileURL),
             snapshotID: snapshotID,
             title: title
@@ -299,11 +299,11 @@ extension AppState {
 
         // The canvas must not stay on the failure just settled: its candidate is a copy in
         // the run's scratch folder, which is deleted once the run has nothing left to show.
-        guard case let .testRunFailure(_, shownID, _) = preview, snapshotIDs.contains(shownID) else { return }
+        guard case let .testRunFailure(_, shownID, _) = canvas.preview, snapshotIDs.contains(shownID) else { return }
         if !isShowingTestRunPlaceholder, let snapshot = projectSnapshot(withID: shownID) {
-            setPreview(.single(snapshot))
+            canvas.show(.single(snapshot))
         } else {
-            closePreview()
+            canvas.close()
         }
     }
 }

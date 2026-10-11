@@ -137,14 +137,14 @@ extension AppState {
         // Only the images on screen are read again, and only when they are among the ones
         // rewritten: a run that re-records five hundred snapshots should not redraw the
         // one being looked at five hundred times.
-        let isShowingRewrittenImage = preview?.panes.contains { pane in
+        let isShowingRewrittenImage = canvas.preview?.panes.contains { pane in
             pane.isWritable
                 && change.rewrittenSnapshotPaths.contains(pane.fileURL.standardizedFileURL.path)
         } ?? false
         guard isShowingRewrittenImage else { return }
 
-        invalidateLoadedImages()
-        updateDiffReport()
+        canvas.invalidateLoadedImages()
+        canvas.updateDiffReport()
     }
 
     /// Scans the open project again and merges the result in, without the loading state.

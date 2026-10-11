@@ -38,8 +38,8 @@ struct DiffMaskView: View {
 
     private var tolerance: Binding<DiffTolerance> {
         Binding(
-            get: { state.diffTolerance },
-            set: { state.diffTolerance = $0 }
+            get: { state.canvas.diffTolerance },
+            set: { state.canvas.diffTolerance = $0 }
         )
     }
 }

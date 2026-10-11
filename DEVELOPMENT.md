@@ -190,7 +190,7 @@ that, a file inside the open project when the other is outside it. That evidence
 log's labels, which are read out of prose. When neither applies and the source labelled
 nothing — a drop, an unmarked log — `looseRoleCertainty` is `.unknown`, and **nothing on
 screen may call either image the baseline**: every side label goes through
-`AppState.sideTitle(for:)`, which answers *Left* and *Right*, and the bar offers
+`CanvasModel.sideTitle(for:)`, which answers *Left* and *Right*, and the bar offers
 `keepLeft()` / `keepRight()`, which copy the kept image over the other because either may be
 the recorded file. A `gimdiff://compare` URL names its sides and is taken at its word.
 
@@ -224,13 +224,20 @@ Three more rules that are easy to undo by accident:
   own, which is what makes the modes mutually exclusive without any code saying so.
 - **Images are read by `SnapshotImageLoader`, never by `AsyncImage`.** `AsyncImage` caches on
   the URL, and GimDiff's whole job is a file whose name stays put while its contents change.
-  `AppState.imageReloadToken` is the counter that says the bytes moved; every view that
+  `CanvasModel.imageReloadToken` is the counter that says the bytes moved; every view that
   decodes an image keys its `task(id:)` on it.
 - **The View menu reaches the canvas's own controls through requests.** Display mode, zoom,
   and the onion skin's fade are each view's `@State`, so the menu posts a
-  `CanvasViewCommand` through `AppState.requestCanvasView(_:)` and every view on screen
-  carries out `canvasViewRequest`. The two canvas colours stay out of `AppState` and reach
+  `CanvasViewCommand` through `CanvasModel.requestView(_:)` and every view on screen
+  carries out `viewRequest`. The two canvas colours stay out of `AppState` and reach
   the menu as the `canvasBackdrop` focused scene value.
+
+The canvas's state lives in `CanvasModel` (`AppState.canvas`): the preview, `diffMode`, the
+diff report and tolerance, Link Panes, the loose pair's side certainty, the reload token, and
+View menu requests, along with the work that belongs to them — measuring the mask, extracting
+a committed version, deciding a dropped pair's sides. Which image a selected row puts on
+screen stays in `AppState.showSnapshot(_:withGitDiff:)`, because that depends on the tree, the
+test run, and the pull request; the model is handed the choice.
 
 `⌘R` refreshes the images on screen and `⇧⌘R` rescans the project, rather than the other way
 round: a snapshot is looked at far more often than a folder is walked again.
