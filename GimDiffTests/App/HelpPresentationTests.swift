@@ -28,7 +28,8 @@ struct HelpPresentationTests {
     @Test("Help does not open over the Open PR sheet")
     func yieldsToThePullRequestSheet() {
         let fixture = AppStateFixture()
-        fixture.state.isPullRequestSheetPresented = true
+        fixture.state.presentPullRequestSheet()
+        #expect(fixture.state.pullRequestReview.isSheetPresented)
 
         fixture.state.presentHelp()
 
@@ -43,7 +44,7 @@ struct HelpPresentationTests {
         fixture.state.presentPullRequestSheet()
 
         #expect(fixture.state.isHelpPresented == false)
-        #expect(fixture.state.isPullRequestSheetPresented)
+        #expect(fixture.state.pullRequestReview.isSheetPresented)
     }
 
     @Test("Every topic has something to read")

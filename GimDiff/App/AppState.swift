@@ -107,14 +107,9 @@ final class AppState {
 
     // MARK: - Pull request review
 
-    /// The pull request the sidebar is showing in place of a project, if any.
-    private(set) var pullRequestSession: PRReviewSession?
-    /// Whether the Open PR sheet is up.
-    ///
-    /// Every route into a review — the menu, a paste, a `gimdiff://open-pr` URL — goes
-    /// through the sheet, so a fetch that takes a while has one place to show progress and
-    /// a failure has one place to be read.
-    var isPullRequestSheetPresented = false
+    /// The pull request under review, and the sheet that fetches it. What a review does to
+    /// the tree is decided here, below.
+    let pullRequestReview: PullRequestReviewModel
     /// Whether the help sheet is up.
     ///
     /// The window holds one sheet at a time, so the Open PR sheet takes precedence: a pull
@@ -124,14 +119,6 @@ final class AppState {
     var isConfirmingAcceptAllTestRunFailures = false
     /// Whether the window is asking before every changed snapshot of the project is restored.
     var isConfirmingDiscardAllGitChanges = false
-    /// What the sheet's field holds: a link, `owner/repo#123`, or a number.
-    var pullRequestInput = ""
-    private(set) var isFetchingPullRequest = false
-    /// Why the last fetch failed, shown in the sheet rather than on the window's banner.
-    private(set) var pullRequestError: String?
-    /// The project the review replaced, put back when the review closes.
-    private var projectBeforePullRequest: ProjectBundle?
-    private var pullRequestTask: Task<Void, Never>?
 
     // MARK: - Test run
 
@@ -151,8 +138,6 @@ final class AppState {
     private let ingestion: any IngestionService
     private let clipboard: ClipboardService
     private let workspace: WorkspaceService
-    private let pullRequests: any GitHubPRService
-    private let pullRequestResolver: GitHubPRReferenceResolver
     private let defaults: UserDefaults
     private var scanTask: Task<Void, Never>?
     private var gitDiffTask: Task<Void, Never>?
@@ -198,12 +183,15 @@ final class AppState {
         self.ingestion = ingestion
         self.clipboard = clipboard
         self.workspace = workspace
-        self.pullRequests = pullRequests ?? DefaultGitHubPRService(
-            http: URLSessionHTTPClient(),
-            tokens: GitHubTokenResolver(),
+        pullRequestReview = PullRequestReviewModel(
+            service: pullRequests ?? DefaultGitHubPRService(
+                http: URLSessionHTTPClient(),
+                tokens: GitHubTokenResolver(),
+                filesystem: filesystem
+            ),
+            resolver: GitHubPRReferenceResolver(gitService: git),
             filesystem: filesystem
         )
-        pullRequestResolver = GitHubPRReferenceResolver(gitService: git)
         testRuns = TestRunModel(
             reader: testResults ?? XcresultReader(runner: SystemCommandRunner(), filesystem: filesystem),
             locator: testResultLocator,
@@ -213,6 +201,7 @@ final class AppState {
         recentProjects = Self.loadRecentProjects(from: defaults)
         diffTolerance = DiffTolerance(maximumDeltaE: defaults.double(forKey: Self.diffToleranceKey))
         linksPanes = defaults.bool(forKey: Self.linksPanesKey)
+        pullRequestReview.reportError = { [weak self] error in self?.report(error) }
     }
 
     deinit {
@@ -281,7 +270,7 @@ final class AppState {
 
         // Opening a project is a way out of a review as much as closing it is; the project
         // the review replaced is not coming back, because the user just chose another.
-        abandonPullRequestReview()
+        pullRequestReview.abandon()
 
         // A newer open supersedes the one in flight: scanning a large repository takes long
         // enough that two overlapping scans would race to publish their results.
@@ -315,7 +304,7 @@ final class AppState {
     /// Under review, the pull request is fetched again instead: new commits are what would
     /// have changed, and there is no folder of GimDiff's own worth rescanning.
     func reload() {
-        if let session = pullRequestSession {
+        if let session = pullRequestReview.session {
             openPullRequest(session.reference.webURL.absoluteString)
             return
         }
@@ -329,7 +318,7 @@ final class AppState {
     /// than a way to forget where the project was.
     func closeProject() {
         forgetFileUndo()
-        abandonPullRequestReview()
+        pullRequestReview.abandon()
         scanTask?.cancel()
         stopWatching()
         discardTestRun()
@@ -774,7 +763,7 @@ final class AppState {
     func showSnapshot(_ snapshot: SnapshotItem, withGitDiff: Bool) {
         gitDiffTask?.cancel()
 
-        if let change = pullRequestSession?.changes[snapshot.id] {
+        if let change = pullRequestReview.change(forSnapshotID: snapshot.id) {
             showPullRequestChange(change, of: snapshot, withBaseline: withGitDiff)
             return
         }
@@ -1267,31 +1256,19 @@ final class AppState {
     // MARK: - Pull request review
 
     /// Whether the sidebar is showing a pull request rather than a project on disk.
-    var isReviewingPullRequest: Bool { pullRequestSession != nil }
-
-    /// What the pull request under review does to a snapshot, or `nil` outside a review.
-    func pullRequestChange(forSnapshotID id: String?) -> PRSnapshotChange? {
-        guard let id else { return nil }
-        return pullRequestSession?.changes[id]
-    }
+    var isReviewingPullRequest: Bool { pullRequestReview.isReviewing }
 
     /// ⌘⇧O: raises the Open PR sheet, filled in from the clipboard when it holds a link.
     func presentPullRequestSheet() {
-        if !isFetchingPullRequest {
-            pullRequestError = nil
-            if pullRequestInput.isEmpty,
-               let text = clipboard.string(),
-               let reference = ingestion.parsePullRequest(text) {
-                pullRequestInput = reference.webURL.absoluteString
-            }
+        pullRequestReview.presentSheet { [clipboard, ingestion] in
+            clipboard.string().flatMap(ingestion.parsePullRequest)?.webURL.absoluteString
         }
         isHelpPresented = false
-        isPullRequestSheetPresented = true
     }
 
     /// ⌘?: raises the help sheet, unless the Open PR sheet already covers the window.
     func presentHelp() {
-        guard !isPullRequestSheetPresented else { return }
+        guard !pullRequestReview.isSheetPresented else { return }
         isHelpPresented = true
     }
 
@@ -1301,57 +1278,23 @@ final class AppState {
 
     /// Puts the sheet away, abandoning a fetch still in flight.
     func dismissPullRequestSheet() {
-        pullRequestTask?.cancel()
-        pullRequestTask = nil
-        isFetchingPullRequest = false
-        pullRequestError = nil
-        isPullRequestSheetPresented = false
+        pullRequestReview.dismissSheet()
     }
 
     /// Fetches the pull request `input` names and, once its snapshots are downloaded,
     /// shows them in place of the open project.
     func openPullRequest(_ input: String) {
-        pullRequestInput = input
-        pullRequestError = nil
         isHelpPresented = false
-        isPullRequestSheetPresented = true
-
-        pullRequestTask?.cancel()
-        isFetchingPullRequest = true
-
-        let root = currentProject?.gitRootURL
-        let preferred = pullRequestSession?.reference.repository
-        pullRequestTask = Task { [pullRequests, pullRequestResolver] in
-            do {
-                let reference = try await pullRequestResolver.reference(
-                    for: input,
-                    repositoryRoot: root,
-                    preferredRepository: preferred
-                )
-                let session = try await pullRequests.fetchPRSession(reference: reference)
-                guard !Task.isCancelled else {
-                    discardFiles(of: session)
-                    return
-                }
-                beginPullRequestReview(session)
-            } catch {
-                // A cancelled download reports itself as a `URLError`, not as a
-                // `CancellationError`, so the task is asked rather than the error.
-                guard !Task.isCancelled else { return }
-                isFetchingPullRequest = false
-                pullRequestError = error.localizedDescription
-            }
+        pullRequestReview.fetch(input, repositoryRoot: currentProject?.gitRootURL) { [weak self] session in
+            self?.beginPullRequestReview(session)
         }
     }
 
-    /// The fetch in flight, if any, so a caller can wait for it.
-    var currentPullRequestFetch: Task<Void, Never>? { pullRequestTask }
-
     /// Ends the review, deleting what it downloaded, and puts back the project it replaced.
     func closePullRequestReview() {
-        guard pullRequestSession != nil else { return }
-        let previous = projectBeforePullRequest
-        abandonPullRequestReview()
+        guard pullRequestReview.isReviewing else { return }
+        let previous = pullRequestReview.projectBeforeReview
+        pullRequestReview.abandon()
         clearFilters()
 
         guard let previous else {
@@ -1363,26 +1306,11 @@ final class AppState {
         refreshGitStatus()
     }
 
-    /// Deletes the downloaded snapshots of the review in progress, for the app to call on
-    /// its way out.
-    func discardPullRequestFiles() {
-        pullRequestTask?.cancel()
-        guard let session = pullRequestSession else { return }
-        discardFiles(of: session)
-    }
-
     private func beginPullRequestReview(_ session: PRReviewSession) {
-        if let current = pullRequestSession {
-            // A second review replaces the first, but the project behind both stays the one
-            // to go back to.
-            discardFiles(of: current)
-        } else {
-            projectBeforePullRequest = currentProject
-        }
+        pullRequestReview.begin(session, replacing: currentProject)
 
         scanTask?.cancel()
         clearFilters()
-        pullRequestSession = session
         load(ProjectBundle(rootURL: session.tempDirectoryURL, suites: session.suites))
         // A pull request is read to see what it changed, so every change starts on show.
         expandedSuiteIDs = Set(session.suites.map(\.id))
@@ -1390,29 +1318,7 @@ final class AppState {
         // something to show the moment the sheet goes away.
         selectRow(withID: visibleRows.first(where: \.isSnapshot)?.id ?? visibleRows.first?.id)
 
-        isFetchingPullRequest = false
-        isPullRequestSheetPresented = false
-        pullRequestInput = ""
-    }
-
-    /// Leaves the review without restoring anything, for a caller about to replace it.
-    private func abandonPullRequestReview() {
-        pullRequestTask?.cancel()
-        pullRequestTask = nil
-        isFetchingPullRequest = false
-        guard let session = pullRequestSession else { return }
-        discardFiles(of: session)
-        pullRequestSession = nil
-        projectBeforePullRequest = nil
-    }
-
-    private func discardFiles(of session: PRReviewSession) {
-        guard filesystem.fileExists(at: session.tempDirectoryURL) else { return }
-        do {
-            try filesystem.removeItem(at: session.tempDirectoryURL)
-        } catch {
-            lastError = error.localizedDescription
-        }
+        pullRequestReview.finishFetch()
     }
 
     // MARK: - Paths

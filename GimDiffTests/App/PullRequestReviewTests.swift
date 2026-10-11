@@ -25,14 +25,14 @@ struct PullRequestReviewTests {
 
         await fixture.open("https://github.com/octo/app/pull/7")
 
-        let session = try #require(fixture.state.pullRequestSession)
+        let session = try #require(fixture.state.pullRequestReview.session)
         #expect(session.id == "octo/app#7")
         #expect(fixture.state.isReviewingPullRequest)
         #expect(fixture.state.currentProject?.suites.map(\.name) == ["HomeTests", "LoginTests"])
         #expect(fixture.state.visibleRows.count == 4)
-        #expect(!fixture.state.isPullRequestSheetPresented)
-        #expect(!fixture.state.isFetchingPullRequest)
-        #expect(fixture.state.pullRequestInput.isEmpty)
+        #expect(!fixture.state.pullRequestReview.isSheetPresented)
+        #expect(!fixture.state.pullRequestReview.isFetching)
+        #expect(fixture.state.pullRequestReview.input.isEmpty)
         #expect(fixture.service.requested == [Self.reference])
     }
 
@@ -56,10 +56,10 @@ struct PullRequestReviewTests {
 
         await fixture.open("https://github.com/octo/app/pull/7")
 
-        #expect(fixture.state.isPullRequestSheetPresented)
-        #expect(!fixture.state.isFetchingPullRequest)
-        #expect(fixture.state.pullRequestError == "Please run 'gh auth login' in terminal to review GitHub PRs")
-        #expect(fixture.state.pullRequestSession == nil)
+        #expect(fixture.state.pullRequestReview.isSheetPresented)
+        #expect(!fixture.state.pullRequestReview.isFetching)
+        #expect(fixture.state.pullRequestReview.error == "Please run 'gh auth login' in terminal to review GitHub PRs")
+        #expect(fixture.state.pullRequestReview.session == nil)
         #expect(fixture.state.currentProject == project)
     }
 
@@ -69,7 +69,7 @@ struct PullRequestReviewTests {
 
         await fixture.open("not a pull request")
 
-        #expect(fixture.state.pullRequestError != nil)
+        #expect(fixture.state.pullRequestReview.error != nil)
         #expect(fixture.service.requested.isEmpty)
     }
 
@@ -92,7 +92,7 @@ struct PullRequestReviewTests {
         let url = try #require(URL(string: "gimdiff://open-pr?url=https://github.com/octo/app/pull/7"))
 
         fixture.state.handle(url)
-        await fixture.state.currentPullRequestFetch?.value
+        await fixture.state.pullRequestReview.currentFetch?.value
 
         #expect(fixture.state.isReviewingPullRequest)
     }
@@ -104,7 +104,7 @@ struct PullRequestReviewTests {
         fixture.pasteboard.setString("please review https://github.com/octo/app/pull/7", forType: .string)
 
         fixture.state.pasteFromClipboard()
-        await fixture.state.currentPullRequestFetch?.value
+        await fixture.state.pullRequestReview.currentFetch?.value
 
         #expect(fixture.service.requested == [Self.reference])
         #expect(fixture.state.isReviewingPullRequest)
@@ -118,8 +118,8 @@ struct PullRequestReviewTests {
 
         fixture.state.presentPullRequestSheet()
 
-        #expect(fixture.state.isPullRequestSheetPresented)
-        #expect(fixture.state.pullRequestInput == "https://github.com/octo/app/pull/7")
+        #expect(fixture.state.pullRequestReview.isSheetPresented)
+        #expect(fixture.state.pullRequestReview.input == "https://github.com/octo/app/pull/7")
     }
 
     // MARK: - Canvas
@@ -128,7 +128,7 @@ struct PullRequestReviewTests {
     func showsReadOnlyComparison() async throws {
         let fixture = Fixture()
         await fixture.open("https://github.com/octo/app/pull/7")
-        let session = try #require(fixture.state.pullRequestSession)
+        let session = try #require(fixture.state.pullRequestReview.session)
         let change = try #require(session.changes[Self.snapshotPath])
 
         fixture.selectSnapshot(Self.snapshotPath)
@@ -176,10 +176,10 @@ struct PullRequestReviewTests {
         let fixture = Fixture(result: .success(.mixed))
         await fixture.open("https://github.com/octo/app/pull/7")
 
-        #expect(fixture.state.pullRequestChange(forSnapshotID: "Tests/Snapshots/HomeTests/testAdded.png")?.kind == .added)
-        #expect(fixture.state.pullRequestChange(forSnapshotID: "Tests/Snapshots/HomeTests/testGone.png")?.kind == .removed)
-        #expect(fixture.state.pullRequestChange(forSnapshotID: "Tests/Snapshots/HomeTests/testHome.png")?.kind == .modified)
-        #expect(fixture.state.pullRequestChange(forSnapshotID: nil) == nil)
+        #expect(fixture.state.pullRequestReview.change(forSnapshotID: "Tests/Snapshots/HomeTests/testAdded.png")?.kind == .added)
+        #expect(fixture.state.pullRequestReview.change(forSnapshotID: "Tests/Snapshots/HomeTests/testGone.png")?.kind == .removed)
+        #expect(fixture.state.pullRequestReview.change(forSnapshotID: "Tests/Snapshots/HomeTests/testHome.png")?.kind == .modified)
+        #expect(fixture.state.pullRequestReview.change(forSnapshotID: nil) == nil)
         #expect(PRSnapshotChange.Kind.removed.title == "Deleted")
     }
 
@@ -218,7 +218,7 @@ struct PullRequestReviewTests {
     func showsHeadOnly() async throws {
         let fixture = Fixture()
         await fixture.open("https://github.com/octo/app/pull/7")
-        let snapshot = try #require(fixture.state.pullRequestSession?.suites.first?.snapshots.first)
+        let snapshot = try #require(fixture.state.pullRequestReview.session?.suites.first?.snapshots.first)
 
         fixture.state.showSnapshot(snapshot, withGitDiff: false)
 
@@ -239,7 +239,7 @@ struct PullRequestReviewTests {
         #expect(preview.panes.map(\.role) == [.baseline])
         #expect(preview.baseline?.origin == .pullRequest)
         #expect(preview.snapshotID == Self.snapshotPath)
-        #expect(fixture.state.pullRequestChange(forSnapshotID: preview.snapshotID)?.kind == .modified)
+        #expect(fixture.state.pullRequestReview.change(forSnapshotID: preview.snapshotID)?.kind == .modified)
     }
 
     // MARK: - Closing
@@ -250,11 +250,11 @@ struct PullRequestReviewTests {
         let project = AppStateFixture.twoSuites()
         fixture.state.load(project)
         await fixture.open("https://github.com/octo/app/pull/7")
-        let session = try #require(fixture.state.pullRequestSession)
+        let session = try #require(fixture.state.pullRequestReview.session)
 
         fixture.state.closePullRequestReview()
 
-        #expect(fixture.state.pullRequestSession == nil)
+        #expect(fixture.state.pullRequestReview.session == nil)
         #expect(fixture.state.currentProject == project)
         #expect(fixture.filesystem.removedPaths == [session.tempDirectoryURL.path])
         #expect(!fixture.filesystem.fileExists(at: session.tempDirectoryURL))
@@ -293,10 +293,10 @@ struct PullRequestReviewTests {
         let project = AppStateFixture.twoSuites()
         fixture.state.load(project)
         await fixture.open("https://github.com/octo/app/pull/7")
-        let first = try #require(fixture.state.pullRequestSession)
+        let first = try #require(fixture.state.pullRequestReview.session)
 
         await fixture.open("https://github.com/octo/app/pull/7")
-        let second = try #require(fixture.state.pullRequestSession)
+        let second = try #require(fixture.state.pullRequestReview.session)
         #expect(first.tempDirectoryURL != second.tempDirectoryURL)
         #expect(fixture.filesystem.removedPaths == [first.tempDirectoryURL.path])
 
@@ -308,11 +308,11 @@ struct PullRequestReviewTests {
     func openingProjectEndsReview() async throws {
         let fixture = Fixture()
         await fixture.open("https://github.com/octo/app/pull/7")
-        let session = try #require(fixture.state.pullRequestSession)
+        let session = try #require(fixture.state.pullRequestReview.session)
 
         fixture.state.closeProject()
 
-        #expect(fixture.state.pullRequestSession == nil)
+        #expect(fixture.state.pullRequestReview.session == nil)
         #expect(fixture.state.currentProject == nil)
         #expect(fixture.filesystem.removedPaths == [session.tempDirectoryURL.path])
     }
@@ -321,9 +321,9 @@ struct PullRequestReviewTests {
     func terminationDiscardsFiles() async throws {
         let fixture = Fixture()
         await fixture.open("https://github.com/octo/app/pull/7")
-        let session = try #require(fixture.state.pullRequestSession)
+        let session = try #require(fixture.state.pullRequestReview.session)
 
-        fixture.state.discardPullRequestFiles()
+        fixture.state.pullRequestReview.discardFiles()
 
         #expect(!fixture.filesystem.fileExists(at: session.tempDirectoryURL))
     }
@@ -335,7 +335,7 @@ struct PullRequestReviewTests {
         await fixture.open("https://github.com/octo/app/pull/7")
 
         #expect(fixture.state.isReviewingPullRequest)
-        #expect(fixture.state.pullRequestSession?.suites.isEmpty == true)
+        #expect(fixture.state.pullRequestReview.session?.suites.isEmpty == true)
         #expect(fixture.state.visibleRows.isEmpty)
     }
 }
@@ -378,7 +378,7 @@ private struct Fixture {
 
     func open(_ input: String) async {
         state.openPullRequest(input)
-        await state.currentPullRequestFetch?.value
+        await state.pullRequestReview.currentFetch?.value
     }
 
     func selectSnapshot(_ path: String) {

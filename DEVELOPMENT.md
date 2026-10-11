@@ -304,6 +304,11 @@ GimDiff can review the snapshots a GitHub pull request changes without checking 
 of every changed image under `Snapshots/` or `__Snapshots__/` into a scratch folder; the
 review then stands in for the open project until it is closed.
 
+The review lives in `PullRequestReviewModel` (`AppState.pullRequestReview`): the session,
+the Open PR sheet's state, the fetch, and the project the review replaced. A fetch hands
+its session back to `AppState`, which loads it into the tree, and `closePullRequestReview()`
+puts the project back — the model never touches the window.
+
 - **Authentication is borrowed, never stored.** `GitHubTokenResolver` runs
   `/usr/bin/env PATH=… gh auth token --hostname github.com`. The `PATH` assignment matters:
   an app launched from the Finder inherits launchd's search path, which has no Homebrew in

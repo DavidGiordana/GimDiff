@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// A pull request's downloaded snapshots, and the images copied out of a test run, are
     /// the session's alone; nothing reopens them.
     func applicationWillTerminate(_ notification: Notification) {
-        state.discardPullRequestFiles()
+        state.pullRequestReview.discardFiles()
         state.testRuns.discardFiles()
     }
 

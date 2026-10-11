@@ -29,7 +29,7 @@ struct SnapshotTreeView: View {
             // happens to be last: the filter bar is hidden while a run is read, and the
             // divider would otherwise close up under the run picker.
             VStack(spacing: 0) {
-                if let session = state.pullRequestSession {
+                if let session = state.pullRequestReview.session {
                     PullRequestHeader(session: session, close: state.closePullRequestReview)
                         .padding(.horizontal, 10)
                         .padding(.top, 8)
@@ -65,7 +65,7 @@ struct SnapshotTreeView: View {
                 ProgressView("Scanning…")
                     .controlSize(.small)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let session = state.pullRequestSession, session.suites.isEmpty {
+            } else if let session = state.pullRequestReview.session, session.suites.isEmpty {
                 SidebarEmptyStateView.noSnapshotChanges(
                     prNumber: session.prNumber,
                     close: state.closePullRequestReview
@@ -441,7 +441,7 @@ private struct TreeRowView: View {
 
             Spacer(minLength: 0)
 
-            if let change = state.pullRequestChange(forSnapshotID: snapshot.id) {
+            if let change = state.pullRequestReview.change(forSnapshotID: snapshot.id) {
                 ChangeKindBadge(kind: change.kind)
             } else {
                 if state.sidebarSource == .testRun, state.testRuns.results?.isFailing(snapshotID: snapshot.id) == true {

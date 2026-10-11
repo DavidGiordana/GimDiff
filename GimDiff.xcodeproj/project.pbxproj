@@ -50,6 +50,7 @@
 				"App/AppState+Undo.swift",
 				"App/AppState+Watching.swift",
 				App/GimDiffApp.swift,
+				App/PullRequestReviewModel.swift,
 				App/SnapshotPreview.swift,
 				App/TestRunModel.swift,
 				"Extensions/Color+Hex.swift",

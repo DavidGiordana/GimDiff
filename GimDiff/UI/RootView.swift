@@ -128,7 +128,7 @@ struct RootView: View {
     /// the fetch the sheet was showing.
     private var pullRequestSheet: Binding<Bool> {
         Binding(
-            get: { state.isPullRequestSheetPresented },
+            get: { state.pullRequestReview.isSheetPresented },
             set: { isPresented in
                 if !isPresented { state.dismissPullRequestSheet() }
             }

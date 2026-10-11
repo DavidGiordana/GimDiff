@@ -249,7 +249,7 @@ struct SnapshotPaneHeader: View {
             }
 
             // Once per preview rather than once per pane: both panes are the same change.
-            if let change = state.pullRequestChange(forSnapshotID: state.preview?.snapshotID),
+            if let change = state.pullRequestReview.change(forSnapshotID: state.preview?.snapshotID),
                pane.id == state.preview?.panes.first?.id {
                 ChangeKindBadge(kind: change.kind)
             }

@@ -20,7 +20,7 @@ struct OpenPRSheetView: View {
     @FocusState private var isFieldFocused: Bool
 
     var body: some View {
-        @Bindable var state = state
+        @Bindable var review = state.pullRequestReview
 
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 10) {
@@ -39,11 +39,11 @@ struct OpenPRSheetView: View {
             VStack(alignment: .leading, spacing: 6) {
                 TextField(
                     "https://github.com/owner/repo/pull/123",
-                    text: $state.pullRequestInput
+                    text: $review.input
                 )
                 .textFieldStyle(.roundedBorder)
                 .focused($isFieldFocused)
-                .disabled(state.isFetchingPullRequest)
+                .disabled(state.pullRequestReview.isFetching)
                 .onSubmit(submit)
                 .accessibilityIdentifier("PullRequestField")
 
@@ -52,7 +52,7 @@ struct OpenPRSheetView: View {
                     .foregroundStyle(.secondary)
             }
 
-            if let error = state.pullRequestError {
+            if let error = state.pullRequestReview.error {
                 Label {
                     Text(error)
                         .fixedSize(horizontal: false, vertical: true)
@@ -65,7 +65,7 @@ struct OpenPRSheetView: View {
             }
 
             HStack {
-                if state.isFetchingPullRequest {
+                if state.pullRequestReview.isFetching {
                     ProgressView()
                         .controlSize(.small)
                     Text("Downloading snapshots…")
@@ -91,13 +91,13 @@ struct OpenPRSheetView: View {
     }
 
     private var canSubmit: Bool {
-        !state.isFetchingPullRequest
-            && !state.pullRequestInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !state.pullRequestReview.isFetching
+            && !state.pullRequestReview.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func submit() {
         guard canSubmit else { return }
-        state.openPullRequest(state.pullRequestInput)
+        state.openPullRequest(state.pullRequestReview.input)
     }
 }
 
