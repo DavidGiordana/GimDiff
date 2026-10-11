@@ -235,7 +235,10 @@ Three more rules that are easy to undo by accident:
 The canvas's state lives in `CanvasModel` (`AppState.canvas`): the preview, `diffMode`, the
 diff report and tolerance, Link Panes, the loose pair's side certainty, the reload token, and
 View menu requests, along with the work that belongs to them — measuring the mask, extracting
-a committed version, deciding a dropped pair's sides. Which image a selected row puts on
+a committed version, deciding a dropped pair's sides. Split View's divider and the onion
+skin's fade live there too, the divider as a fraction of the *images'* width rather than
+the view's, so *Copy Comparison Image* (`ComparisonImageRenderer` in `Engine/Diffing/`)
+cuts the picture where the screen does whatever the letterboxing. Which image a selected row puts on
 screen stays in `AppState.showSnapshot(_:withGitDiff:)`, because that depends on the tree, the
 test run, and the pull request; the model is handed the choice.
 

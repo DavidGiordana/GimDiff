@@ -187,7 +187,7 @@ struct AppCommands: Commands {
                     state.canvas.requestView(.fadeOnionSkin(to: 0))
                 }
                 Button("Both Equally") {
-                    state.canvas.requestView(.fadeOnionSkin(to: OnionSkinView.defaultOpacity))
+                    state.canvas.requestView(.fadeOnionSkin(to: CanvasModel.defaultOnionOpacity))
                 }
                 Button("\(onionSideTitle(.candidate)) Only") {
                     state.canvas.requestView(.fadeOnionSkin(to: 1))
@@ -268,6 +268,17 @@ struct AppCommands: Commands {
                 state.copySelectedRowName()
             }
             .disabled(state.selectedRowName == nil)
+
+            // Only Split View and the onion skin: they are one picture on screen, so a copy
+            // of them is what the user is looking at. ⇧⌘C rather than ⌘C, which stays Copy.
+            Button("Copy Comparison Image") {
+                state.copyComparisonImage(
+                    backdrop: canvasBackdrop?.panelBackground.wrappedValue.map { NSColor($0).cgColor },
+                    matte: canvasBackdrop?.imageMatte.wrappedValue.map { NSColor($0).cgColor }
+                )
+            }
+            .keyboardShortcut("c", modifiers: [.command, .shift])
+            .disabled(!state.canvas.canCopyComparisonImage)
 
             Divider()
 

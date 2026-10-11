@@ -23,6 +23,8 @@ final class CanvasModel {
     static let linksPanesKey = "links_panes"
     /// Commit-ish a snapshot is compared against when its Git diff is shown.
     static let comparisonGitRef = "HEAD"
+    /// Where the onion skin's fade starts and goes back to: both images at equal strength.
+    static let defaultOnionOpacity = 0.5
 
     /// What the canvas is showing. Changed through ``show(_:)`` and the methods built on it.
     private(set) var preview: SnapshotPreview?
@@ -67,6 +69,15 @@ final class CanvasModel {
     /// the menu cannot set them directly; it posts a request each of those views carries
     /// out. The serial makes the same command twice in a row two requests.
     private(set) var viewRequest: CanvasViewRequest?
+    /// Where Split View's divider stands, as a fraction of the images' width: 0 shows only
+    /// the right image, 1 only the left.
+    ///
+    /// Of the images rather than of the view, so a copy of the comparison cuts the pictures
+    /// where the screen did, however much of the view their letterboxing left empty.
+    var splitPosition = 0.5
+    /// How much of the candidate the onion skin shows: 0 is the baseline alone, 1 the
+    /// candidate alone.
+    var onionOpacity = CanvasModel.defaultOnionOpacity
 
     /// Where a comparison that failed is reported, which is the window's banner. Set by
     /// ``AppState`` once it exists.
@@ -277,8 +288,20 @@ final class CanvasModel {
         preview?.isComparison == true && diffMode == .onionSkin
     }
 
+    /// Whether the comparison on screen can be copied as one picture: Split View and the
+    /// onion skin, which draw both images in one frame. The other modes are two images
+    /// side by side, which a copy would only flatten.
+    var canCopyComparisonImage: Bool {
+        preview?.isComparison == true && (diffMode == .curtain || diffMode == .onionSkin)
+    }
+
     /// Hands `command` to whichever canvas views it applies to.
     func requestView(_ command: CanvasViewCommand) {
+        // The fade is the model's own, so it is set rather than relayed.
+        if case let .fadeOnionSkin(opacity) = command {
+            onionOpacity = min(max(opacity, 0), 1)
+            return
+        }
         viewRequest = CanvasViewRequest(serial: (viewRequest?.serial ?? 0) + 1, command: command)
     }
 }

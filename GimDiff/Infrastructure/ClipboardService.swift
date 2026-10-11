@@ -33,6 +33,12 @@ struct ClipboardService {
         pasteboard.setString(string, forType: .string)
     }
 
+    /// Puts a PNG on the pasteboard, for pasting into a chat, an issue, or an image editor.
+    func copy(pngData: Data) {
+        pasteboard.clearContents()
+        pasteboard.setData(pngData, forType: .png)
+    }
+
     /// Puts a file on the pasteboard so it can be pasted into Finder or another app.
     func copy(fileAt url: URL) {
         pasteboard.clearContents()

@@ -14,8 +14,6 @@ import SwiftUI
 /// the fade under the user's hand, sweeping from one end to the other makes whatever changed
 /// move, appear, or vanish while everything that matches stays still.
 struct OnionSkinView: View {
-    /// Where the slider starts: both images at equal strength.
-    static let defaultOpacity = 0.5
 
     let baseline: SnapshotPane
     let candidate: SnapshotPane
@@ -25,8 +23,6 @@ struct OnionSkinView: View {
     @Environment(AppState.self) private var state
     @Environment(\.displayScale) private var displayScale
 
-    /// How much of the candidate shows: 0 is the baseline alone, 1 the candidate alone.
-    @State private var candidateOpacity = Self.defaultOpacity
     @State private var baselineImage: CanvasImage?
     @State private var candidateImage: CanvasImage?
 
@@ -39,7 +35,7 @@ struct OnionSkinView: View {
                 ZStack {
                     layer(baselineImage, matte: matte, in: proxy.size)
                     layer(candidateImage, matte: nil, in: proxy.size)
-                        .opacity(candidateOpacity)
+                        .opacity(state.canvas.onionOpacity)
                 }
             }
             .padding(12)
@@ -50,11 +46,6 @@ struct OnionSkinView: View {
         }
         .task(id: ReloadKey(baseline: baseline.fileURL.path, candidate: candidate.fileURL.path, token: reloadToken)) {
             await loadImages()
-        }
-        .onChange(of: state.canvas.viewRequest) { _, request in
-            if case let .fadeOnionSkin(opacity)? = request?.command {
-                candidateOpacity = opacity
-            }
         }
     }
 
@@ -75,31 +66,33 @@ struct OnionSkinView: View {
         }
     }
 
+    @ViewBuilder
     private var footer: some View {
+        @Bindable var canvas = state.canvas
         HStack(spacing: 10) {
             Text(state.canvas.sideTitle(for: baseline))
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-            Slider(value: $candidateOpacity, in: 0...1)
+            Slider(value: $canvas.onionOpacity, in: 0...1)
                 .frame(maxWidth: 280)
                 .accessibilityLabel("\(state.canvas.sideTitle(for: candidate)) Opacity")
-                .accessibilityValue("\(Int((candidateOpacity * 100).rounded())) percent")
+                .accessibilityValue("\(Int((state.canvas.onionOpacity * 100).rounded())) percent")
 
             Text(state.canvas.sideTitle(for: candidate))
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-            Text("\(Int((candidateOpacity * 100).rounded()))%")
+            Text("\(Int((state.canvas.onionOpacity * 100).rounded()))%")
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(width: 40, alignment: .trailing)
 
             Button("Reset") {
-                candidateOpacity = Self.defaultOpacity
+                state.canvas.onionOpacity = CanvasModel.defaultOnionOpacity
             }
             .buttonStyle(.borderless)
-            .disabled(candidateOpacity == Self.defaultOpacity)
+            .disabled(state.canvas.onionOpacity == CanvasModel.defaultOnionOpacity)
             .help("Show both images at equal strength again")
         }
         .frame(maxWidth: .infinity)

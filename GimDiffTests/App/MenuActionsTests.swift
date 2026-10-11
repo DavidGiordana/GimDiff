@@ -106,4 +106,36 @@ struct MenuActionsTests {
         #expect(second.command == .zoomIn)
         #expect(first != second)
     }
+
+    @Test("Only Split View and the onion skin can be copied as one picture")
+    func copyIsOfferedInSingleFrameModes() {
+        let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
+        let canvas = fixture.state.canvas
+        canvas.showComparison(
+            reference: URL(fileURLWithPath: "/tmp/a.png"),
+            failure: URL(fileURLWithPath: "/tmp/b.png")
+        )
+
+        canvas.diffMode = .sideBySide
+        #expect(!canvas.canCopyComparisonImage)
+        canvas.diffMode = .difference
+        #expect(!canvas.canCopyComparisonImage)
+        canvas.diffMode = .curtain
+        #expect(canvas.canCopyComparisonImage)
+        canvas.diffMode = .onionSkin
+        #expect(canvas.canCopyComparisonImage)
+
+        canvas.close()
+        #expect(!canvas.canCopyComparisonImage)
+    }
+
+    @Test("The View menu's fade commands set the onion skin's fade, kept within range")
+    func fadeCommandsSetTheFade() {
+        let canvas = AppStateFixture().state.canvas
+
+        canvas.requestView(.fadeOnionSkin(to: 1))
+        #expect(canvas.onionOpacity == 1)
+        canvas.requestView(.fadeOnionSkin(to: -2))
+        #expect(canvas.onionOpacity == 0)
+    }
 }

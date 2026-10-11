@@ -202,6 +202,7 @@ private extension HelpTopic {
             .shortcuts([
                 HelpShortcut("⌘↩", "Reveal the selection in the Finder"),
                 HelpShortcut("⌘L", "Clear the canvas"),
+                HelpShortcut("⇧⌘C", "Copy Split View or the onion skin as an image"),
                 HelpShortcut("⌘= ⌘-", "Zoom the images in and out"),
                 HelpShortcut("⌘⌫", "Move the selection to the Trash"),
                 HelpShortcut("⌘Z ⇧⌘Z", "Undo or redo the last change to a file"),
@@ -237,6 +238,13 @@ private extension HelpTopic {
                 pixel in magenta and reports how much of the image changed. Switch between them \
                 from the toolbar or the **View** menu. **View ▸ Onion Skin** jumps the fade to \
                 either image or back to both equally, as the slider's **Reset** does.
+                """),
+            .text("""
+                In **Split View** and **Onion Skin**, **Snapshot ▸ Copy Comparison Image** \
+                (⇧⌘C) puts what you see on the clipboard as one picture, at the snapshots' own \
+                resolution: cut where the split stands or faded as far as the slider goes, \
+                with the sides and the setting written underneath. Paste it into a pull \
+                request, an issue, or a chat.
                 """),
             .text("""
                 The mask's **Tolerance** menu (also **View ▸ Diff Tolerance**) lets through \

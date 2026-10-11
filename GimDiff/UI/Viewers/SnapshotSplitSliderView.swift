@@ -29,14 +29,15 @@ struct SnapshotSplitSliderView: View {
     @Environment(AppState.self) private var state
     @Environment(\.displayScale) private var displayScale
 
-    @State private var splitPosition: CGFloat = 0.5
     @State private var leadingImage: CanvasImage?
     @State private var trailingImage: CanvasImage?
 
     var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
-            let splitX = width * splitPosition
+            let span = imageSpan(in: proxy.size)
+            let splitPosition = CGFloat(state.canvas.splitPosition)
+            let splitX = span.minX + span.width * splitPosition
 
             ZStack(alignment: .topLeading) {
                 // The trailing image is laid down whole and then masked from the right, so
@@ -81,8 +82,8 @@ struct SnapshotSplitSliderView: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        guard width > 0 else { return }
-                        splitPosition = min(max(value.location.x / width, 0), 1)
+                        guard span.width > 0 else { return }
+                        state.canvas.splitPosition = Double(min(max((value.location.x - span.minX) / span.width, 0), 1))
                     }
             )
         }
@@ -92,6 +93,33 @@ struct SnapshotSplitSliderView: View {
     }
 
     // MARK: - Pieces
+
+    /// Where the two images are drawn inside `size`, together: the span the split position
+    /// is a fraction of, as ``ComparisonImageRenderer`` measures it for a copy.
+    private func imageSpan(in size: CGSize) -> CGRect {
+        let sizes = [leadingImage, trailingImage].compactMap { image -> CGSize? in
+            guard case let .loaded(decoded) = image else { return nil }
+            return decoded.pixelSize
+        }
+        guard let first = sizes.first else { return CGRect(origin: .zero, size: size) }
+        let layout = ComparisonImageRenderer.layout(left: first, right: sizes.last ?? first)
+        let bounds = layout.imageBounds
+        guard layout.canvasSize.width > 0, layout.canvasSize.height > 0 else {
+            return CGRect(origin: .zero, size: size)
+        }
+        // The layout is in the images' pixels; the view fits that whole frame, aspect kept.
+        let ratio = min(size.width / layout.canvasSize.width, size.height / layout.canvasSize.height)
+        let origin = CGPoint(
+            x: (size.width - layout.canvasSize.width * ratio) / 2,
+            y: (size.height - layout.canvasSize.height * ratio) / 2
+        )
+        return CGRect(
+            x: origin.x + bounds.minX * ratio,
+            y: origin.y + bounds.minY * ratio,
+            width: bounds.width * ratio,
+            height: bounds.height * ratio
+        )
+    }
 
     @ViewBuilder
     private func curtainImage(_ image: CanvasImage?, in size: CGSize) -> some View {

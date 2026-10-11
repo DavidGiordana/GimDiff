@@ -6,6 +6,7 @@
 //  Copyright © 2026 David Giordana. All rights reserved.
 //
 
+import CoreGraphics
 import Foundation
 import Observation
 
@@ -938,6 +939,67 @@ final class AppState {
     func copySelectedRowName() {
         guard let name = selectedRowName else { return }
         copyToClipboard(name)
+    }
+
+    /// Snapshot ▸ Copy Comparison Image: puts the split or the onion skin on the clipboard
+    /// as one picture, cut or faded exactly where the canvas has it.
+    ///
+    /// - Parameters:
+    ///   - backdrop: The panel colour behind the images, when one is chosen.
+    ///   - matte: The colour behind the images themselves, when one is chosen.
+    func copyComparisonImage(backdrop: CGColor?, matte: CGColor?) {
+        guard canvas.canCopyComparisonImage,
+              let preview = canvas.preview,
+              let baseline = preview.baseline,
+              let candidate = preview.candidate
+        else { return }
+        guard let below = ComparisonImageRenderer.image(at: baseline.fileURL),
+              let above = ComparisonImageRenderer.image(at: candidate.fileURL)
+        else {
+            report("One of the two images could not be read, so there is nothing to copy.")
+            return
+        }
+
+        let left = canvas.sideTitle(for: baseline)
+        let right = canvas.sideTitle(for: candidate)
+        let rendered: CGImage?
+        if canvas.diffMode == .curtain {
+            rendered = ComparisonImageRenderer.split(
+                left: below,
+                right: above,
+                position: canvas.splitPosition,
+                backdrop: backdrop,
+                matte: matte,
+                caption: ComparisonCaption(
+                    leftTitle: left,
+                    rightTitle: right,
+                    detail: "\(preview.title) · split at \(Self.percent(canvas.splitPosition))"
+                )
+            )
+        } else {
+            rendered = ComparisonImageRenderer.onionSkin(
+                under: below,
+                over: above,
+                rightOpacity: canvas.onionOpacity,
+                backdrop: backdrop,
+                matte: matte,
+                caption: ComparisonCaption(
+                    leftTitle: left,
+                    rightTitle: right,
+                    detail: "\(preview.title) · \(right) at \(Self.percent(canvas.onionOpacity))"
+                )
+            )
+        }
+
+        guard let rendered, let png = ComparisonImageRenderer.pngData(rendered) else {
+            report("The comparison could not be drawn.")
+            return
+        }
+        clipboard.copy(pngData: png)
+    }
+
+    private static func percent(_ fraction: Double) -> String {
+        "\(Int((fraction * 100).rounded()))%"
     }
 
     /// What showing `snapshot` with its diff is called, in the menu bar and on the row alike.
