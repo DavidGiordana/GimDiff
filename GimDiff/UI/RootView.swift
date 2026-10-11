@@ -37,11 +37,6 @@ struct RootView: View {
                 DropZoneOverlay()
             }
         }
-        .overlay(alignment: .top) {
-            if let message = state.lastError {
-                ErrorBanner(message: message, dismiss: state.dismissError)
-            }
-        }
         .onAppear(perform: revealSidebarOnLaunch)
         .onAppear { state.undoManager = undoManager }
         .onChange(of: undoManager) { state.undoManager = undoManager }
@@ -200,28 +195,6 @@ private struct DropZoneOverlay: View {
         .allowsHitTesting(false)
         .transition(.opacity)
         .accessibilityLabel("Drop to process")
-    }
-}
-
-/// Transient banner describing the most recent failure.
-private struct ErrorBanner: View {
-    let message: String
-    let dismiss: () -> Void
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-            Text(message)
-                .font(.callout)
-            Button("Dismiss", action: dismiss)
-                .buttonStyle(.link)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.regularMaterial, in: .rect(cornerRadius: 10))
-        .shadow(radius: 8, y: 2)
-        .padding()
     }
 }
 

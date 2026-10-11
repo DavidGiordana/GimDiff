@@ -19,6 +19,8 @@ import Observation
 final class AppState {
     /// `UserDefaults` key the recent project list is persisted under.
     static let recentProjectsKey = "recent_projects"
+    /// How many messages Window ▸ Recent Messages keeps.
+    static let recentMessagesLimit = 10
     /// How many folders the recent list keeps before it starts forgetting the oldest.
     static let recentProjectsLimit = 12
 
@@ -53,8 +55,19 @@ final class AppState {
     /// The window's rather than one of GimDiff's own, so Edit ▸ Undo, ⌘Z, and the filter
     /// field's typing share the one stack a Mac user expects. Handed over by ``RootView``.
     @ObservationIgnored weak var undoManager: UndoManager?
-    /// The most recent failure, shown as a banner until it is dismissed.
-    private(set) var lastError: String?
+    /// The message on screen, under the canvas, if any.
+    private(set) var currentMessage: AppMessage?
+    /// The last few messages, newest first, so one that closed itself or was replaced can
+    /// still be read. Window ▸ Recent Messages lists them.
+    private(set) var recentMessages: [AppMessage] = []
+    /// How long a notice stays before it closes itself. Shortened by tests.
+    @ObservationIgnored var noticeLifetime = Duration.seconds(6)
+    @ObservationIgnored private var messageDismissTask: Task<Void, Never>?
+    /// Whether the pointer rests on the message, which keeps a notice from closing.
+    @ObservationIgnored private var isMessageHeld = false
+
+    /// The text of the message on screen, for callers that only need to know what it says.
+    var lastError: String? { currentMessage?.text }
 
     /// Bumped whenever something outside the sidebar asks it to move keyboard focus.
     ///
@@ -180,7 +193,7 @@ final class AppState {
                 openPullRequest(input)
             }
         } catch {
-            lastError = error.localizedDescription
+            report(error)
         }
     }
 
@@ -191,7 +204,7 @@ final class AppState {
         } else if url.isImageFile {
             canvas.show(.single(Self.looseSnapshot(at: url)))
         } else {
-            lastError = "“\(url.lastPathComponent)” is neither a folder nor an image GimDiff can open."
+            report("“\(url.lastPathComponent)” is neither a folder nor an image GimDiff can open.")
         }
     }
 
@@ -217,7 +230,7 @@ final class AppState {
     func openProject(at url: URL) {
         let root = url.resolvingSymlinksInPath()
         guard filesystem.isDirectory(at: root) else {
-            lastError = "“\(url.path)” is not a folder."
+            report("“\(url.path)” is not a folder.")
             return
         }
 
@@ -231,7 +244,7 @@ final class AppState {
         // The scan about to start reads everything a background refresh would have.
         cancelBackgroundRefresh()
         loadingProjectURL = root
-        lastError = nil
+        dismissMessage()
         addRecentProject(root)
 
         // A structured `Task`, never `Task.detached`. The scan suspends the main actor and
@@ -246,7 +259,7 @@ final class AppState {
                 // Superseded by a newer scan, which owns `loadingProjectURL` now.
             } catch {
                 guard !Task.isCancelled else { return }
-                lastError = error.localizedDescription
+                report(error)
                 loadingProjectURL = nil
             }
         }
@@ -281,7 +294,7 @@ final class AppState {
         selectedRowID = nil
         expandedSuiteIDs = []
         loadingProjectURL = nil
-        lastError = nil
+        dismissMessage()
         // The filters described the project that has just gone; carrying them into the next
         // one would hide most of it for no reason the user could see.
         clearFilters()
@@ -776,13 +789,62 @@ final class AppState {
         )
     }
 
+    /// Shows a failure: something GimDiff was asked to do did not happen. It stays until
+    /// it is dismissed, because whatever failed may need doing again.
     func report(_ error: any Error) {
-        lastError = error.localizedDescription
+        post(AppMessage(text: error.localizedDescription, kind: .failure))
     }
 
+    /// Shows an explanation — why an action is unavailable, or what GimDiff could not make
+    /// of something it was handed. It closes itself, since nothing is left undone.
     func report(_ message: String) {
-        lastError = message
+        post(AppMessage(text: message, kind: .notice))
     }
+
+    /// Puts the message away.
+    func dismissMessage() {
+        messageDismissTask?.cancel()
+        messageDismissTask = nil
+        isMessageHeld = false
+        currentMessage = nil
+    }
+
+    /// Keeps a notice on screen while the pointer is on it, and starts its time again when
+    /// the pointer leaves, so a message being read never closes under the reader.
+    func holdMessage(_ isHeld: Bool) {
+        isMessageHeld = isHeld
+        if isHeld {
+            messageDismissTask?.cancel()
+        } else {
+            scheduleDismissal()
+        }
+    }
+
+    func clearRecentMessages() {
+        recentMessages = []
+    }
+
+    private func post(_ message: AppMessage) {
+        currentMessage = message
+        recentMessages.insert(message, at: 0)
+        if recentMessages.count > Self.recentMessagesLimit {
+            recentMessages.removeLast(recentMessages.count - Self.recentMessagesLimit)
+        }
+        scheduleDismissal()
+    }
+
+    private func scheduleDismissal() {
+        messageDismissTask?.cancel()
+        guard let message = currentMessage, message.kind == .notice, !isMessageHeld else { return }
+        messageDismissTask = Task { [noticeLifetime] in
+            try? await Task.sleep(for: noticeLifetime)
+            guard !Task.isCancelled, currentMessage?.id == message.id else { return }
+            currentMessage = nil
+        }
+    }
+
+    /// The notice's countdown, if one is running, so a test can wait for it.
+    var currentMessageDismissal: Task<Void, Never>? { messageDismissTask }
 
     // MARK: - Git status
 
@@ -842,7 +904,7 @@ final class AppState {
         }
 
         guard let text = clipboard.string(), let payload = ingestion.parseClipboardText(text) else {
-            lastError = "The clipboard holds no snapshot path GimDiff recognises."
+            report("The clipboard holds no snapshot path GimDiff recognises.")
             return
         }
 
@@ -874,10 +936,6 @@ final class AppState {
         workspace.perform(action)
     }
 
-    func dismissError() {
-        lastError = nil
-    }
-
     // MARK: - Context menu actions
 
     func copyToClipboard(_ text: String) {
@@ -886,7 +944,7 @@ final class AppState {
 
     func openTestSource(for suite: SnapshotSuite) {
         guard let sourceCodeURL = suite.sourceCodeURL else {
-            lastError = "GimDiff could not find the test source for “\(suite.name)”."
+            report("GimDiff could not find the test source for “\(suite.name)”.")
             return
         }
         workspace.open(sourceCodeURL)
@@ -1093,7 +1151,7 @@ final class AppState {
     /// request and only make the review lie about what it changes.
     private func refusesDeletionUnderReview() -> Bool {
         guard isReviewingPullRequest else { return false }
-        lastError = "Snapshots in a pull request review are read-only; there is nothing on disk to delete."
+        report("Snapshots in a pull request review are read-only; there is nothing on disk to delete.")
         return true
     }
 
@@ -1105,7 +1163,7 @@ final class AppState {
             }
             return true
         } catch {
-            lastError = error.localizedDescription
+            report(error)
             return false
         }
     }
@@ -1249,4 +1307,20 @@ enum CanvasViewCommand: Equatable, Sendable {
 struct CanvasViewRequest: Equatable, Sendable {
     let serial: Int
     let command: CanvasViewCommand
+}
+
+/// One thing GimDiff has to tell the user, shown under the canvas.
+struct AppMessage: Identifiable, Equatable, Sendable {
+    enum Kind: Sendable {
+        /// Something asked for did not happen. Stays until dismissed.
+        case failure
+        /// Why something is unavailable, or what could not be made of an input. Closes
+        /// itself.
+        case notice
+    }
+
+    let id = UUID()
+    let text: String
+    let kind: Kind
+    let date = Date()
 }

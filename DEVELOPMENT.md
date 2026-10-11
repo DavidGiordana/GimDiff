@@ -277,6 +277,22 @@ A pull request review is not watched. Tests that load a project hand `AppState` 
 `StubProjectWatcher`, so no real stream delivers an event halfway through an assertion;
 `AppState.projectFilesChanged(_:)` is the seam they drive instead.
 
+### Messages
+
+Everything GimDiff has to tell the user goes through `AppState.report(_:)`, and the overload
+decides how long it stays:
+
+- **`report(error)` is a failure** — something asked for did not happen. It stays until
+  dismissed, because whatever failed may need doing again.
+- **`report("…")` is a notice** — why an action is unavailable, or what could not be made of
+  an input. It closes itself after `noticeLifetime` unless the pointer rests on it.
+
+Pick the overload for what happened, not for what you have to hand: a refusal you can only
+describe as a string is a notice, and a write that failed is a failure even if you build its
+text yourself (wrap it in an error). The message is a strip laid out under the canvas, never
+an overlay, so it cannot cover a pane header; the last ten are kept for
+*Window ▸ Recent Messages*. Never assign the message directly.
+
 ### URL scheme
 
 `gimdiff://` is registered in `GimDiff/Info.plist` (role `Viewer`, identifier

@@ -298,7 +298,7 @@ struct ProjectOpeningTests {
 
         #expect(state.lastError != nil)
 
-        state.dismissError()
+        state.dismissMessage()
         #expect(state.lastError == nil)
     }
 

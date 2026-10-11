@@ -157,6 +157,14 @@ private extension HelpTopic {
                 you picked an older run, which stays until you pick the newest again.
                 """),
         ]),
+        HelpSection(title: "Messages", blocks: [
+            .text("""
+                What GimDiff has to tell you appears in a strip under the canvas. An \
+                explanation — why an action is unavailable — goes away on its own after a few \
+                seconds, unless the pointer is on it; a failure stays until you dismiss it. \
+                **Window ▸ Recent Messages** keeps the last ten; choose one to copy it.
+                """),
+        ]),
         HelpSection(title: "After re-running your tests", blocks: [
             .text("""
                 GimDiff watches the open project, so a test run shows up on its own: \

@@ -391,6 +391,25 @@ struct AppCommands: Commands {
 
         // Replaced so the item opens GimDiff's own help sheet instead of the system's
         // "Help isn't available" alert. AppKit still adds its menu search field above it.
+        // Every message that came and went, so one that closed itself or was replaced can be
+        // read again. Choosing one copies it, for a bug report or a chat.
+        CommandGroup(after: .windowArrangement) {
+            Menu("Recent Messages") {
+                ForEach(state.recentMessages) { message in
+                    Button(Self.menuTitle(of: message)) {
+                        state.copyToClipboard(message.text)
+                    }
+                }
+
+                Divider()
+
+                Button("Clear Recent Messages") {
+                    state.clearRecentMessages()
+                }
+            }
+            .disabled(state.recentMessages.isEmpty)
+        }
+
         CommandGroup(replacing: .help) {
             Button("GimDiff Help") {
                 state.presentHelp()
@@ -416,6 +435,14 @@ struct AppCommands: Commands {
             get: { state.testRuns.selectedBundle?.url },
             set: { url in url.map(state.showTestRun(from:)) }
         )
+    }
+
+    /// A message as a menu item: when it came, and as much of it as a menu has room for.
+    private static func menuTitle(of message: AppMessage) -> String {
+        let time = message.date.formatted(date: .omitted, time: .standard)
+        let limit = 80
+        let text = message.text.count > limit ? message.text.prefix(limit - 1) + "…" : message.text
+        return "\(time) — \(text)"
     }
 
     /// The image in the candidate pane, switched through ``AppState/selectTestRunCandidate(_:)``.

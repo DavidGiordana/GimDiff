@@ -26,7 +26,15 @@ struct SnapshotCanvasView: View {
     @State private var linkedTransform: LinkedPaneTransform?
 
     var body: some View {
-        content
+        VStack(spacing: 0) {
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Laid out under the canvas rather than floated over it, so a message never
+            // covers a pane's header, its buttons, or the image.
+            if let message = state.currentMessage {
+                MessageBar(message: message)
+            }
+        }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(backdrop)
             .navigationTitle(preview?.title ?? "GimDiff")
@@ -201,6 +209,45 @@ struct SnapshotCanvasView: View {
     private var subtitle: String {
         guard preview?.isComparison == true else { return "" }
         return state.canvas.diffMode.title
+    }
+}
+
+/// The message GimDiff has for the user, as a strip under the canvas.
+///
+/// A failure stays until dismissed; a notice closes itself unless the pointer rests on it.
+struct MessageBar: View {
+    @Environment(AppState.self) private var state
+
+    let message: AppMessage
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 10) {
+                Image(systemName: message.kind == .failure ? "exclamationmark.triangle.fill" : "info.circle")
+                    .foregroundStyle(message.kind == .failure ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                Text(message.text)
+                    .font(.callout)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+                    .textSelection(.enabled)
+                    .help(message.text)
+                Spacer(minLength: 8)
+                Button(action: state.dismissMessage) {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.borderless)
+                .help("Dismiss")
+                .accessibilityLabel("Dismiss Message")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+        }
+        .background(.bar)
+        .onHover(perform: state.holdMessage)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("MessageBar")
     }
 }
 
