@@ -121,8 +121,8 @@ struct AppCommands: Commands {
 
             // And the sidebar's run picker, newest first.
             Picker("Test Runs", selection: testRunBundle) {
-                ForEach(state.testRunBundles) { bundle in
-                    Text(TestRunBundleLabel.title(of: bundle, among: state.testRunBundles))
+                ForEach(state.testRuns.bundles) { bundle in
+                    Text(TestRunBundleLabel.title(of: bundle, among: state.testRuns.bundles))
                         .tag(Optional(bundle.url))
                 }
             }
@@ -402,7 +402,7 @@ struct AppCommands: Commands {
     /// to it when it was showing the project.
     private var testRunBundle: Binding<URL?> {
         Binding(
-            get: { state.selectedTestRunBundle?.url },
+            get: { state.testRuns.selectedBundle?.url },
             set: { url in url.map(state.showTestRun(from:)) }
         )
     }

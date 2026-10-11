@@ -20,7 +20,7 @@ extension AppState {
         !isReviewingPullRequest
             && currentProject?.gitRootURL != nil
             && snapshot.gitStatus == .modified
-            && !Self.isTestRunAttachment(snapshotID: snapshot.id)
+            && !TestRunModel.isAttachment(snapshotID: snapshot.id)
     }
 
     /// The snapshots of `suite` that ``discardGitChanges(of:)`` would restore.
@@ -128,7 +128,7 @@ extension AppState {
     /// bundle again puts it back. Under the project's view the read waits for the next
     /// switch, as it does when a new run arrives.
     func rereadTestRunAfterDiscarding() {
-        guard testRun != nil else { return }
+        guard testRuns.results != nil else { return }
         discardTestRun()
         // The candidate on the canvas was a copy out of the run just discarded.
         if case .testRunFailure = preview { closePreview() }

@@ -55,10 +55,10 @@ struct TestRunTests {
         }
 
         fixture.state.load(bundle)
-        await fixture.state.currentTestRunLocate?.value
+        await fixture.state.testRuns.currentLocate?.value
         if switchingToRun {
             fixture.state.showTestRun()
-            await fixture.state.currentTestRunRefresh?.value
+            await fixture.state.testRuns.currentRead?.value
         }
         return fixture
     }
@@ -110,7 +110,7 @@ struct TestRunTests {
 
         #expect(fixture.state.sidebarSource == .project)
         #expect(fixture.testResults.readCount == 0)
-        #expect(fixture.state.testRun == nil)
+        #expect(fixture.state.testRuns.results == nil)
         #expect(fixture.state.canShowTestRun)
         #expect(fixture.rowDescriptions == ["AlphaTests", "BetaTests"])
     }
@@ -122,9 +122,9 @@ struct TestRunTests {
 
         #expect(state.sidebarSource == .testRun)
         #expect(fixture.testResults.readCount == 1)
-        #expect(state.testRun?.failedSnapshotsCount == 2)
-        #expect(state.isFailingInTestRun(try snapshot("header", in: fixture)))
-        #expect(!state.isFailingInTestRun(try snapshot("footer", in: fixture)))
+        #expect(state.testRuns.results?.failedSnapshotsCount == 2)
+        #expect(state.testRuns.isFailing(try snapshot("header", in: fixture)))
+        #expect(!state.testRuns.isFailing(try snapshot("footer", in: fixture)))
         // Opened for reading, the way a pull request review is.
         #expect(fixture.rowDescriptions == [
             "AlphaTests",
@@ -158,7 +158,7 @@ struct TestRunTests {
         #expect(fixture.state.preview?.candidate?.origin == .workingTree)
 
         fixture.state.showTestRun()
-        await fixture.state.currentTestRunRefresh?.value
+        await fixture.state.testRuns.currentRead?.value
         #expect(fixture.testResults.readCount == 1)
         #expect(fixture.state.preview?.candidate?.origin == .testRun)
     }
@@ -169,7 +169,7 @@ struct TestRunTests {
         fixture.state.showWarningsOnly = true
 
         fixture.state.showTestRun()
-        await fixture.state.currentTestRunRefresh?.value
+        await fixture.state.testRuns.currentRead?.value
 
         #expect(!fixture.state.showWarningsOnly)
         #expect(!fixture.state.canFilterByWarnings)
@@ -179,9 +179,9 @@ struct TestRunTests {
     @Test("A project that has never been tested offers no switch")
     func hidesSwitchWithoutRun() async throws {
         let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
-        await fixture.state.currentTestRunLocate?.value
+        await fixture.state.testRuns.currentLocate?.value
 
-        #expect(fixture.state.latestTestRunBundle == nil)
+        #expect(fixture.state.testRuns.latestBundle == nil)
         #expect(!fixture.state.canShowTestRun)
         #expect(!fixture.state.showsSidebarSourcePicker)
 
@@ -194,7 +194,7 @@ struct TestRunTests {
     func showsSwitchWithRun() async throws {
         let fixture = await openWithFailures(switchingToRun: false)
 
-        #expect(fixture.state.latestTestRunBundle == StubTestResults.bundleURL)
+        #expect(fixture.state.testRuns.latestBundle == StubTestResults.bundleURL)
         #expect(fixture.state.showsSidebarSourcePicker)
         #expect(fixture.testResults.readCount == 0)
     }
@@ -205,11 +205,11 @@ struct TestRunTests {
         fixture.testResults.report = nil
 
         fixture.state.refreshTestRun()
-        await fixture.state.currentTestRunRefresh?.value
+        await fixture.state.testRuns.currentRead?.value
 
         #expect(!fixture.state.canShowTestRun)
         #expect(fixture.state.showsSidebarSourcePicker)
-        #expect(fixture.state.testRunError != nil)
+        #expect(fixture.state.testRuns.error != nil)
 
         fixture.state.showProjectStatus()
         #expect(!fixture.state.showsSidebarSourcePicker)
@@ -225,13 +225,13 @@ struct TestRunTests {
         )
         fixture.filesystem.createDirectory(at: Self.scratch)
         fixture.state.load(AppStateFixture.twoSuites())
-        await fixture.state.currentTestRunLocate?.value
+        await fixture.state.testRuns.currentLocate?.value
 
         fixture.state.showTestRun()
-        await fixture.state.currentTestRunRefresh?.value
+        await fixture.state.testRuns.currentRead?.value
 
-        #expect(fixture.state.testRun?.isEmpty == true)
-        #expect(fixture.state.testRunError == nil)
+        #expect(fixture.state.testRuns.results?.isEmpty == true)
+        #expect(fixture.state.testRuns.error == nil)
         #expect(fixture.state.isShowingTestRunPlaceholder)
         #expect(!fixture.filesystem.fileExists(at: Self.scratch))
     }
@@ -307,8 +307,8 @@ struct TestRunTests {
 
         #expect(fixture.filesystem.contents(of: header.fileURL) == "header rendered")
         #expect(fixture.state.lastError == nil)
-        #expect(!fixture.state.isFailingInTestRun(header))
-        #expect(fixture.state.testRun?.failedSnapshotsCount == 1)
+        #expect(!fixture.state.testRuns.isFailing(header))
+        #expect(fixture.state.testRuns.results?.failedSnapshotsCount == 1)
     }
 
     @Test("Accepting takes the snapshot off the run's list and moves on")
@@ -342,7 +342,7 @@ struct TestRunTests {
 
         fixture.state.promoteCandidateToBaseline()
 
-        #expect(fixture.state.testRun?.isEmpty == true)
+        #expect(fixture.state.testRuns.results?.isEmpty == true)
         #expect(fixture.state.isShowingTestRunPlaceholder)
         #expect(!fixture.filesystem.fileExists(at: Self.scratch))
         #expect(fixture.state.preview == nil)
@@ -362,7 +362,7 @@ struct TestRunTests {
         #expect(fixture.filesystem.contents(of: header.fileURL) == "header rendered")
         #expect(fixture.filesystem.contents(of: menu.fileURL) == "menu rendered")
         #expect(fixture.state.lastError == nil)
-        #expect(fixture.state.testRun?.failedSnapshotsCount == 0)
+        #expect(fixture.state.testRuns.results?.failedSnapshotsCount == 0)
         #expect(fixture.state.acceptableTestRunFailuresCount == 0)
         #expect(fixture.rowDescriptions.allSatisfy { $0.hasPrefix(Self.unmatchedSuite) })
         // The canvas no longer points into the run's scratch folder.
@@ -391,7 +391,7 @@ struct TestRunTests {
         await fixture.state.currentGitStatusRefresh?.value
         // What the status read after a real accept would report.
         fixture.state.applyGitStatuses([header.fileURL: .modified, menu.fileURL: .modified])
-        #expect(fixture.state.testRun?.failedSnapshotsCount == 0)
+        #expect(fixture.state.testRuns.results?.failedSnapshotsCount == 0)
 
         fixture.state.showProjectStatus()
         // What `git restore` would leave behind.
@@ -399,17 +399,17 @@ struct TestRunTests {
         fixture.filesystem.stub(menu.fileURL, contents: "menu recorded")
         fixture.state.discardAllGitChanges()
         await fixture.state.currentDiscard?.value
-        #expect(fixture.state.testRun == nil)
+        #expect(fixture.state.testRuns.results == nil)
 
         // Reading the bundle again exports its attachments again.
         for image in fixture.testResults.report?.failures.flatMap(\.groups).flatMap(\.images) ?? [] {
             fixture.filesystem.stub(image.fileURL, contents: contents[image.id] ?? "")
         }
         fixture.state.showTestRun()
-        await fixture.state.currentTestRunRefresh?.value
+        await fixture.state.testRuns.currentRead?.value
         #expect(fixture.testResults.readCount == 2)
-        #expect(fixture.state.testRun?.failedSnapshotsCount == 2)
-        #expect(fixture.state.isFailingInTestRun(header))
+        #expect(fixture.state.testRuns.results?.failedSnapshotsCount == 2)
+        #expect(fixture.state.testRuns.isFailing(header))
     }
 
     @Test("Accept All is undone in one step, putting every recorded snapshot back")
@@ -446,8 +446,8 @@ struct TestRunTests {
         #expect(fixture.state.lastError != nil)
         #expect(fixture.filesystem.contents(of: header.fileURL) == "header recorded")
         #expect(fixture.filesystem.contents(of: menu.fileURL) == "menu rendered")
-        #expect(fixture.state.isFailingInTestRun(header))
-        #expect(!fixture.state.isFailingInTestRun(menu))
+        #expect(fixture.state.testRuns.isFailing(header))
+        #expect(!fixture.state.testRuns.isFailing(menu))
     }
 
     @Test("Asking to accept all confirms first and writes nothing yet")
@@ -532,7 +532,7 @@ struct TestRunTests {
     @Test("The suite of unmatched images carries no missing-source warning")
     func unmatchedSuiteIsNotAWarning() async throws {
         let fixture = await openWithFailures()
-        let attachments = try #require(fixture.state.testRunAttachmentsSuite)
+        let attachments = try #require(fixture.state.testRuns.attachmentsSuite)
 
         #expect(attachments.isMissingSourceCode)
         #expect(!fixture.state.hasSourceWarning(attachments))
@@ -562,7 +562,7 @@ struct TestRunTests {
             failures: [older]
         ))
         fixture.state.locateTestRun()
-        await fixture.state.currentTestRunLocate?.value
+        await fixture.state.testRuns.currentLocate?.value
     }
 
     @Test("Every run is offered, newest first, and the newest is the one shown")
@@ -570,14 +570,14 @@ struct TestRunTests {
         let fixture = await openWithFailures(switchingToRun: false)
         await addOlderRun(to: fixture)
 
-        #expect(fixture.state.testRunBundles.map(\.url) == [StubTestResults.bundleURL, Self.olderBundle])
-        #expect(fixture.state.selectedTestRunBundle?.url == StubTestResults.bundleURL)
+        #expect(fixture.state.testRuns.bundles.map(\.url) == [StubTestResults.bundleURL, Self.olderBundle])
+        #expect(fixture.state.testRuns.selectedBundle?.url == StubTestResults.bundleURL)
 
         fixture.state.showTestRun()
-        await fixture.state.currentTestRunRefresh?.value
+        await fixture.state.testRuns.currentRead?.value
 
-        #expect(fixture.state.testRun?.bundleURL == StubTestResults.bundleURL)
-        #expect(fixture.state.pinnedTestRunBundleURL == nil)
+        #expect(fixture.state.testRuns.results?.bundleURL == StubTestResults.bundleURL)
+        #expect(fixture.state.testRuns.pinnedBundleURL == nil)
     }
 
     @Test("Picking an older run lists what it failed on, and deletes the newer run's copies")
@@ -586,10 +586,10 @@ struct TestRunTests {
         await addOlderRun(to: fixture)
 
         fixture.state.showTestRun(from: Self.olderBundle)
-        await fixture.state.currentTestRunRefresh?.value
+        await fixture.state.testRuns.currentRead?.value
 
-        #expect(fixture.state.testRun?.bundleURL == Self.olderBundle)
-        #expect(fixture.state.selectedTestRunBundle?.url == Self.olderBundle)
+        #expect(fixture.state.testRuns.results?.bundleURL == Self.olderBundle)
+        #expect(fixture.state.testRuns.selectedBundle?.url == Self.olderBundle)
         #expect(fixture.rowDescriptions == ["AlphaTests", "AlphaTests/header"])
         #expect(fixture.selectedRowDescription == "AlphaTests/header")
         #expect(fixture.state.preview?.candidate?.fileURL == Self.olderScratch.appendingPathComponent("O.png"))
@@ -602,10 +602,10 @@ struct TestRunTests {
         await addOlderRun(to: fixture)
 
         fixture.state.showTestRun(from: Self.olderBundle)
-        await fixture.state.currentTestRunRefresh?.value
+        await fixture.state.testRuns.currentRead?.value
 
         #expect(fixture.state.sidebarSource == .testRun)
-        #expect(fixture.state.testRun?.bundleURL == Self.olderBundle)
+        #expect(fixture.state.testRuns.results?.bundleURL == Self.olderBundle)
         #expect(fixture.testResults.readCount == 1)
     }
 
@@ -614,20 +614,20 @@ struct TestRunTests {
         let fixture = await openWithFailures()
         await addOlderRun(to: fixture)
         fixture.state.showTestRun(from: Self.olderBundle)
-        await fixture.state.currentTestRunRefresh?.value
+        await fixture.state.testRuns.currentRead?.value
         let reads = fixture.testResults.readCount
 
         fixture.state.refreshTestRun()
-        await fixture.state.currentTestRunRefresh?.value
+        await fixture.state.testRuns.currentRead?.value
 
-        #expect(fixture.state.testRun?.bundleURL == Self.olderBundle)
+        #expect(fixture.state.testRuns.results?.bundleURL == Self.olderBundle)
         #expect(fixture.testResults.readCount == reads)
 
         fixture.state.showTestRun(from: StubTestResults.bundleURL)
-        await fixture.state.currentTestRunRefresh?.value
+        await fixture.state.testRuns.currentRead?.value
 
-        #expect(fixture.state.pinnedTestRunBundleURL == nil)
-        #expect(fixture.state.testRun?.bundleURL == StubTestResults.bundleURL)
+        #expect(fixture.state.testRuns.pinnedBundleURL == nil)
+        #expect(fixture.state.testRuns.results?.bundleURL == StubTestResults.bundleURL)
     }
 
     @Test("A picked run that is deleted gives way to the newest")
@@ -635,14 +635,14 @@ struct TestRunTests {
         let fixture = await openWithFailures()
         await addOlderRun(to: fixture)
         fixture.state.showTestRun(from: Self.olderBundle)
-        await fixture.state.currentTestRunRefresh?.value
+        await fixture.state.testRuns.currentRead?.value
 
         fixture.testResults.reports.removeLast()
         fixture.state.refreshTestRun()
-        await fixture.state.currentTestRunRefresh?.value
+        await fixture.state.testRuns.currentRead?.value
 
-        #expect(fixture.state.pinnedTestRunBundleURL == nil)
-        #expect(fixture.state.testRun?.bundleURL == StubTestResults.bundleURL)
+        #expect(fixture.state.testRuns.pinnedBundleURL == nil)
+        #expect(fixture.state.testRuns.results?.bundleURL == StubTestResults.bundleURL)
     }
 
     // MARK: - Lifetime
@@ -653,7 +653,7 @@ struct TestRunTests {
 
         fixture.state.closeProject()
 
-        #expect(fixture.state.testRun == nil)
+        #expect(fixture.state.testRuns.results == nil)
         #expect(fixture.filesystem.removedPaths == [Self.scratch.path])
     }
 
@@ -671,12 +671,12 @@ struct TestRunTests {
         )
         fixture.watcher.send([ProjectFileEvent(url: directory.appendingPathComponent("Run2.xcresult/Info.plist"))])
 
-        for _ in 0 ..< 400 where fixture.state.testRun?.isEmpty != true {
+        for _ in 0 ..< 400 where fixture.state.testRuns.results?.isEmpty != true {
             try await Task.sleep(for: .milliseconds(10))
         }
-        await fixture.state.currentTestRunRefresh?.value
+        await fixture.state.testRuns.currentRead?.value
 
-        #expect(fixture.state.testRun?.isEmpty == true)
+        #expect(fixture.state.testRuns.results?.isEmpty == true)
         #expect(fixture.filesystem.removedPaths.contains(Self.scratch.path))
     }
 
@@ -690,7 +690,7 @@ struct TestRunTests {
             ProjectFileEvent(url: directory.appendingPathComponent("Run2.xcresult/Info.plist")),
         ])
 
-        #expect(fixture.state.testRun == nil)
+        #expect(fixture.state.testRuns.results == nil)
         #expect(fixture.testResults.readCount == 1)
         #expect(fixture.filesystem.removedPaths.contains(Self.scratch.path))
     }

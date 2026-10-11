@@ -138,26 +138,9 @@ final class AppState {
     /// What the sidebar lists: the project as it stands, or what its last test run failed
     /// on. Changed through ``showProjectStatus()`` and ``showTestRun()``.
     var sidebarSource: SidebarSource = .project
-    /// What the chosen test run of the open project failed on, or `nil` until somebody asks
-    /// for it. See `AppState+TestRun`.
-    private(set) var testRun: TestRunResults?
-    /// Every result bundle Xcode has for the open project, newest first, found without
-    /// reading any of them; empty when the project has never been tested.
-    var testRunBundles: [TestRunBundle] = []
-    /// The run somebody picked from the history, or `nil` to follow the newest one — which
-    /// is what a project opens on, and what keeps a fresh run replacing the one on screen.
-    var pinnedTestRunBundleURL: URL?
-    var testRunLocateTask: Task<Void, Never>?
-    /// Whether the run is being read, so the sidebar can say so rather than stand empty.
-    var isReadingTestRun = false
-    /// Why the run could not be shown, in place of the rows.
-    var testRunError: String?
-    let testResults: any TestResultReading
-    let testResultLocator: any TestResultLocating
-    /// The read in flight, so a newer run supersedes it rather than racing it.
-    var testRunTask: Task<Void, Never>?
-    /// Where Xcode writes the project's result bundles, as handed to the watcher.
-    var testResultDirectories: [String] = []
+    /// The open project's test runs and what the one read failed on. What a run does to the
+    /// tree and the canvas is decided here, in `AppState+TestRun`.
+    let testRuns: TestRunModel
 
     let filesystem: any FilesystemService
     let gitService: any GitService
@@ -221,8 +204,11 @@ final class AppState {
             filesystem: filesystem
         )
         pullRequestResolver = GitHubPRReferenceResolver(gitService: git)
-        self.testResults = testResults ?? XcresultReader(runner: SystemCommandRunner(), filesystem: filesystem)
-        self.testResultLocator = testResultLocator
+        testRuns = TestRunModel(
+            reader: testResults ?? XcresultReader(runner: SystemCommandRunner(), filesystem: filesystem),
+            locator: testResultLocator,
+            filesystem: filesystem
+        )
         self.defaults = defaults
         recentProjects = Self.loadRecentProjects(from: defaults)
         diffTolerance = DiffTolerance(maximumDeltaE: defaults.double(forKey: Self.diffToleranceKey))
@@ -347,9 +333,7 @@ final class AppState {
         scanTask?.cancel()
         stopWatching()
         discardTestRun()
-        testRunLocateTask?.cancel()
-        testRunBundles = []
-        pinnedTestRunBundleURL = nil
+        testRuns.reset()
         closePreview()
         currentProject = nil
         selectedRowID = nil
@@ -400,8 +384,7 @@ final class AppState {
         sidebarSource = .project
         selectedRowID = visibleRows.first?.id
         restartWatching()
-        testRunBundles = []
-        pinnedTestRunBundleURL = nil
+        testRuns.reset()
         locateTestRun()
     }
 
@@ -418,7 +401,7 @@ final class AppState {
         // The scan read the working tree's status itself, and more recently.
         gitStatusTask?.cancel()
         currentProject = bundle
-        expandedSuiteIDs.formIntersection(bundle.suites.map(\.id) + [Self.testRunSuiteID])
+        expandedSuiteIDs.formIntersection(bundle.suites.map(\.id) + [TestRunModel.attachmentsSuiteID])
 
         let rows = visibleRows
         if rowsBefore.isEmpty {
@@ -430,7 +413,7 @@ final class AppState {
 
         // An attachment of the test run was never in the scan, and is not gone for that.
         if let shown = preview?.snapshotID,
-           !Self.isTestRunAttachment(snapshotID: shown),
+           !TestRunModel.isAttachment(snapshotID: shown),
            !bundle.suites.contains(where: { $0.snapshots.contains { $0.id == shown } }) {
             closePreview()
         }
@@ -543,10 +526,10 @@ final class AppState {
         guard var suites = currentProject?.suites else { return [] }
         let isShowingTestRun = sidebarSource == .testRun
         if isShowingTestRun {
-            guard testRun != nil else { return [] }
+            guard testRuns.results != nil else { return [] }
             // Last, below everything the project itself holds: these are images the run
             // attached that belong to none of it.
-            if let attachments = testRunAttachmentsSuite { suites.append(attachments) }
+            if let attachments = testRuns.attachmentsSuite { suites.append(attachments) }
         }
 
         let query = trimmedFilterText.lowercased()
@@ -555,7 +538,7 @@ final class AppState {
         for suite in suites where !showWarningsOnly || hasSourceWarning(suite) {
             var children = showGitModifiedOnly ? suite.snapshots.filter(\.hasGitDiff) : suite.snapshots
             if isShowingTestRun {
-                children = children.filter { isFailingInTestRun($0) }
+                children = children.filter { testRuns.isFailing($0) }
             }
             let suiteMatches = query.isEmpty || suite.name.lowercased().contains(query)
 
@@ -796,7 +779,7 @@ final class AppState {
             return
         }
 
-        guard !Self.isTestRunAttachment(snapshotID: snapshot.id) else {
+        guard !TestRunModel.isAttachment(snapshotID: snapshot.id) else {
             setPreview(.testRunAttachment(snapshot))
             return
         }
@@ -804,7 +787,7 @@ final class AppState {
         // What the last run rendered says more than what the last commit held: the failure
         // is why the snapshot is being looked at.
         if withGitDiff, sidebarSource == .testRun,
-           let candidate = testRun?.candidates(forSnapshotID: snapshot.id).first {
+           let candidate = testRuns.results?.candidates(forSnapshotID: snapshot.id).first {
             showTestRunCandidate(candidate, against: snapshot)
             return
         }
@@ -944,11 +927,6 @@ final class AppState {
     /// Makes every view holding a decoded image read it off disk again.
     func invalidateLoadedImages() {
         imageReloadToken += 1
-    }
-
-    /// Replaces what the last test run is known to have failed on.
-    func setTestRun(_ newValue: TestRunResults?) {
-        testRun = newValue
     }
 
     func report(_ error: any Error) {
@@ -1122,7 +1100,7 @@ final class AppState {
     /// What showing `snapshot` with its diff is called, in the menu bar and on the row alike.
     func compareActionTitle(for snapshot: SnapshotItem?) -> String {
         if isReviewingPullRequest { return "Compare with Base Branch" }
-        if let snapshot, sidebarSource == .testRun, testRun?.isFailing(snapshotID: snapshot.id) == true {
+        if let snapshot, sidebarSource == .testRun, testRuns.results?.isFailing(snapshotID: snapshot.id) == true {
             return "Compare with Test Run"
         }
         return "Show Snapshot with Git Diff"

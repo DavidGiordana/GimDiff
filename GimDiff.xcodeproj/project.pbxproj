@@ -51,6 +51,7 @@
 				"App/AppState+Watching.swift",
 				App/GimDiffApp.swift,
 				App/SnapshotPreview.swift,
+				App/TestRunModel.swift,
 				"Extensions/Color+Hex.swift",
 				UI/Components/EmptyStateView.swift,
 				UI/Components/FullWidthPickers.swift,

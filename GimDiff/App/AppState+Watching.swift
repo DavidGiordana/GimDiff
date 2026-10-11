@@ -36,10 +36,8 @@ extension AppState {
         }
 
         // Where Xcode writes the next run's results, which is outside the project entirely.
-        testResultDirectories = testResultLocator
-            .resultDirectories(forProjectAt: project.rootURL, gitRootURL: project.gitRootURL)
-            .map(\.standardizedFileURL.path)
-        roots += testResultDirectories.map { URL(fileURLWithPath: $0, isDirectory: true) }
+        testRuns.updateResultDirectories(for: project)
+        roots += testRuns.resultDirectories.map { URL(fileURLWithPath: $0, isDirectory: true) }
 
         let batches = watcher.changes(under: roots)
         // Weakly held: the loop only ends when the stream does, and a strong reference
@@ -54,7 +52,7 @@ extension AppState {
     func stopWatching() {
         watchTask?.cancel()
         watchTask = nil
-        testResultDirectories = []
+        testRuns.updateResultDirectories(for: nil)
         cancelBackgroundRefresh()
     }
 
@@ -76,7 +74,7 @@ extension AppState {
 
         // A result bundle being written is a test run under way, and says nothing about the
         // snapshots until it is finished.
-        if touchesTestResults(events) {
+        if testRuns.touchesResults(events) {
             testResultsChanged()
         }
 

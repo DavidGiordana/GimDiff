@@ -40,7 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// the session's alone; nothing reopens them.
     func applicationWillTerminate(_ notification: Notification) {
         state.discardPullRequestFiles()
-        state.discardTestRunFiles()
+        state.testRuns.discardFiles()
     }
 
     /// Nothing outlives the window, so closing it quits rather than leaving a menu bar behind.

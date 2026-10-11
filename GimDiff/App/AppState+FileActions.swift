@@ -45,7 +45,7 @@ extension AppState {
         guard survivor.origin != .testRun else {
             let item = SnapshotItem(
                 id: preview?.snapshotID,
-                name: testRunImageName(at: survivor.fileURL) ?? name,
+                name: testRuns.imageName(at: survivor.fileURL) ?? name,
                 fileURL: survivor.fileURL
             )
             setPreview(.testRunAttachment(item))
@@ -157,7 +157,7 @@ extension AppState {
     /// Zero outside the run's view, so the action is only offered where its effect is listed.
     var acceptableTestRunFailuresCount: Int {
         guard sidebarSource == .testRun else { return 0 }
-        return testRun?.failedSnapshotsCount ?? 0
+        return testRuns.results?.failedSnapshotsCount ?? 0
     }
 
     /// Asks before ``acceptAllTestRunFailures()``, which every route to it goes through.
@@ -179,7 +179,7 @@ extension AppState {
     /// and does not hold back the others.
     func acceptAllTestRunFailures() {
         isConfirmingAcceptAllTestRunFailures = false
-        guard acceptableTestRunFailuresCount > 0, let testRun else { return }
+        guard acceptableTestRunFailuresCount > 0, let testRun = testRuns.results else { return }
 
         var accepted: Set<SnapshotItem.ID> = []
         var saved: [SavedFile] = []

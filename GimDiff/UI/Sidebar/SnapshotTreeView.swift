@@ -113,11 +113,11 @@ struct SnapshotTreeView: View {
     /// failed on nothing.
     @ViewBuilder
     private var testRunPlaceholder: some View {
-        if state.isReadingTestRun, state.testRun == nil {
+        if state.testRuns.isReading, state.testRuns.results == nil {
             ProgressView("Reading test results…")
                 .controlSize(.small)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let error = state.testRunError {
+        } else if let error = state.testRuns.error {
             SidebarEmptyStateView.testRunUnavailable(message: error, showProject: state.showProjectStatus)
         } else {
             SidebarEmptyStateView.noTestFailures(showProject: state.showProjectStatus)
@@ -275,7 +275,7 @@ private struct ProjectHeader: View {
         let testCaseNoun = testCases == 1 ? "test case" : "test cases"
         let snapshotNoun = snapshots == 1 ? "snapshot" : "snapshots"
         let totals = "\(testCases.formatted()) \(testCaseNoun) · \(snapshots.formatted()) \(snapshotNoun)"
-        guard state.sidebarSource == .testRun, let run = state.testRun else { return totals }
+        guard state.sidebarSource == .testRun, let run = state.testRuns.results else { return totals }
 
         // Under the run, the line says which run and how much of the project it failed on.
         let failed = "\(run.failedSnapshotsCount.formatted()) of \(snapshots.formatted()) failed"
@@ -321,9 +321,9 @@ private struct TestRunHistoryPicker: View {
                 .foregroundStyle(.secondary)
 
             FullWidthPopUpPicker(
-                options: state.testRunBundles.map { bundle in
+                options: state.testRuns.bundles.map { bundle in
                     PickerOption(
-                        title: TestRunBundleLabel.title(of: bundle, among: state.testRunBundles),
+                        title: TestRunBundleLabel.title(of: bundle, among: state.testRuns.bundles),
                         value: bundle.url
                     )
                 },
@@ -347,7 +347,7 @@ private struct TestRunHistoryPicker: View {
     /// whether it is pinned or the newest is followed.
     private var bundle: Binding<URL?> {
         Binding(
-            get: { state.selectedTestRunBundle?.url },
+            get: { state.testRuns.selectedBundle?.url },
             set: { url in url.map(state.showTestRun(from:)) }
         )
     }
@@ -415,7 +415,7 @@ private struct TreeRowView: View {
             }
 
             let failing = state.sidebarSource == .testRun ? state.failingSnapshotsCount(in: suite) : 0
-            if failing > 0, suite.id != AppState.testRunSuiteID {
+            if failing > 0, suite.id != TestRunModel.attachmentsSuiteID {
                 TestFailureBadge(count: failing)
             }
 
@@ -432,7 +432,7 @@ private struct TreeRowView: View {
 
     private func snapshotRow(_ snapshot: SnapshotItem) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: AppState.isTestRunAttachment(snapshotID: snapshot.id) ? "paperclip" : "function")
+            Image(systemName: TestRunModel.isAttachment(snapshotID: snapshot.id) ? "paperclip" : "function")
                 .foregroundStyle(.secondary)
 
             Text(snapshot.displayName)
@@ -444,7 +444,7 @@ private struct TreeRowView: View {
             if let change = state.pullRequestChange(forSnapshotID: snapshot.id) {
                 ChangeKindBadge(kind: change.kind)
             } else {
-                if state.sidebarSource == .testRun, state.testRun?.isFailing(snapshotID: snapshot.id) == true {
+                if state.sidebarSource == .testRun, state.testRuns.results?.isFailing(snapshotID: snapshot.id) == true {
                     TestFailureBadge()
                 }
                 if snapshot.hasGitDiff {

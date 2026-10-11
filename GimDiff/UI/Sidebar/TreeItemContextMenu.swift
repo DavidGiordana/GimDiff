@@ -30,7 +30,7 @@ struct TreeItemContextMenu: View {
     /// Whether the row is one of the images the last test run attached, which are copies
     /// with no test file behind them and nothing in the project to delete.
     private var isTestRunAttachment: Bool {
-        item.suiteID == AppState.testRunSuiteID
+        item.suiteID == TestRunModel.attachmentsSuiteID
     }
 
     @ViewBuilder

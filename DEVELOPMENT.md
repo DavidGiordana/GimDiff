@@ -332,9 +332,15 @@ The sidebar has two views of an open project, switched by the *Project / Test Ru
 control under the project header (and View ▸ Sidebar Shows). `AppState.sidebarSource` holds
 which one is up; switch through `showTestRun()` and `showProjectStatus()`, never by assigning.
 
-- **Every run is offered; the newest is the default.** `testRunBundles` lists every bundle
+The runs themselves live in `TestRunModel` (`AppState.testRuns`): the bundles, the run
+picked, the results, and the reading. It knows nothing about the window. A read hands its
+results back to `AppState+TestRun`, which decides what they do to the tree, the selection,
+and the canvas — so a new rule about the run goes in the model, and a new rule about what
+the user sees goes in the extension.
+
+- **Every run is offered; the newest is the default.** `testRuns.bundles` lists every bundle
   of the project, newest first, and the menu under the switch (and View ▸ Test Runs) picks
-  one through `showTestRun(from:)`. Picking an older run sets `pinnedTestRunBundleURL`, and
+  one through `showTestRun(from:)`. Picking an older run sets `testRuns.pinnedBundleURL`, and
   a pinned run stays on screen when a newer one arrives; picking the newest clears the pin,
   so the view follows new runs again. A pinned run that is deleted gives way to the newest.
 - **The switch appears only when there is a run.** `load(_:)` looks for the project's
@@ -382,7 +388,7 @@ own structure or from bytes.
 - **The canvas.** A failing snapshot opens as `SnapshotPreview.testRunFailure`: the
   candidate carries the `testRun` origin (never written to, so Reject is refused) and the
   baseline is the working file (so Accept works and settles the failure in memory). Images
-  that match nothing are listed under a synthetic suite, `AppState.testRunSuiteID`, which
+  that match nothing are listed under a synthetic suite, `TestRunModel.attachmentsSuiteID`, which
   cannot be deleted and carries no source warning.
 - **Accepting them all.** *Accept All…* beside the run picker (and Snapshot ▸ Accept All
   Test Run Failures…, deliberately unshortcut'd) goes through

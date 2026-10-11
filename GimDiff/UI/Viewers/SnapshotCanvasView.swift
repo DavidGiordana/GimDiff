@@ -303,7 +303,7 @@ struct SnapshotPaneHeader: View {
 
     private var displayName: String {
         guard pane.origin == .testRun else { return pane.fileURL.lastPathComponent }
-        return state.testRunImageName(at: pane.fileURL) ?? pane.fileURL.lastPathComponent
+        return state.testRuns.imageName(at: pane.fileURL) ?? pane.fileURL.lastPathComponent
     }
 
     /// Accepting and rejecting are not here: they decide between both panes, so they live

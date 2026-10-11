@@ -19,6 +19,10 @@ enum SidebarSource: Hashable, Sendable {
 
 /// The failures of one of the project's test runs, as a second view of the project.
 ///
+/// ``TestRunModel`` finds and reads the runs; this is what a run does to the window: the
+/// view switch, the selection and the canvas when results arrive, and the canvas methods
+/// that compare a failing snapshot with what its test rendered.
+///
 /// Every run Xcode still keeps is offered, newest first, and the newest is the one shown
 /// until somebody picks another. A picked run stays on screen when a newer one arrives;
 /// following the newest again is a matter of picking it.
@@ -29,15 +33,6 @@ enum SidebarSource: Hashable, Sendable {
 /// failing snapshot opens against the image its test rendered, so accepting that image is
 /// re-recording the snapshot without running the test again.
 extension AppState {
-    /// Identifier of the suite holding the images the run attached that belong to no
-    /// snapshot of the project.
-    static let testRunSuiteID = "test-run:attachments"
-    /// How long the result folder has to stay quiet before a new bundle is read.
-    ///
-    /// A run writes its bundle for as long as it lasts, and a bundle read halfway through
-    /// fails or says too little. Every new event restarts the wait.
-    static let testRunSettleDelay = Duration.seconds(1)
-
     // MARK: - Switching
 
     /// Whether there is a project on disk to have run the tests of, as opposed to nothing
@@ -49,22 +44,7 @@ extension AppState {
     /// Whether the sidebar can offer a test run: the project is on disk and Xcode has a run
     /// of it.
     var canShowTestRun: Bool {
-        isProjectOnDisk && !testRunBundles.isEmpty
-    }
-
-    /// The newest result bundle Xcode has for the open project; `nil` when the project has
-    /// never been tested.
-    var latestTestRunBundle: URL? {
-        testRunBundles.first?.url
-    }
-
-    /// The run the test run view shows, or would show if switched to: the one picked from
-    /// the history while it still exists, the newest otherwise.
-    var selectedTestRunBundle: TestRunBundle? {
-        if let pinned = pinnedTestRunBundleURL, let bundle = testRunBundles.first(where: { $0.url == pinned }) {
-            return bundle
-        }
-        return testRunBundles.first
+        isProjectOnDisk && !testRuns.bundles.isEmpty
     }
 
     /// Whether the Project / Test Run switch is on screen.
@@ -75,34 +55,18 @@ extension AppState {
         canShowTestRun || (isProjectOnDisk && sidebarSource == .testRun)
     }
 
-    // MARK: - Locating
-
     /// Looks for the runs of the open project, without reading any of them.
-    ///
-    /// Cheap enough to do on every load — one property list per workspace Xcode has built,
-    /// and one per run — and all the switch and the run picker need to know.
     func locateTestRun() {
-        testRunLocateTask?.cancel()
-        guard isProjectOnDisk, let project = currentProject else {
-            testRunBundles = []
-            return
-        }
-
-        testRunLocateTask = Task { [testResultLocator] in
-            let bundles = await Self.bundles(of: project, locator: testResultLocator)
-            guard !Task.isCancelled, currentProject?.rootURL == project.rootURL else { return }
-            testRunBundles = bundles
-        }
+        testRuns.locate(project: isProjectOnDisk ? currentProject : nil)
     }
-
-    /// The search in flight, if any, so a caller can wait for it.
-    var currentTestRunLocate: Task<Void, Never>? { testRunLocateTask }
 
     /// Whether the run's view has no rows to show, only a state: being read, unreadable, or
     /// failing on nothing.
     var isShowingTestRunPlaceholder: Bool {
         guard sidebarSource == .testRun else { return false }
-        return (isReadingTestRun && testRun == nil) || testRunError != nil || testRun?.isEmpty == true
+        return (testRuns.isReading && testRuns.results == nil)
+            || testRuns.error != nil
+            || testRuns.results?.isEmpty == true
     }
 
     /// Lists what the selected test run failed on, reading it first if it has not been read.
@@ -112,7 +76,7 @@ extension AppState {
         // The filters describe the project's status, not the run's failures.
         clearFilters()
 
-        if testRun == nil {
+        if testRuns.results == nil {
             refreshTestRun()
         } else {
             settleSelectionAfterSwitch()
@@ -120,13 +84,10 @@ extension AppState {
     }
 
     /// Lists what the run in `bundle` failed on, in place of whichever run was read.
-    ///
-    /// Picking the newest run is not pinning it: the view then follows the newest again, so
-    /// the next run Xcode writes replaces it as it always did.
     func showTestRun(from bundle: URL) {
-        guard isProjectOnDisk, testRunBundles.contains(where: { $0.url == bundle }) else { return }
-        pinnedTestRunBundleURL = bundle == latestTestRunBundle ? nil : bundle
-        guard testRun?.bundleURL != bundle else {
+        guard isProjectOnDisk, testRuns.bundles.contains(where: { $0.url == bundle }) else { return }
+        testRuns.pick(bundle)
+        guard testRuns.results?.bundleURL != bundle else {
             showTestRun()
             return
         }
@@ -177,115 +138,35 @@ extension AppState {
 
     // MARK: - Reading
 
-    /// Reads the selected run of the open project: the one picked from the history, or the
-    /// newest when none was or the one picked has since been deleted.
+    /// Reads the selected run of the open project, and puts what it failed on in the tree.
     ///
     /// - Parameter settling: Whether to wait for the result folder to go quiet first, for a
     ///   refresh set off by a run that may still be writing.
     func refreshTestRun(settling: Bool = false) {
-        testRunTask?.cancel()
         guard isProjectOnDisk, let project = currentProject else {
             discardTestRun()
             return
         }
 
-        isReadingTestRun = true
-        testRunError = nil
-        testRunTask = Task { [testResults, testResultLocator, filesystem] in
-            if settling {
-                do {
-                    try await Task.sleep(for: Self.testRunSettleDelay)
-                } catch {
-                    return
-                }
-            }
-
-            let bundles = await Self.bundles(of: project, locator: testResultLocator)
-            guard !Task.isCancelled else { return }
-            testRunBundles = bundles
-            if let pinned = pinnedTestRunBundleURL, !bundles.contains(where: { $0.url == pinned }) {
-                pinnedTestRunBundleURL = nil
-            }
-            guard let bundle = selectedTestRunBundle?.url else {
-                guard !Task.isCancelled else { return }
-                // The run the tree was showing has gone with its derived data.
-                discardTestRun()
-                testRunError = "Xcode has no test results for this project. Run its tests, then try again."
-                return
-            }
-            // A run picked from the history is finished; only the newest can still be growing.
-            if pinnedTestRunBundleURL != nil, testRun?.bundleURL == bundle {
-                isReadingTestRun = false
-                return
-            }
-
-            let results: TestRunResults
-            do {
-                results = try await Self.results(of: bundle, in: project, reader: testResults, filesystem: filesystem)
-            } catch {
-                guard !Task.isCancelled else { return }
-                isReadingTestRun = false
-                // A bundle that cannot be read may still be being written; results already on
-                // screen stay there until it can be.
-                if testRun == nil { testRunError = error.localizedDescription }
-                return
-            }
-
-            guard !Task.isCancelled,
-                  isProjectOnDisk,
-                  currentProject?.rootURL == project.rootURL
-            else {
-                Self.removeScratch(of: results, filesystem: filesystem)
-                return
-            }
-            isReadingTestRun = false
-            replaceTestRun(with: results)
-        }
-    }
-
-    /// The read in flight, if any, so a caller can wait for it.
-    var currentTestRunRefresh: Task<Void, Never>? { testRunTask }
-
-    /// Off the main actor: finding the bundles reads a property list per workspace Xcode
-    /// has ever built, and one per bundle.
-    @concurrent
-    private static func bundles(
-        of project: ProjectBundle,
-        locator: any TestResultLocating
-    ) async -> [TestRunBundle] {
-        locator.resultBundles(forProjectAt: project.rootURL, gitRootURL: project.gitRootURL)
-    }
-
-    /// Off the main actor as well: matching reads the attached images and every snapshot
-    /// of the same length.
-    @concurrent
-    private static func results(
-        of bundle: URL,
-        in project: ProjectBundle,
-        reader: any TestResultReading,
-        filesystem: any FilesystemService
-    ) async throws -> TestRunResults {
-        let report = try await reader.report(forBundleAt: bundle)
-        do {
-            let differences = try TestRunMatcher(filesystem: filesystem)
-                .differences(in: report, against: project)
-            return TestRunResults(report: report, differences: differences)
-        } catch {
-            try? filesystem.removeItem(at: report.scratchDirectory)
-            throw error
-        }
+        testRuns.read(
+            project: project,
+            settling: settling,
+            deliver: { [weak self] results in
+                guard let self, isProjectOnDisk, currentProject?.rootURL == project.rootURL else { return false }
+                replaceTestRun(with: results)
+                return true
+            },
+            forget: { [weak self] in self?.discardTestRun() }
+        )
     }
 
     private func replaceTestRun(with results: TestRunResults) {
-        let previous = testRun
+        let hadResults = testRuns.results != nil
         let rowsBefore = visibleRows
-        setTestRun(results)
-        if let previous { Self.removeScratch(of: previous, filesystem: filesystem) }
-        // A run with nothing to show has no images worth keeping on disk.
-        if results.isEmpty { Self.removeScratch(of: results, filesystem: filesystem) }
+        testRuns.replaceResults(with: results)
 
         guard sidebarSource == .testRun else { return }
-        guard previous != nil else {
+        guard hadResults else {
             settleSelectionAfterSwitch()
             return
         }
@@ -298,7 +179,7 @@ extension AppState {
 
         // The canvas follows a snapshot whose standing changed, but only if it is on one.
         guard let shownID = preview?.snapshotID else { return }
-        if Self.isTestRunAttachment(snapshotID: shownID) {
+        if TestRunModel.isAttachment(snapshotID: shownID) {
             if !rows.contains(where: { $0.snapshot?.id == shownID }) { closePreview() }
         } else if let snapshot = projectSnapshot(withID: shownID), previewFollowsTestRun(snapshot) {
             showSnapshot(snapshot, withGitDiff: true)
@@ -308,7 +189,7 @@ extension AppState {
     /// Whether the preview of `snapshot` no longer says what the run did to it: it shows a
     /// failure the run no longer has, or none where it now has one.
     private func previewFollowsTestRun(_ snapshot: SnapshotItem) -> Bool {
-        let candidates = testRun?.candidates(forSnapshotID: snapshot.id) ?? []
+        let candidates = testRuns.results?.candidates(forSnapshotID: snapshot.id) ?? []
         switch preview {
         case let .testRunFailure(pair, _, _):
             return !candidates.contains { $0.fileURL == pair.failure.url }
@@ -323,30 +204,13 @@ extension AppState {
         currentProject?.suites.lazy.flatMap(\.snapshots).first { $0.id == id }
     }
 
-    /// Forgets the run's results and deletes their images.
+    /// Forgets the run's results and deletes their images, closing the canvas when it shows
+    /// one of them.
     func discardTestRun() {
-        testRunTask?.cancel()
-        testRunTask = nil
-        isReadingTestRun = false
-        testRunError = nil
-        guard let testRun else { return }
-        setTestRun(nil)
-        Self.removeScratch(of: testRun, filesystem: filesystem)
-        if let shown = preview?.snapshotID, Self.isTestRunAttachment(snapshotID: shown) {
+        guard testRuns.forgetResults() else { return }
+        if let shown = preview?.snapshotID, TestRunModel.isAttachment(snapshotID: shown) {
             closePreview()
         }
-    }
-
-    /// Deletes the images of the results on screen, for the app to call on its way out.
-    func discardTestRunFiles() {
-        testRunTask?.cancel()
-        guard let testRun else { return }
-        Self.removeScratch(of: testRun, filesystem: filesystem)
-    }
-
-    private static func removeScratch(of results: TestRunResults, filesystem: any FilesystemService) {
-        guard filesystem.fileExists(at: results.scratchDirectory) else { return }
-        try? filesystem.removeItem(at: results.scratchDirectory)
     }
 
     /// Answers a change where Xcode writes the project's result bundles.
@@ -364,71 +228,24 @@ extension AppState {
         }
     }
 
-    // MARK: - Watching
-
-    /// Whether any of `events` happened where Xcode writes the project's result bundles.
-    func touchesTestResults(_ events: [ProjectFileEvent]) -> Bool {
-        guard !testResultDirectories.isEmpty else { return false }
-        return events.contains { event in
-            let path = event.url.standardizedFileURL.path
-            return testResultDirectories.contains { path == $0 || path.hasPrefix($0 + "/") }
-        }
-    }
-
     // MARK: - Rows
-
-    /// Whether the last run failed on `snapshot`, or attached it.
-    func isFailingInTestRun(_ snapshot: SnapshotItem) -> Bool {
-        Self.isTestRunAttachment(snapshotID: snapshot.id) || testRun?.isFailing(snapshotID: snapshot.id) == true
-    }
 
     /// Whether a suite row carries the missing-source warning.
     ///
     /// Never the run's attachments: they belong to no test file, and that is not a fault
     /// anybody can fix.
     func hasSourceWarning(_ suite: SnapshotSuite) -> Bool {
-        suite.isMissingSourceCode && suite.id != Self.testRunSuiteID
+        suite.isMissingSourceCode && suite.id != TestRunModel.attachmentsSuiteID
     }
 
     /// How many snapshots under `suite` the last run failed on.
     func failingSnapshotsCount(in suite: SnapshotSuite) -> Int {
-        suite.snapshots.filter(isFailingInTestRun).count
-    }
-
-    static func isTestRunAttachment(snapshotID: String) -> Bool {
-        snapshotID.hasPrefix(testRunSuiteID + ":")
-    }
-
-    /// The images the run attached that belong to no snapshot, as a suite of their own.
-    ///
-    /// Kept rather than dropped: an image that matches nothing is a snapshot recorded for
-    /// the first time, or one whose baseline has been replaced since, and both are worth
-    /// seeing. Each image is its own row, named after the test and the attachment.
-    var testRunAttachmentsSuite: SnapshotSuite? {
-        guard let testRun else { return nil }
-        let items = testRun.unmatched.flatMap { difference in
-            difference.candidates.map { image in
-                SnapshotItem(
-                    id: "\(Self.testRunSuiteID):\(difference.id):\(image.id)",
-                    name: "\(difference.testName) · \(image.name)",
-                    fileURL: image.fileURL
-                )
-            }
-        }
-        guard !items.isEmpty else { return nil }
-
-        return SnapshotSuite(
-            id: Self.testRunSuiteID,
-            name: "Unmatched Test Run Attachments",
-            snapshotsFolderURL: testRun.scratchDirectory,
-            snapshots: items,
-            providerId: Self.testRunSuiteID
-        )
+        suite.snapshots.filter(testRuns.isFailing).count
     }
 
     /// Refuses to delete an image the run attached, saying why.
     func refusesDeletionOfTestRunAttachments(in suiteID: String) -> Bool {
-        guard suiteID == Self.testRunSuiteID else { return false }
+        guard suiteID == TestRunModel.attachmentsSuiteID else { return false }
         report("These images were copied out of a test run; there is nothing in the project to delete.")
         return true
     }
@@ -448,7 +265,7 @@ extension AppState {
     /// switch between.
     var testRunCandidatesOnScreen: [TestRunImage] {
         guard case let .testRunFailure(_, snapshotID, _) = preview else { return [] }
-        return testRun?.candidates(forSnapshotID: snapshotID) ?? []
+        return testRuns.results?.candidates(forSnapshotID: snapshotID) ?? []
     }
 
     /// Puts another of the attached images in the candidate pane.
@@ -459,11 +276,6 @@ extension AppState {
             snapshotID: snapshotID,
             title: title
         ))
-    }
-
-    /// The name the image at `url` was attached under, when it came from the run.
-    func testRunImageName(at url: URL) -> String? {
-        testRun?.image(at: url)?.name
     }
 
     /// Takes a snapshot out of the run's failures once its candidate has been accepted.
@@ -478,11 +290,7 @@ extension AppState {
     /// the canvas a single time rather than once per snapshot.
     func resolveTestRunFailures(snapshotIDs: Set<String>) {
         let rowsBefore = visibleRows
-        if var updated = testRun {
-            updated.resolve(snapshotIDs: snapshotIDs)
-            setTestRun(updated)
-            if updated.isEmpty { Self.removeScratch(of: updated, filesystem: filesystem) }
-        }
+        testRuns.resolve(snapshotIDs: snapshotIDs)
 
         let rows = visibleRows
         if let selected = selectedRowID, !rows.contains(where: { $0.id == selected }) {
