@@ -65,9 +65,9 @@ struct DiffTolerancePicker: View {
 extension DiffTolerance {
     /// What the canvas and the View menu call this tolerance.
     var title: String {
-        guard !isExact else { return "Exact" }
+        guard !isExact else { return String(localized: "Exact") }
         let value = maximumDeltaE.formatted(.number.precision(.fractionLength(0...1)))
-        return maximumDeltaE == 2.3 ? "ΔE \(value) (Just Noticeable)" : "ΔE \(value)"
+        return maximumDeltaE == 2.3 ? String(localized: "ΔE \(value) (Just Noticeable)") : String(localized: "ΔE \(value)")
     }
 }
 
@@ -102,25 +102,25 @@ struct DiffReportPill: View {
     /// Differently sized images are called out rather than reported as 100% changed: the
     /// percentage would be true and useless, and the size is the thing to go and fix.
     static func summary(of report: ImageDiffReport) -> String {
-        guard report.hasIdenticalDimensions else { return "⚠️ Size Mismatch" }
+        guard report.hasIdenticalDimensions else { return String(localized: "⚠️ Size Mismatch") }
         guard !report.isIdentical else {
-            return report.toleratedPixelCount == 0 ? "100% Match" : "Match within Tolerance"
+            return report.toleratedPixelCount == 0 ? String(localized: "100% Match") : String(localized: "Match within Tolerance")
         }
 
         let pixels = report.differentPixelCount
-        let summary = String(format: "%.2f%% Diff (%@ pixels)", report.diffPercentage, pixels.formatted())
+        let summary = String(format: String(localized: "%.2f%% Diff (%@ pixels)"), report.diffPercentage, pixels.formatted())
         guard report.toleratedPixelCount > 0 else { return summary }
-        return "\(summary) · \(report.toleratedPixelCount.formatted()) tolerated"
+        return String(localized: "\(summary) · \(report.toleratedPixelCount) tolerated")
     }
 
     /// How loose the comparison would have to be for the two images to match.
     static func detail(of report: ImageDiffReport) -> String {
         guard report.hasIdenticalDimensions else {
-            return "The images are different sizes, so no pixel lines up with another."
+            return String(localized: "The images are different sizes, so no pixel lines up with another.")
         }
-        guard report.maximumDeltaE > 0 else { return "Every pixel is byte for byte the same." }
+        guard report.maximumDeltaE > 0 else { return String(localized: "Every pixel is byte for byte the same.") }
         let largest = report.maximumDeltaE.formatted(.number.precision(.fractionLength(1)))
-        return "The largest difference is ΔE \(largest). A tolerance at least that loose would call these images a match."
+        return String(localized: "The largest difference is ΔE \(largest). A tolerance at least that loose would call these images a match.")
     }
 
     static func tint(for report: ImageDiffReport) -> Color {

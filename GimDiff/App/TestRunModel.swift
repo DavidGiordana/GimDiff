@@ -157,7 +157,7 @@ final class TestRunModel {
             guard let bundle = selectedBundle?.url else {
                 // The run the tree was showing has gone with its derived data.
                 if let forget { forget() } else { forgetResults() }
-                error = "Xcode has no test results for this project. Run its tests, then try again."
+                error = String(localized: "Xcode has no test results for this project. Run its tests, then try again.")
                 return
             }
             // A run picked from the history is finished; only the newest can still be growing.
@@ -310,7 +310,7 @@ final class TestRunModel {
 
         return SnapshotSuite(
             id: Self.attachmentsSuiteID,
-            name: "Unmatched Test Run Attachments",
+            name: String(localized: "Unmatched Test Run Attachments"),
             snapshotsFolderURL: results.scratchDirectory,
             snapshots: items,
             providerId: Self.attachmentsSuiteID

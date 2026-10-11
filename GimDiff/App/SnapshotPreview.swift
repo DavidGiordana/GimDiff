@@ -48,8 +48,8 @@ struct SnapshotPane: Identifiable, Equatable, Sendable {
 
     var roleTitle: String {
         switch role {
-        case .candidate: "Candidate"
-        case .baseline: "Baseline"
+        case .candidate: String(localized: "Candidate")
+        case .baseline: String(localized: "Baseline")
         }
     }
 
@@ -57,12 +57,12 @@ struct SnapshotPane: Identifiable, Equatable, Sendable {
     /// when both carry the same file name.
     var roleSubtitle: String {
         switch (role, origin) {
-        case (.candidate, .pullRequest): "Pull Request Head"
-        case (.baseline, .pullRequest): "Base Branch"
-        case (_, .testRun): "Test Run"
-        case (.candidate, _): "Current"
-        case (.baseline, .committedVersion): "Committed in Git"
-        case (.baseline, .workingTree): "Recorded on Disk"
+        case (.candidate, .pullRequest): String(localized: "Pull Request Head")
+        case (.baseline, .pullRequest): String(localized: "Base Branch")
+        case (_, .testRun): String(localized: "Test Run")
+        case (.candidate, _): String(localized: "Current")
+        case (.baseline, .committedVersion): String(localized: "Committed in Git")
+        case (.baseline, .workingTree): String(localized: "Recorded on Disk")
         }
     }
 

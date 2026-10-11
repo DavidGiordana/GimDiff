@@ -89,12 +89,12 @@ struct BackdropColorButton: View {
     ///
     /// Named, because the View menu offers the same colours by name.
     static let presets: [(name: String, color: Color)] = [
-        ("White", .white),
-        ("Light Grey", Color(white: 0.85)),
-        ("Grey", Color(white: 0.5)),
-        ("Dark Grey", Color(white: 0.2)),
-        ("Black", .black),
-        ("Green", Color(red: 0, green: 0.85, blue: 0.3)),
+        (String(localized: "White"), .white),
+        (String(localized: "Light Grey"), Color(white: 0.85)),
+        (String(localized: "Grey"), Color(white: 0.5)),
+        (String(localized: "Dark Grey"), Color(white: 0.2)),
+        (String(localized: "Black"), .black),
+        (String(localized: "Green"), Color(red: 0, green: 0.85, blue: 0.3)),
     ]
 
     let title: String
@@ -138,7 +138,7 @@ struct BackdropColorButton: View {
                 Text("Custom")
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
-                PopoverColorWell(color: $color, accessibilityLabel: "Custom \(title)")
+                PopoverColorWell(color: $color, accessibilityLabel: String(localized: "Custom \(title)"))
                     .frame(
                         width: PopoverColorWell.controlSize.width,
                         height: PopoverColorWell.controlSize.height

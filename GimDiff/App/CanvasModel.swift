@@ -220,7 +220,7 @@ final class CanvasModel {
     /// What to call a pane on screen: its role, or its position when the roles are unknown.
     func sideTitle(for pane: SnapshotPane) -> String {
         guard looseRolesAreUnknown else { return pane.roleTitle }
-        return pane.role == .baseline ? "Left" : "Right"
+        return pane.role == .baseline ? String(localized: "Left") : String(localized: "Right")
     }
 
     // MARK: - Diff mask

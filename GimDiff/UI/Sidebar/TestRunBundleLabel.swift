@@ -30,7 +30,7 @@ enum TestRunBundleLabel {
             title += " · \(bundle.workspaceName)"
         }
         if bundle.url == bundles.first?.url {
-            title += " (Latest)"
+            title += String(localized: " (Latest)")
         }
         return title
     }

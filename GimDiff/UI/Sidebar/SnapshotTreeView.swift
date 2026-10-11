@@ -270,17 +270,14 @@ private struct ProjectHeader: View {
     }
 
     private func summary(of project: ProjectBundle) -> String {
-        let testCases = project.suites.count
         let snapshots = project.snapshotsCount
-        let testCaseNoun = testCases == 1 ? "test case" : "test cases"
-        let snapshotNoun = snapshots == 1 ? "snapshot" : "snapshots"
-        let totals = "\(testCases.formatted()) \(testCaseNoun) · \(snapshots.formatted()) \(snapshotNoun)"
+        let totals = String(localized: "\(project.suites.count) test cases · \(snapshots) snapshots")
         guard state.sidebarSource == .testRun, let run = state.testRuns.results else { return totals }
 
         // Under the run, the line says which run and how much of the project it failed on.
-        let failed = "\(run.failedSnapshotsCount.formatted()) of \(snapshots.formatted()) failed"
+        let failed = String(localized: "\(run.failedSnapshotsCount) of \(snapshots) failed")
         guard let startedAt = run.startedAt else { return failed }
-        return "\(failed) · run \(startedAt.formatted(.relative(presentation: .named)))"
+        return String(localized: "\(failed) · run \(startedAt.formatted(.relative(presentation: .named)))")
     }
 }
 
@@ -291,11 +288,11 @@ private struct SidebarSourcePicker: View {
     var body: some View {
         FullWidthSegmentedPicker(
             options: [
-                PickerOption(title: "Project", value: SidebarSource.project),
-                PickerOption(title: "Test Run", value: SidebarSource.testRun),
+                PickerOption(title: String(localized: "Project"), value: SidebarSource.project),
+                PickerOption(title: String(localized: "Test Run"), value: SidebarSource.testRun),
             ],
             selection: source,
-            help: "Show the project's snapshots, or the ones a test run in Xcode failed on",
+            help: String(localized: "Show the project's snapshots, or the ones a test run in Xcode failed on"),
             accessibilityIdentifier: "SidebarSource"
         )
     }
@@ -328,8 +325,8 @@ private struct TestRunHistoryPicker: View {
                     )
                 },
                 selection: bundle,
-                help: "Choose which of the test runs Xcode keeps for this project to show",
-                accessibilityLabel: "Run",
+                help: String(localized: "Choose which of the test runs Xcode keeps for this project to show"),
+                accessibilityLabel: String(localized: "Run"),
                 accessibilityIdentifier: "TestRunHistory"
             )
 
@@ -490,8 +487,8 @@ private struct TestFailureBadge: View {
     }
 
     private var explanation: String {
-        guard let count else { return "Failed in the test run" }
-        return count == 1 ? "1 snapshot failed in the test run" : "\(count) snapshots failed in the test run"
+        guard let count else { return String(localized: "Failed in the test run") }
+        return String(localized: "\(count) snapshots failed in the test run")
     }
 }
 

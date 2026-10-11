@@ -39,10 +39,10 @@ struct ChangeKindBadge: View {
 
     private var explanation: String {
         switch kind {
-        case .added: "Added by this pull request; the base branch has no version to compare with"
-        case .modified: "Modified by this pull request"
-        case .removed: "Deleted by this pull request; only the base branch's version exists"
-        case .renamed: "Renamed by this pull request"
+        case .added: String(localized: "Added by this pull request; the base branch has no version to compare with")
+        case .modified: String(localized: "Modified by this pull request")
+        case .removed: String(localized: "Deleted by this pull request; only the base branch's version exists")
+        case .renamed: String(localized: "Renamed by this pull request")
         }
     }
 }

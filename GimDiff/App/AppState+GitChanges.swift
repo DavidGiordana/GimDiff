@@ -91,7 +91,9 @@ extension AppState {
             }
             registerUndo(
                 restoring: saved,
-                actionName: snapshots.count == 1 ? "Discard Changes" : "Discard Changes to \(snapshots.count) Snapshots"
+                actionName: snapshots.count == 1
+                    ? String(localized: "Discard Changes")
+                    : String(localized: "Discard Changes to \(snapshots.count) Snapshots")
             )
             finishDiscarding(Set(snapshots.map(\.id)))
         }

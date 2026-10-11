@@ -204,7 +204,7 @@ final class AppState {
         } else if url.isImageFile {
             canvas.show(.single(Self.looseSnapshot(at: url)))
         } else {
-            report("“\(url.lastPathComponent)” is neither a folder nor an image GimDiff can open.")
+            report(String(localized: "“\(url.lastPathComponent)” is neither a folder nor an image GimDiff can open."))
         }
     }
 
@@ -230,7 +230,7 @@ final class AppState {
     func openProject(at url: URL) {
         let root = url.resolvingSymlinksInPath()
         guard filesystem.isDirectory(at: root) else {
-            report("“\(url.path)” is not a folder.")
+            report(String(localized: "“\(url.path)” is not a folder."))
             return
         }
 
@@ -904,7 +904,7 @@ final class AppState {
         }
 
         guard let text = clipboard.string(), let payload = ingestion.parseClipboardText(text) else {
-            report("The clipboard holds no snapshot path GimDiff recognises.")
+            report(String(localized: "The clipboard holds no snapshot path GimDiff recognises."))
             return
         }
 
@@ -944,7 +944,7 @@ final class AppState {
 
     func openTestSource(for suite: SnapshotSuite) {
         guard let sourceCodeURL = suite.sourceCodeURL else {
-            report("GimDiff could not find the test source for “\(suite.name)”.")
+            report(String(localized: "GimDiff could not find the test source for “\(suite.name)”."))
             return
         }
         workspace.open(sourceCodeURL)
@@ -1014,7 +1014,7 @@ final class AppState {
         guard let below = ComparisonImageRenderer.image(at: baseline.fileURL),
               let above = ComparisonImageRenderer.image(at: candidate.fileURL)
         else {
-            report("One of the two images could not be read, so there is nothing to copy.")
+            report(String(localized: "One of the two images could not be read, so there is nothing to copy."))
             return
         }
 
@@ -1031,7 +1031,7 @@ final class AppState {
                 caption: ComparisonCaption(
                     leftTitle: left,
                     rightTitle: right,
-                    detail: "\(preview.title) · split at \(Self.percent(canvas.splitPosition))"
+                    detail: String(localized: "\(preview.title) · split at \(Self.percent(canvas.splitPosition))")
                 )
             )
         } else {
@@ -1044,13 +1044,13 @@ final class AppState {
                 caption: ComparisonCaption(
                     leftTitle: left,
                     rightTitle: right,
-                    detail: "\(preview.title) · \(right) at \(Self.percent(canvas.onionOpacity))"
+                    detail: String(localized: "\(preview.title) · \(right) at \(Self.percent(canvas.onionOpacity))")
                 )
             )
         }
 
         guard let rendered, let png = ComparisonImageRenderer.pngData(rendered) else {
-            report("The comparison could not be drawn.")
+            report(String(localized: "The comparison could not be drawn."))
             return
         }
         clipboard.copy(pngData: png)
@@ -1062,16 +1062,16 @@ final class AppState {
 
     /// What showing `snapshot` with its diff is called, in the menu bar and on the row alike.
     func compareActionTitle(for snapshot: SnapshotItem?) -> String {
-        if isReviewingPullRequest { return "Compare with Base Branch" }
+        if isReviewingPullRequest { return String(localized: "Compare with Base Branch") }
         if let snapshot, sidebarSource == .testRun, testRuns.results?.isFailing(snapshotID: snapshot.id) == true {
-            return "Compare with Test Run"
+            return String(localized: "Compare with Test Run")
         }
-        return "Show Snapshot with Git Diff"
+        return String(localized: "Show Snapshot with Git Diff")
     }
 
     /// What showing a snapshot on its own is called, in the menu bar and on the row alike.
     var showAloneActionTitle: String {
-        isReviewingPullRequest ? "Show Pull Request Version Only" : "Show Snapshot without Git Diff"
+        isReviewingPullRequest ? String(localized: "Show Pull Request Version Only") : String(localized: "Show Snapshot without Git Diff")
     }
 
     func showSelectedSnapshot(withGitDiff: Bool) {
@@ -1119,7 +1119,7 @@ final class AppState {
         let rowID = TreeRowItem.snapshotRowID(snapshot.id, parentSuiteID: suiteID)
         let replacement = selection(surviving: [rowID])
 
-        guard trash(snapshot.fileURL, actionName: "Move Snapshot to Trash") else { return }
+        guard trash(snapshot.fileURL, actionName: String(localized: "Move Snapshot to Trash")) else { return }
 
         // Pruned in memory rather than rescanned: the scan that found this snapshot walked
         // the whole project, and nothing about deleting one file needs that repeated.
@@ -1137,7 +1137,7 @@ final class AppState {
         }
         let replacement = selection(surviving: removedRowIDs)
 
-        guard trash(suite.snapshotsFolderURL, actionName: "Move Snapshots Folder to Trash") else { return }
+        guard trash(suite.snapshotsFolderURL, actionName: String(localized: "Move Snapshots Folder to Trash")) else { return }
 
         currentProject?.suites.removeAll { $0.id == suite.id }
         expandedSuiteIDs.remove(suite.id)
@@ -1151,7 +1151,7 @@ final class AppState {
     /// request and only make the review lie about what it changes.
     private func refusesDeletionUnderReview() -> Bool {
         guard isReviewingPullRequest else { return false }
-        report("Snapshots in a pull request review are read-only; there is nothing on disk to delete.")
+        report(String(localized: "Snapshots in a pull request review are read-only; there is nothing on disk to delete."))
         return true
     }
 

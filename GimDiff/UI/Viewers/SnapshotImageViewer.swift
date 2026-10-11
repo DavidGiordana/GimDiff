@@ -21,9 +21,9 @@ enum CanvasDisplayMode: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .free: "Free"
-        case .fit: "Fit"
-        case .actualSize: "Actual Size (1:1)"
+        case .free: String(localized: "Free")
+        case .fit: String(localized: "Fit")
+        case .actualSize: String(localized: "Actual Size (1:1)")
         }
     }
 }

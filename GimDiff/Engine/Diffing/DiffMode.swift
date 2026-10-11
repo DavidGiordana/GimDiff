@@ -23,10 +23,10 @@ enum DiffMode: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .sideBySide: "Side by Side"
-        case .curtain: "Split View"
-        case .onionSkin: "Onion Skin"
-        case .difference: "Difference"
+        case .sideBySide: String(localized: "Side by Side")
+        case .curtain: String(localized: "Split View")
+        case .onionSkin: String(localized: "Onion Skin")
+        case .difference: String(localized: "Difference")
         }
     }
 

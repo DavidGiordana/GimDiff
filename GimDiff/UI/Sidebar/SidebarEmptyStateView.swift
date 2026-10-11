@@ -16,9 +16,9 @@ import SwiftUI
 struct SidebarEmptyStateView: View {
     let systemImage: String
     var tint: Color?
-    let title: String
-    let message: String
-    let actionTitle: String
+    let title: LocalizedStringKey
+    let message: LocalizedStringKey
+    let actionTitle: LocalizedStringKey
     let action: () -> Void
 
     var body: some View {
@@ -85,7 +85,8 @@ extension SidebarEmptyStateView {
         SidebarEmptyStateView(
             systemImage: "xmark.octagon",
             title: "No Test Results",
-            message: message,
+            // Interpolated, so the reason is shown as written rather than looked up.
+            message: "\(message)",
             actionTitle: "Show Project",
             action: showProject
         )

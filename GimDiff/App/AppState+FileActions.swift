@@ -73,17 +73,17 @@ extension AppState {
     /// than refusing, so the reason is spelled out instead.
     var candidatePromotionObstacle: String? {
         guard let baseline = canvas.preview?.baseline else {
-            return "There is no baseline on screen to overwrite."
+            return String(localized: "There is no baseline on screen to overwrite.")
         }
         guard baseline.origin != .pullRequest else {
             return Self.pullRequestPromotionObstacle
         }
         guard baseline.isWritable else {
-            return """
+            return String(localized: """
             The baseline on screen was read out of \(CanvasModel.comparisonGitRef) and exists only \
             for this comparison. The candidate is already the file on disk — commit it to \
             make it the recorded baseline.
-            """
+            """)
         }
         return nil
     }
@@ -91,16 +91,16 @@ extension AppState {
     var canPromoteCandidate: Bool { candidatePromotionObstacle == nil }
 
     /// Why the candidate out of a test run cannot be written to.
-    static let testRunRevertObstacle = """
+    static let testRunRevertObstacle = String(localized: """
         The candidate is a copy of what the test run rendered, not a file in the \
         project. Run the test again to replace it.
-        """
+        """)
 
     /// Why neither side of a pull request comparison can be written to.
-    static let pullRequestPromotionObstacle = """
+    static let pullRequestPromotionObstacle = String(localized: """
         Both images were downloaded from a GitHub pull request for review. Accept or reject \
         the change on its branch; there is no file on disk here to overwrite.
-        """
+        """)
 
     /// Whether the candidate on disk can be put back to what the baseline holds.
     ///
@@ -112,7 +112,7 @@ extension AppState {
     /// Why the candidate cannot be put back to the baseline, or `nil` when it can.
     var candidateRevertObstacle: String? {
         guard let candidate = canvas.preview?.candidate, canvas.preview?.baseline != nil else {
-            return "There is no comparison on screen to reject."
+            return String(localized: "There is no comparison on screen to reject.")
         }
         guard candidate.isWritable else {
             return candidate.origin == .testRun ? Self.testRunRevertObstacle : Self.pullRequestPromotionObstacle
@@ -125,7 +125,7 @@ extension AppState {
     /// - Parameter actionName: What Edit ▸ Undo calls the write.
     /// - Returns: Whether the baseline was written.
     @discardableResult
-    func promoteCandidateToBaseline(actionName: String = "Accept Candidate") -> Bool {
+    func promoteCandidateToBaseline(actionName: String = String(localized: "Accept Candidate")) -> Bool {
         guard let candidate = canvas.preview?.candidate, let baseline = canvas.preview?.baseline else { return false }
 
         if let obstacle = candidatePromotionObstacle {
@@ -195,7 +195,7 @@ extension AppState {
         }
 
         // One step for the lot: the confirmation asked about them together.
-        registerUndo(restoring: saved, actionName: "Accept All Test Run Failures")
+        registerUndo(restoring: saved, actionName: String(localized: "Accept All Test Run Failures"))
         guard !accepted.isEmpty else { return }
         resolveTestRunFailures(snapshotIDs: accepted)
         finishFileAction()
@@ -209,14 +209,14 @@ extension AppState {
     /// Written rather than merely kept, unlike ``keepBaseline()``: with the sides unknown,
     /// the right image may be the recorded snapshot, and keeping the left has to reach it.
     func keepLeft() {
-        guard canvas.looseRolesAreUnknown, revertCandidateToBaseline(actionName: "Keep Left") else { return }
+        guard canvas.looseRolesAreUnknown, revertCandidateToBaseline(actionName: String(localized: "Keep Left")) else { return }
         closePane(.candidate)
     }
 
     /// Settles an undecided pair in favour of the right image: it is written over the left
     /// one, and stays on screen on its own.
     func keepRight() {
-        guard canvas.looseRolesAreUnknown, promoteCandidateToBaseline(actionName: "Keep Right") else { return }
+        guard canvas.looseRolesAreUnknown, promoteCandidateToBaseline(actionName: String(localized: "Keep Right")) else { return }
         closePane(.baseline)
     }
 
@@ -234,7 +234,7 @@ extension AppState {
     func keepCandidate() {
         guard canvas.preview?.isLoosePair == true,
               !canvas.looseRolesAreUnknown,
-              promoteCandidateToBaseline(actionName: "Keep Candidate")
+              promoteCandidateToBaseline(actionName: String(localized: "Keep Candidate"))
         else { return }
         closePane(.candidate)
     }
@@ -244,7 +244,7 @@ extension AppState {
     /// - Parameter actionName: What Edit ▸ Undo calls the write.
     /// - Returns: Whether the candidate was written.
     @discardableResult
-    func revertCandidateToBaseline(actionName: String = "Reject Candidate") -> Bool {
+    func revertCandidateToBaseline(actionName: String = String(localized: "Reject Candidate")) -> Bool {
         guard let candidate = canvas.preview?.candidate, let baseline = canvas.preview?.baseline else { return false }
         if let obstacle = candidateRevertObstacle {
             report(obstacle)
@@ -300,7 +300,7 @@ extension AppState {
 
     func openTestSourceForPreview() {
         guard let suite = previewSuite else {
-            report("GimDiff does not know which test recorded this image.")
+            report(String(localized: "GimDiff does not know which test recorded this image."))
             return
         }
         openTestSource(for: suite)

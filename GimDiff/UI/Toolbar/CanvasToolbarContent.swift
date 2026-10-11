@@ -33,16 +33,16 @@ struct CanvasToolbarContent: ToolbarContent {
 
         ToolbarItemGroup(placement: .principal) {
             BackdropColorButton(
-                title: "Panel Background",
+                title: String(localized: "Panel Background"),
                 systemImage: "rectangle.inset.filled",
-                help: "Colour behind the image panes",
+                help: String(localized: "Colour behind the image panes"),
                 color: $panelBackground
             )
 
             BackdropColorButton(
-                title: "Image Matte",
+                title: String(localized: "Image Matte"),
                 systemImage: "photo",
-                help: "Colour painted behind the image itself, for reading a transparent snapshot",
+                help: String(localized: "Colour painted behind the image itself, for reading a transparent snapshot"),
                 color: $imageMatte
             )
 

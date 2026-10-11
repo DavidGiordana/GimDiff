@@ -460,7 +460,7 @@ struct AppCommands: Commands {
     /// What the onion skin calls one side, which is its position when the roles are unknown.
     private func onionSideTitle(_ role: SnapshotPane.Role) -> String {
         guard let pane = state.canvas.preview?.panes.first(where: { $0.role == role }) else {
-            return role == .baseline ? "Baseline" : "Candidate"
+            return role == .baseline ? String(localized: "Baseline") : String(localized: "Candidate")
         }
         return state.canvas.sideTitle(for: pane)
     }

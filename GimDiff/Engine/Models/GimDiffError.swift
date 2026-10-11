@@ -34,23 +34,23 @@ extension GimDiffError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .unsupportedScheme(scheme):
-            "“\(scheme ?? "(none)")” is not a GimDiff URL scheme."
+            String(localized: "“\(scheme ?? String(localized: "(none)"))” is not a GimDiff URL scheme.")
         case let .unsupportedAction(action):
-            "GimDiff does not know how to handle the action “\(action ?? "(none)")”."
+            String(localized: "GimDiff does not know how to handle the action “\(action ?? String(localized: "(none)"))”.")
         case let .missingParameter(name):
-            "The URL is missing the required “\(name)” parameter."
+            String(localized: "The URL is missing the required “\(name)” parameter.")
         case let .commandFailed(command, exitCode, message):
-            "“\(command)” failed with status \(exitCode): \(message)"
+            String(localized: "“\(command)” failed with status \(exitCode): \(message)")
         case let .notARepository(url):
-            "“\(url.path)” is not inside a Git repository."
+            String(localized: "“\(url.path)” is not inside a Git repository.")
         case let .unrecognisedProjectLayout(url):
-            "GimDiff found no snapshots it recognises under “\(url.path)”."
+            String(localized: "GimDiff found no snapshots it recognises under “\(url.path)”.")
         case let .unreadableImage(url):
-            "“\(url.path)” could not be read as an image."
+            String(localized: "“\(url.path)” could not be read as an image.")
         case let .imageProcessingFailed(url):
-            "“\(url.path)” could not be prepared for comparison."
+            String(localized: "“\(url.path)” could not be prepared for comparison.")
         case let .unreadableTestResults(url):
-            "The test results in “\(url.path)” could not be read."
+            String(localized: "The test results in “\(url.path)” could not be read.")
         }
     }
 }

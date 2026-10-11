@@ -246,7 +246,7 @@ extension AppState {
     /// Refuses to delete an image the run attached, saying why.
     func refusesDeletionOfTestRunAttachments(in suiteID: String) -> Bool {
         guard suiteID == TestRunModel.attachmentsSuiteID else { return false }
-        report("These images were copied out of a test run; there is nothing in the project to delete.")
+        report(String(localized: "These images were copied out of a test run; there is nothing in the project to delete."))
         return true
     }
 

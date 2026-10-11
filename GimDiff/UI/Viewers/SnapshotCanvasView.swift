@@ -445,21 +445,21 @@ struct SnapshotDecisionBar: View {
         .help("Overwrite the left image with the right one")
     }
 
-    static let undecidedNote = """
+    static let undecidedNote = String(localized: """
         GimDiff can’t tell which image is the recorded snapshot. Keep the one that’s \
         right; the other is overwritten with it.
-        """
+        """)
 
     /// What decided the sides, when it was the files rather than the source's own labels.
     static func reason(for certainty: LooseRoleCertainty?) -> String? {
         guard case let .inferred(evidence, swapped) = certainty else { return nil }
         let because = switch evidence {
-        case .trackedByGit: "Git tracks the baseline and not the candidate"
-        case .insideProject: "the baseline is in the open project and the candidate is not"
+        case .trackedByGit: String(localized: "Git tracks the baseline and not the candidate")
+        case .insideProject: String(localized: "the baseline is in the open project and the candidate is not")
         }
         return swapped
-            ? "Sides swapped from the order given: \(because)."
-            : "Sides chosen because \(because)."
+            ? String(localized: "Sides swapped from the order given: \(because).")
+            : String(localized: "Sides chosen because \(because).")
     }
 
     private func note(_ text: String) -> some View {
@@ -490,7 +490,7 @@ struct SnapshotDecisionBar: View {
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
         .disabled(!state.canPromoteCandidate)
-        .help(state.candidatePromotionObstacle ?? "Overwrite the baseline with the candidate")
+        .help(state.candidatePromotionObstacle ?? String(localized: "Overwrite the baseline with the candidate"))
     }
 
     @ViewBuilder
@@ -502,7 +502,7 @@ struct SnapshotDecisionBar: View {
         }
         .controlSize(.large)
         .disabled(!state.canRevertToBaseline)
-        .help(state.candidateRevertObstacle ?? "Overwrite the candidate with the baseline")
+        .help(state.candidateRevertObstacle ?? String(localized: "Overwrite the candidate with the baseline"))
         .accessibilityLabel("Reject Candidate")
 
         Button {
@@ -513,7 +513,7 @@ struct SnapshotDecisionBar: View {
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
         .disabled(!state.canPromoteCandidate)
-        .help(state.candidatePromotionObstacle ?? "Overwrite the baseline with the candidate")
+        .help(state.candidatePromotionObstacle ?? String(localized: "Overwrite the baseline with the candidate"))
         .accessibilityLabel("Accept Candidate")
     }
 

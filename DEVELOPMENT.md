@@ -525,6 +525,32 @@ there, only files. **Adding a file under `GimDiff/App/` or `GimDiff/UI/`, or any
 that imports SwiftUI or AppKit, means adding its path to that list** — otherwise the next
 `xcodebuild -scheme gimdiff` build fails on it.
 
+## Localization
+
+The app's text lives in `GimDiff/Localizable.xcstrings`, English being the source language.
+No translation ships yet; adding one is a matter of filling the catalog in Xcode.
+
+- **Every word a user reads goes through the catalog.** A literal handed straight to `Text`,
+  `Button`, `Label`, `.help`, or a menu item is extracted on its own. Anything built first
+  and handed over as a `String` is not — SwiftUI shows a `String` verbatim — so write it as
+  `String(localized: "…")` where it is built: titles, messages, `report("…")`, help topics,
+  undo action names, error descriptions.
+- **A count is one key, not two literals.** Write `String(localized: "\(n) snapshots")` and
+  put the singular in the catalog's plural variations, never `n == 1 ? "…" : "…"`: other
+  languages have more than two forms. `LocalizationTests` checks the English ones.
+- **The `gimdiff` tool stays English.** Its output is read by scripts, and its target does
+  not extract strings; the catalog is excluded from it like any other app-only file.
+
+`xcodebuild` compiles the catalog but does not add new strings to it — Xcode does that when
+it builds. From the command line, merge what the compiler extracted after a build:
+
+```sh
+xcodebuild -scheme GimDiff -destination 'platform=macOS' build
+I=$(xcodebuild -scheme GimDiff -showBuildSettings | awk '/ TARGET_TEMP_DIR /{print $3}')
+xcrun xcstringstool sync GimDiff/Localizable.xcstrings \
+    $(find "$I" -name '*.stringsdata' -path '*arm64*' -exec echo --stringsdata {} \;)
+```
+
 ## Code style
 
 - No trailing whitespace, and no empty line containing indentation. Verify with:

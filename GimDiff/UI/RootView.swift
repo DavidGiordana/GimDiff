@@ -85,10 +85,7 @@ struct RootView: View {
     }
 
     private var discardAllTitle: String {
-        let count = state.discardableProjectSnapshots.count
-        return count == 1
-            ? "Discard the changes to 1 snapshot?"
-            : "Discard the changes to \(count.formatted()) snapshots?"
+        String(localized: "Discard the changes to \(state.discardableProjectSnapshots.count) snapshots?")
     }
 
     private var discardAllConfirmation: Binding<Bool> {
@@ -99,10 +96,7 @@ struct RootView: View {
     }
 
     private var acceptAllTitle: String {
-        let count = state.acceptableTestRunFailuresCount
-        return count == 1
-            ? "Accept the failing snapshot?"
-            : "Accept all \(count.formatted()) failing snapshots?"
+        String(localized: "Accept all \(state.acceptableTestRunFailuresCount) failing snapshots?")
     }
 
     private var acceptAllConfirmation: Binding<Bool> {

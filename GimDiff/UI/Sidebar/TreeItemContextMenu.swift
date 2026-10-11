@@ -66,9 +66,7 @@ struct TreeItemContextMenu: View {
                     state.discardGitChanges(of: discardable)
                 } label: {
                     Label(
-                        discardable.count == 1
-                            ? "Discard Changes to 1 Snapshot"
-                            : "Discard Changes to \(discardable.count) Snapshots",
+                        "Discard Changes to \(discardable.count) Snapshots",
                         systemImage: "arrow.uturn.backward"
                     )
                 }

@@ -18,9 +18,9 @@ struct EmptyStateView: View {
     let systemImage: String
     /// Colour for the icon, when the state is news rather than an absence.
     var tint: Color?
-    let title: String
-    let message: String
-    var actionTitle: String?
+    let title: LocalizedStringKey
+    let message: LocalizedStringKey
+    var actionTitle: LocalizedStringKey?
     var action: (() -> Void)?
 
     var body: some View {
