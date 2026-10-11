@@ -77,6 +77,28 @@ struct PromotionIntegrationTests {
         #expect(state.currentProject?.hasGitDiff == false)
     }
 
+    @Test("Undoing a reject puts the working change back on disk, and Redo rejects it again")
+    func undoesARejectOnDisk() async throws {
+        let (repository, item) = try repositoryWithAModifiedSnapshot()
+        let defaults = TemporaryDefaults()
+        let state = state(for: repository, item: item, defaults: defaults)
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        state.undoManager = undo
+
+        state.showSnapshot(item, withGitDiff: true)
+        await state.currentGitDiff?.value
+        state.revertCandidateToBaseline()
+        #expect(try Data(contentsOf: item.fileURL) == Self.committedBytes)
+        #expect(undo.undoActionName == "Reject Candidate")
+
+        undo.undo()
+        #expect(try Data(contentsOf: item.fileURL) == Self.modifiedBytes)
+
+        undo.redo()
+        #expect(try Data(contentsOf: item.fileURL) == Self.committedBytes)
+    }
+
     @Test("Discarding puts HEAD back, staged change included, and leaves the image on its own")
     func discardsAModifiedSnapshot() async throws {
         let (repository, item) = try repositoryWithAModifiedSnapshot()

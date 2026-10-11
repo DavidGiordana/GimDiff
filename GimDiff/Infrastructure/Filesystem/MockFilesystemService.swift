@@ -22,6 +22,9 @@ final class MockFilesystemService: FilesystemService, @unchecked Sendable {
     private var storedDirectories: Set<String> = ["/"]
     private var storedPackages: Set<String> = []
     private var storedTrashedPaths: [String] = []
+    /// What each trashed item held, keyed by the path the mock says it went to, with every
+    /// file under it stored relative to the item itself.
+    private var storedTrash: [String: [String: Data]] = [:]
     private var storedRemovedPaths: [String] = []
     private var storedModificationDates: [String: Date] = [:]
 
@@ -177,15 +180,48 @@ final class MockFilesystemService: FilesystemService, @unchecked Sendable {
         }
     }
 
-    func trashFile(at url: URL) throws {
+    @discardableResult
+    func trashFile(at url: URL) throws -> URL? {
         try lock.withLock {
             let key = Self.key(for: url)
             guard storedFiles[key] != nil || storedDirectories.contains(key) else {
                 throw Self.noSuchFile(url)
             }
-            storedFiles[key] = nil
-            storedDirectories.remove(key)
+            let trashKey = Self.trashDirectory
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathComponent(url.lastPathComponent)
+                .path
+            storedTrash[trashKey] = takeSubtree(at: key)
             storedTrashedPaths.append(key)
+            return URL(fileURLWithPath: trashKey)
+        }
+    }
+
+    func moveItem(at source: URL, to destination: URL) throws {
+        try lock.withLock {
+            let sourceKey = Self.key(for: source)
+            let destinationKey = Self.key(for: destination)
+            guard storedFiles[destinationKey] == nil, !storedDirectories.contains(destinationKey) else {
+                throw CocoaError(.fileWriteFileExists, userInfo: [NSURLErrorKey: destination])
+            }
+
+            let subtree: [String: Data]
+            if let trashed = storedTrash.removeValue(forKey: sourceKey) {
+                subtree = trashed
+            } else {
+                guard storedFiles[sourceKey] != nil || storedDirectories.contains(sourceKey) else {
+                    throw Self.noSuchFile(source)
+                }
+                subtree = takeSubtree(at: sourceKey)
+            }
+
+            registerDirectory(destinationKey)
+            for (relative, data) in subtree {
+                let key = relative.isEmpty ? destinationKey : destinationKey + "/" + relative
+                if relative.isEmpty { storedDirectories.remove(key) }
+                storedFiles[key] = data
+                registerParents(of: key)
+            }
         }
     }
 
@@ -211,6 +247,25 @@ final class MockFilesystemService: FilesystemService, @unchecked Sendable {
     }
 
     // MARK: - Storage
+
+    /// Where the mock says trashed items went.
+    static let trashDirectory = URL(fileURLWithPath: "/mock-trash", isDirectory: true)
+
+    /// Removes the file or folder at `key` and returns every file it held, by path relative
+    /// to it; a single file comes back under the empty path.
+    private func takeSubtree(at key: String) -> [String: Data] {
+        var subtree: [String: Data] = [:]
+        if let data = storedFiles.removeValue(forKey: key) {
+            subtree[""] = data
+        }
+        let prefix = key + "/"
+        for (path, data) in storedFiles where path.hasPrefix(prefix) {
+            subtree[String(path.dropFirst(prefix.count))] = data
+            storedFiles[path] = nil
+        }
+        storedDirectories = storedDirectories.filter { $0 != key && !$0.hasPrefix(prefix) }
+        return subtree
+    }
 
     private func registerParents(of key: String) {
         registerDirectory((key as NSString).deletingLastPathComponent)

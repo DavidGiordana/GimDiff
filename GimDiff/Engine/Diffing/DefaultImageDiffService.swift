@@ -36,9 +36,12 @@ struct DefaultImageDiffService: ImageDiffService {
         self.filesystem = filesystem
     }
 
-    func compare(candidateURL: URL, baselineURL: URL, diffColor: CGColor) async throws
-        -> ImageDiffReport
-    {
+    func compare(
+        candidateURL: URL,
+        baselineURL: URL,
+        diffColor: CGColor,
+        tolerance: DiffTolerance
+    ) async throws -> ImageDiffReport {
         let candidate = try Self.loadImage(at: candidateURL)
         let baseline = try Self.loadImage(at: baselineURL)
 
@@ -73,12 +76,28 @@ struct DefaultImageDiffService: ImageDiffService {
 
         let highlight = Self.components(of: diffColor)
         var differentPixelCount = 0
+        var toleratedPixelCount = 0
+        var maximumDeltaE = 0.0
 
         for offset in stride(from: 0, to: byteCount, by: Self.bytesPerPixel) {
-            let differs = candidatePixels[offset] != baselinePixels[offset]
+            var differs = candidatePixels[offset] != baselinePixels[offset]
                 || candidatePixels[offset + 1] != baselinePixels[offset + 1]
                 || candidatePixels[offset + 2] != baselinePixels[offset + 2]
                 || candidatePixels[offset + 3] != baselinePixels[offset + 3]
+
+            // The distance is measured only where the bytes moved, which in a snapshot is
+            // almost nowhere, so the colour maths costs nothing on a matching image.
+            if differs {
+                let distance = Self.perceptualDistance(
+                    Self.pixel(candidatePixels, at: offset),
+                    Self.pixel(baselinePixels, at: offset)
+                )
+                maximumDeltaE = max(maximumDeltaE, distance)
+                if !tolerance.isExact, distance <= tolerance.maximumDeltaE {
+                    differs = false
+                    toleratedPixelCount += 1
+                }
+            }
 
             if differs {
                 differentPixelCount += 1
@@ -107,7 +126,9 @@ struct DefaultImageDiffService: ImageDiffService {
             differentPixelCount: differentPixelCount,
             totalPixelCount: totalPixelCount,
             diffPercentage: Self.percentage(of: differentPixelCount, in: totalPixelCount),
-            diffMaskURL: try writeMask(from: maskContext, for: candidateURL)
+            diffMaskURL: try writeMask(from: maskContext, for: candidateURL),
+            toleratedPixelCount: toleratedPixelCount,
+            maximumDeltaE: maximumDeltaE
         )
     }
 
@@ -115,6 +136,63 @@ struct DefaultImageDiffService: ImageDiffService {
     static func percentage(of differentPixels: Int, in totalPixels: Int) -> Double {
         guard totalPixels > 0 else { return 0.0 }
         return (Double(differentPixels) / Double(totalPixels)) * 100.0
+    }
+
+    // MARK: - Perceptual distance
+
+    /// One premultiplied RGBA pixel of a comparison buffer.
+    typealias Pixel = (red: UInt8, green: UInt8, blue: UInt8, alpha: UInt8)
+
+    private static func pixel(_ buffer: UnsafeMutablePointer<UInt8>, at offset: Int) -> Pixel {
+        (buffer[offset], buffer[offset + 1], buffer[offset + 2], buffer[offset + 3])
+    }
+
+    /// How visibly two pixels differ, as a ΔE: black against white is 100, and two
+    /// saturated colours can be further apart still.
+    ///
+    /// The colour distance is CIE76 ΔE between the two premultiplied pixels, which is each
+    /// one composited over black. Transparency is not a colour Lab can describe, so a change
+    /// in alpha is scaled so that a fully opaque pixel turning fully transparent is 100, as
+    /// far as black is from white, and the larger of the two wins.
+    static func perceptualDistance(_ first: Pixel, _ second: Pixel) -> Double {
+        let lab1 = lab(first)
+        let lab2 = lab(second)
+        let deltaE = sqrt(
+            (lab1.l - lab2.l) * (lab1.l - lab2.l)
+                + (lab1.a - lab2.a) * (lab1.a - lab2.a)
+                + (lab1.b - lab2.b) * (lab1.b - lab2.b)
+        )
+        let deltaAlpha = abs(Double(first.alpha) - Double(second.alpha)) / 255.0 * 100.0
+        return max(deltaE, deltaAlpha)
+    }
+
+    /// Each 8-bit sRGB value with the transfer curve undone, so the conversion to Lab is a
+    /// table lookup rather than a `pow` per channel per pixel.
+    private static let linearComponents: [Double] = (0...255).map { byte in
+        let value = Double(byte) / 255.0
+        return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+    }
+
+    /// The pixel in CIE L*a*b*, against the D65 white sRGB is defined for.
+    private static func lab(_ pixel: Pixel) -> (l: Double, a: Double, b: Double) {
+        let red = linearComponents[Int(pixel.red)]
+        let green = linearComponents[Int(pixel.green)]
+        let blue = linearComponents[Int(pixel.blue)]
+
+        let x = (0.4124564 * red + 0.3575761 * green + 0.1804375 * blue) / 0.95047
+        let y = 0.2126729 * red + 0.7151522 * green + 0.0721750 * blue
+        let z = (0.0193339 * red + 0.1191920 * green + 0.9503041 * blue) / 1.08883
+
+        let fx = labCurve(x)
+        let fy = labCurve(y)
+        let fz = labCurve(z)
+        return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
+    }
+
+    private static func labCurve(_ t: Double) -> Double {
+        let epsilon = 216.0 / 24389.0
+        let kappa = 24389.0 / 27.0
+        return t > epsilon ? cbrt(t) : (kappa * t + 16) / 116
     }
 
     // MARK: - Mask

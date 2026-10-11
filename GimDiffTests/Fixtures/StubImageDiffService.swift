@@ -25,9 +25,12 @@ struct StubImageDiffService: ImageDiffService {
     /// Thrown in place of the report, to exercise the failure path.
     var failure: (any Error)?
 
-    func compare(candidateURL: URL, baselineURL: URL, diffColor: CGColor) async throws
-        -> ImageDiffReport
-    {
+    func compare(
+        candidateURL: URL,
+        baselineURL: URL,
+        diffColor: CGColor,
+        tolerance: DiffTolerance
+    ) async throws -> ImageDiffReport {
         if let failure { throw failure }
         return report
     }

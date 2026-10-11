@@ -77,14 +77,22 @@ extension AppState {
         let snapshots = snapshots.filter(canDiscardGitChanges(of:))
         guard !snapshots.isEmpty, let gitRoot = currentProject?.gitRootURL else { return }
 
+        // Saved before git runs: a change that was never staged exists nowhere else.
+        let saved = saveForUndo(snapshots.map(\.fileURL))
+
         discardTask?.cancel()
         discardTask = Task { [gitService] in
             do {
                 try await gitService.discardChanges(to: snapshots.map(\.fileURL), repositoryRoot: gitRoot)
             } catch {
+                discardSaved(saved)
                 report(error)
                 return
             }
+            registerUndo(
+                restoring: saved,
+                actionName: snapshots.count == 1 ? "Discard Changes" : "Discard Changes to \(snapshots.count) Snapshots"
+            )
             finishDiscarding(Set(snapshots.map(\.id)))
         }
     }
@@ -119,7 +127,7 @@ extension AppState {
     /// Accepting takes a failure out of the run in memory, and nothing short of reading the
     /// bundle again puts it back. Under the project's view the read waits for the next
     /// switch, as it does when a new run arrives.
-    private func rereadTestRunAfterDiscarding() {
+    func rereadTestRunAfterDiscarding() {
         guard testRun != nil else { return }
         discardTestRun()
         // The candidate on the canvas was a copy out of the run just discarded.

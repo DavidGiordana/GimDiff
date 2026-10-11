@@ -122,9 +122,10 @@ extension AppState {
 
     /// Accepts the candidate: copies it over the baseline on disk.
     ///
+    /// - Parameter actionName: What Edit ▸ Undo calls the write.
     /// - Returns: Whether the baseline was written.
     @discardableResult
-    func promoteCandidateToBaseline() -> Bool {
+    func promoteCandidateToBaseline(actionName: String = "Accept Candidate") -> Bool {
         guard let candidate = preview?.candidate, let baseline = preview?.baseline else { return false }
 
         if let obstacle = candidatePromotionObstacle {
@@ -132,7 +133,12 @@ extension AppState {
             return false
         }
 
-        guard copy(contentsOf: candidate.fileURL, over: baseline.fileURL) else { return false }
+        let saved = saveForUndo([baseline.fileURL])
+        guard copy(contentsOf: candidate.fileURL, over: baseline.fileURL) else {
+            discardSaved(saved)
+            return false
+        }
+        registerUndo(restoring: saved, actionName: actionName)
 
         // The snapshot now holds what the run rendered, so the failure is settled. Settled
         // before the refresh, so the images reloaded are the ones left on the canvas rather
@@ -176,13 +182,20 @@ extension AppState {
         guard acceptableTestRunFailuresCount > 0, let testRun else { return }
 
         var accepted: Set<SnapshotItem.ID> = []
+        var saved: [SavedFile] = []
         for snapshot in currentProject?.suites.flatMap(\.snapshots) ?? [] where !accepted.contains(snapshot.id) {
-            guard let candidate = testRun.candidates(forSnapshotID: snapshot.id).first,
-                  copy(contentsOf: candidate.fileURL, over: snapshot.fileURL)
-            else { continue }
+            guard let candidate = testRun.candidates(forSnapshotID: snapshot.id).first else { continue }
+            let original = saveForUndo([snapshot.fileURL])
+            guard copy(contentsOf: candidate.fileURL, over: snapshot.fileURL) else {
+                discardSaved(original)
+                continue
+            }
+            saved += original
             accepted.insert(snapshot.id)
         }
 
+        // One step for the lot: the confirmation asked about them together.
+        registerUndo(restoring: saved, actionName: "Accept All Test Run Failures")
         guard !accepted.isEmpty else { return }
         resolveTestRunFailures(snapshotIDs: accepted)
         finishFileAction()
@@ -208,14 +221,14 @@ extension AppState {
     /// Written rather than merely kept, unlike ``keepBaseline()``: with the sides unknown,
     /// the right image may be the recorded snapshot, and keeping the left has to reach it.
     func keepLeft() {
-        guard looseRolesAreUnknown, revertCandidateToBaseline() else { return }
+        guard looseRolesAreUnknown, revertCandidateToBaseline(actionName: "Keep Left") else { return }
         closePane(.candidate)
     }
 
     /// Settles an undecided pair in favour of the right image: it is written over the left
     /// one, and stays on screen on its own.
     func keepRight() {
-        guard looseRolesAreUnknown, promoteCandidateToBaseline() else { return }
+        guard looseRolesAreUnknown, promoteCandidateToBaseline(actionName: "Keep Right") else { return }
         closePane(.baseline)
     }
 
@@ -231,21 +244,30 @@ extension AppState {
     ///
     /// A write that fails leaves the pair up, so the error banner is read against it.
     func keepCandidate() {
-        guard preview?.isLoosePair == true, !looseRolesAreUnknown, promoteCandidateToBaseline() else { return }
+        guard preview?.isLoosePair == true,
+              !looseRolesAreUnknown,
+              promoteCandidateToBaseline(actionName: "Keep Candidate")
+        else { return }
         closePane(.candidate)
     }
 
     /// Rejects the candidate: copies the baseline back over it on disk.
     ///
+    /// - Parameter actionName: What Edit ▸ Undo calls the write.
     /// - Returns: Whether the candidate was written.
     @discardableResult
-    func revertCandidateToBaseline() -> Bool {
+    func revertCandidateToBaseline(actionName: String = "Reject Candidate") -> Bool {
         guard let candidate = preview?.candidate, let baseline = preview?.baseline else { return false }
         if let obstacle = candidateRevertObstacle {
             report(obstacle)
             return false
         }
-        guard copy(contentsOf: baseline.fileURL, over: candidate.fileURL) else { return false }
+        let saved = saveForUndo([candidate.fileURL])
+        guard copy(contentsOf: baseline.fileURL, over: candidate.fileURL) else {
+            discardSaved(saved)
+            return false
+        }
+        registerUndo(restoring: saved, actionName: actionName)
         finishFileAction()
         return true
     }
@@ -259,7 +281,7 @@ extension AppState {
     /// version of it.
     ///
     /// - Returns: Whether the write went through; a failure is already on the error banner.
-    private func copy(contentsOf source: URL, over destination: URL) -> Bool {
+    func copy(contentsOf source: URL, over destination: URL) -> Bool {
         do {
             let staged = filesystem.createTemporaryFile(
                 prefix: destination.deletingPathExtension().lastPathComponent,
@@ -315,11 +337,12 @@ extension AppState {
         }
 
         setDiffReport(nil, isComputing: true)
-        diffTask = Task { [imageDiff] in
+        diffTask = Task { [imageDiff, diffTolerance] in
             do {
                 let measured = try await imageDiff.compare(
                     candidateURL: candidate.fileURL,
-                    baselineURL: baseline.fileURL
+                    baselineURL: baseline.fileURL,
+                    tolerance: diffTolerance
                 )
                 guard !Task.isCancelled else { return }
                 setDiffReport(measured)

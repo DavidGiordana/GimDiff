@@ -57,7 +57,14 @@ protocol FilesystemService: Sendable {
     func replaceFile(at destination: URL, with source: URL) throws
 
     /// Moves `url` to the user's Trash so a deletion stays recoverable.
-    func trashFile(at url: URL) throws
+    ///
+    /// - Returns: Where the item now is in the Trash, when the volume says, so Undo can
+    ///   move it back.
+    @discardableResult
+    func trashFile(at url: URL) throws -> URL?
+
+    /// Moves `source` to `destination`, which must not exist yet.
+    func moveItem(at source: URL, to destination: URL) throws
 
     /// Deletes `url` outright, folder and all.
     ///

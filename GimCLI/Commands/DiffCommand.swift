@@ -9,25 +9,29 @@
 import CoreGraphics
 import Foundation
 
-/// `gimdiff diff <candidatePath> <baselinePath> [--out <maskPath>] [--json]`
+/// `gimdiff diff <candidatePath> <baselinePath> [--out <maskPath>] [--tolerance <ΔE>] [--json]`
 ///
 /// The headless half of the canvas: the same pixel comparison, reported as text.
 enum DiffCommand {
     static let name = "diff"
     static let summary = "Compare two images and report how far apart they are."
     static let usage = """
-    Usage: gimdiff diff <candidate> <baseline> [--out <mask.png>] [--json]
+    Usage: gimdiff diff <candidate> <baseline> [--out <mask.png>] [--tolerance <ΔE>] [--json]
 
       Compares two images pixel by pixel and prints the share of the image that differs.
 
-      --out <path>   Write the highlight mask to <path> as a PNG.
-      --json         Emit the result as JSON instead of text.
+      --out <path>        Write the highlight mask to <path> as a PNG.
+      --tolerance <ΔE>    Count two pixels as the same when they are at most this far apart
+                          perceptually, as a CIE76 ΔE (black against white is 100). 2.3 is
+                          about the smallest change anybody can see. Defaults to 0: the
+                          bytes must match.
+      --json              Emit the result as JSON instead of text.
 
     Exits 0 when the images match, 1 when they differ, 2 when the comparison failed.
     """
 
-    static let valueOptions: Set<String> = ["out"]
-    static let knownOptions: Set<String> = ["out", "json"]
+    static let valueOptions: Set<String> = ["out", "tolerance"]
+    static let knownOptions: Set<String> = ["out", "tolerance", "json"]
 
     /// Decimal places used for the percentage, enough to keep a single changed pixel in a
     /// 4K snapshot from being reported as a flat zero.
@@ -42,7 +46,11 @@ enum DiffCommand {
 
         let filesystem = DefaultFilesystemService()
         let service = DefaultImageDiffService(filesystem: filesystem)
-        let report = try await service.compare(candidateURL: candidateURL, baselineURL: baselineURL)
+        let report = try await service.compare(
+            candidateURL: candidateURL,
+            baselineURL: baselineURL,
+            tolerance: try tolerance(from: arguments)
+        )
 
         let maskURL = try deliverMask(
             from: report,
@@ -57,6 +65,15 @@ enum DiffCommand {
         }
 
         return report.isIdentical ? .success : .differencesFound
+    }
+
+    /// Reads `--tolerance`, refusing anything that is not a ΔE a comparison can use.
+    static func tolerance(from arguments: Arguments) throws -> DiffTolerance {
+        guard let text = arguments.value(of: "tolerance") else { return .exact }
+        guard let value = Double(text), value.isFinite, value >= 0 else {
+            throw Arguments.Failure.invalidValue(option: "tolerance", value: text)
+        }
+        return DiffTolerance(maximumDeltaE: value)
     }
 
     // MARK: - Mask
@@ -101,6 +118,13 @@ enum DiffCommand {
             console.write("Pixels", "not comparable — the two images are different sizes")
         }
 
+        if report.toleratedPixelCount > 0 {
+            console.write("Tolerated", "\(report.toleratedPixelCount) within tolerance")
+        }
+        if report.hasIdenticalDimensions {
+            console.write("Largest ΔE", String(format: "%.2f", report.maximumDeltaE))
+        }
+
         console.write("Difference", percentage(report.diffPercentage))
         if let maskURL {
             console.write("Mask", maskURL.path)
@@ -127,6 +151,8 @@ enum DiffCommand {
         var differentPixelCount: Int
         var totalPixelCount: Int
         var diffPercentage: Double
+        var toleratedPixelCount: Int
+        var maximumDeltaE: Double
         var maskPath: String?
 
         init(_ report: ImageDiffReport, maskURL: URL?) {
@@ -139,6 +165,8 @@ enum DiffCommand {
             differentPixelCount = report.differentPixelCount
             totalPixelCount = report.totalPixelCount
             diffPercentage = report.diffPercentage
+            toleratedPixelCount = report.toleratedPixelCount
+            maximumDeltaE = report.maximumDeltaE
             maskPath = maskURL?.path
         }
     }

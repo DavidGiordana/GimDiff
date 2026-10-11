@@ -18,6 +18,8 @@ import Observation
 final class AppState {
     /// `UserDefaults` key the recent project list is persisted under.
     static let recentProjectsKey = "recent_projects"
+    /// `UserDefaults` key the diff mask's tolerance is remembered under, as a ΔE.
+    static let diffToleranceKey = "diff_tolerance_delta_e"
     /// How many folders the recent list keeps before it starts forgetting the oldest.
     static let recentProjectsLimit = 12
     /// Commit-ish a snapshot is compared against when its Git diff is shown.
@@ -52,6 +54,17 @@ final class AppState {
     private(set) var diffReport: ImageDiffReport?
     /// Whether that comparison is in flight, so the footer can say so rather than go blank.
     private(set) var isComputingDiff = false
+    /// How far apart two pixels may be before the diff mask paints them.
+    ///
+    /// Remembered across launches: it describes the renderer a project's tests run on,
+    /// which does not change from one snapshot to the next.
+    var diffTolerance: DiffTolerance = .exact {
+        didSet {
+            guard diffTolerance != oldValue else { return }
+            defaults.set(diffTolerance.maximumDeltaE, forKey: Self.diffToleranceKey)
+            updateDiffReport()
+        }
+    }
     /// How the sides of a loose pair were chosen, while one is on screen.
     ///
     /// `nil` for anything else: a snapshot's own comparison has sides the project gave it.
@@ -67,6 +80,11 @@ final class AppState {
     /// the menu cannot set them directly; it posts a request each of those views carries
     /// out. The serial makes the same command twice in a row two requests.
     private(set) var canvasViewRequest: CanvasViewRequest?
+    /// The window's undo manager, which every file GimDiff writes registers its way back on.
+    ///
+    /// The window's rather than one of GimDiff's own, so Edit ▸ Undo, ⌘Z, and the filter
+    /// field's typing share the one stack a Mac user expects. Handed over by ``RootView``.
+    @ObservationIgnored weak var undoManager: UndoManager?
     /// The most recent failure, shown as a banner until it is dismissed.
     private(set) var lastError: String?
 
@@ -197,6 +215,7 @@ final class AppState {
         self.testResultLocator = testResultLocator
         self.defaults = defaults
         recentProjects = Self.loadRecentProjects(from: defaults)
+        diffTolerance = DiffTolerance(maximumDeltaE: defaults.double(forKey: Self.diffToleranceKey))
     }
 
     deinit {
@@ -312,6 +331,7 @@ final class AppState {
     /// The folder stays in ``recentProjects``, so closing is a way back to the list rather
     /// than a way to forget where the project was.
     func closeProject() {
+        forgetFileUndo()
         abandonPullRequestReview()
         scanTask?.cancel()
         stopWatching()
@@ -356,6 +376,7 @@ final class AppState {
     /// The single point where a bundle becomes what the window is showing; ``openProject(at:)``
     /// is this plus the scan that produced it.
     func load(_ bundle: ProjectBundle) {
+        forgetFileUndo()
         currentProject = bundle
         loadingProjectURL = nil
         setPreview(nil)
@@ -1110,7 +1131,7 @@ final class AppState {
         let rowID = TreeRowItem.snapshotRowID(snapshot.id, parentSuiteID: suiteID)
         let replacement = selection(surviving: [rowID])
 
-        guard trash(snapshot.fileURL) else { return }
+        guard trash(snapshot.fileURL, actionName: "Move Snapshot to Trash") else { return }
 
         // Pruned in memory rather than rescanned: the scan that found this snapshot walked
         // the whole project, and nothing about deleting one file needs that repeated.
@@ -1128,7 +1149,7 @@ final class AppState {
         }
         let replacement = selection(surviving: removedRowIDs)
 
-        guard trash(suite.snapshotsFolderURL) else { return }
+        guard trash(suite.snapshotsFolderURL, actionName: "Move Snapshots Folder to Trash") else { return }
 
         currentProject?.suites.removeAll { $0.id == suite.id }
         expandedSuiteIDs.remove(suite.id)
@@ -1146,14 +1167,28 @@ final class AppState {
         return true
     }
 
-    private func trash(_ url: URL) -> Bool {
+    private func trash(_ url: URL, actionName: String) -> Bool {
         do {
-            try filesystem.trashFile(at: url)
+            let trashed = try filesystem.trashFile(at: url)
+            if let trashed {
+                registerUndoOfTrash(original: url, trashed: trashed, actionName: actionName)
+            }
             return true
         } catch {
             lastError = error.localizedDescription
             return false
         }
+    }
+
+    /// Rescans the project after GimDiff itself put files back or took them away again.
+    ///
+    /// The watcher ignores GimDiff's own writes, so nothing else would notice. Counted as an
+    /// edit first, so a scan already walking the disk is thrown away rather than merged.
+    func rescanAfterOwnEdit() {
+        projectEdits += 1
+        var change = ProjectChange()
+        change.needsRescan = true
+        schedule(change)
     }
 
     private func finishDeletion(replacement: String?, removedSnapshotIDs: Set<String>) {

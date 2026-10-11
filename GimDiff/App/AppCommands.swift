@@ -148,6 +148,15 @@ struct AppCommands: Commands {
             .pickerStyle(.inline)
             .disabled(state.preview?.isComparison != true)
 
+            // The diff mask footer's tolerance menu again. Enabled with any comparison, not
+            // only under the mask: it is remembered, and set before switching to it.
+            Picker("Diff Tolerance", selection: binding(\.diffTolerance)) {
+                ForEach(DiffTolerance.presets, id: \.self) { preset in
+                    Text(preset.title).tag(preset)
+                }
+            }
+            .disabled(state.preview?.isComparison != true)
+
             Divider()
 
             // The footer controls of each pane, applied to every pane on screen at once.

@@ -14,6 +14,7 @@ struct RootView: View {
     @Environment(AppState.self) private var state
 
     @Environment(\.controlActiveState) private var controlActiveState
+    @Environment(\.undoManager) private var undoManager
 
     @State private var isDropTargeted = false
     @State private var hasRevealedSidebar = false
@@ -42,6 +43,8 @@ struct RootView: View {
             }
         }
         .onAppear(perform: revealSidebarOnLaunch)
+        .onAppear { state.undoManager = undoManager }
+        .onChange(of: undoManager) { state.undoManager = undoManager }
         .onChange(of: controlActiveState) { revealSidebarOnLaunch() }
         .sheet(isPresented: pullRequestSheet) {
             OpenPRSheetView()
@@ -80,7 +83,8 @@ struct RootView: View {
         } message: {
             Text("""
             Every modified snapshot goes back to the committed version. Changes that were \
-            never committed cannot be recovered. Untracked snapshots are left alone.
+            never committed can be put back with Edit ▸ Undo until you open another project \
+            or quit. Untracked snapshots are left alone.
             """)
         }
     }

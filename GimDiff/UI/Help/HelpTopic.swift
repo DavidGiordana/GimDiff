@@ -132,8 +132,9 @@ private extension HelpTopic {
                 **Discard Changes** puts a modified snapshot back to its committed version; on \
                 a suite it does so for every modified snapshot in it. **Discard All…**, beside \
                 the filter chips (or **Snapshot ▸ Discard All Changes in Project…**), does it \
-                for the whole project after asking first. Untracked snapshots are left alone, \
-                and a change that was never committed cannot be recovered.
+                for the whole project after asking first. Untracked snapshots are left alone. \
+                A change that was never committed exists nowhere but in GimDiff's undo: \
+                **Edit ▸ Undo** (⌘Z) puts it back until you open another project or quit.
                 """),
         ]),
         HelpSection(title: "Failures from your test runs", blocks: [
@@ -200,6 +201,7 @@ private extension HelpTopic {
                 HelpShortcut("⌘L", "Clear the canvas"),
                 HelpShortcut("⌘= ⌘-", "Zoom the images in and out"),
                 HelpShortcut("⌘⌫", "Move the selection to the Trash"),
+                HelpShortcut("⌘Z ⇧⌘Z", "Undo or redo the last change to a file"),
             ]),
         ]),
         HelpSection(title: "Window", blocks: [
@@ -234,6 +236,13 @@ private extension HelpTopic {
                 either image or back to both equally, as the slider's **Reset** does.
                 """),
             .text("""
+                The mask's **Tolerance** menu (also **View ▸ Diff Tolerance**) lets through \
+                differences nobody could see. It measures how far apart two pixels look, as a \
+                ΔE: at ΔE 2.3, about the smallest visible change, anti-aliasing and rounding \
+                stop being painted while real changes still are. Hover over the result to see \
+                the largest difference between the two images. GimDiff remembers the setting.
+                """),
+            .text("""
                 The **×** in a pane's header (or **Snapshot ▸ Close Baseline** and **Close \
                 Candidate**) closes that side and leaves the other on screen on its own.
                 """),
@@ -258,6 +267,11 @@ private extension HelpTopic {
                 The bar under a comparison decides it. **Accept** copies the candidate over \
                 the baseline file. **Reject** copies the baseline over the candidate. Both \
                 overwrite a file on disk; when one is unavailable, the bar says why.
+                """),
+            .text("""
+                Every action that writes a snapshot — Accept, Reject, Keep, Accept All, \
+                Discard, and Move to Trash — can be taken back with **Edit ▸ Undo** (⌘Z) and \
+                repeated with **Redo** (⇧⌘Z), until you open another project or quit.
                 """),
             .text("""
                 A pair pasted from a failure log, dropped in, or opened by URL offers \
@@ -324,7 +338,7 @@ private extension HelpTopic {
                 gimdiff <candidate> <baseline>
                 gimdiff pr <url-or-number>
                 gimdiff scan <project-path> [--json]
-                gimdiff diff <candidate> <baseline> [--out <mask.png>] [--json]
+                gimdiff diff <candidate> <baseline> [--out <mask.png>] [--tolerance <ΔE>] [--json]
                 gimdiff parse-clipboard [--input "<log text>"] [--json]
                 """),
             .text("""

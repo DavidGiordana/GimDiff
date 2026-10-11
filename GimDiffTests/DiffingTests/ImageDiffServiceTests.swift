@@ -8,6 +8,7 @@
 
 import CoreGraphics
 import Foundation
+import ImageIO
 import Testing
 @testable import GimDiff
 
@@ -146,7 +147,8 @@ struct ImageDiffServiceTests {
         let report = try await makeService().compare(
             candidateURL: ImageFixtures.modifiedB,
             baselineURL: ImageFixtures.modifiedA,
-            diffColor: CGColor(srgbRed: 0.0, green: 1.0, blue: 0.0, alpha: 1.0)
+            diffColor: CGColor(srgbRed: 0.0, green: 1.0, blue: 0.0, alpha: 1.0),
+            tolerance: .exact
         )
         defer { discard(report) }
 
@@ -227,5 +229,136 @@ struct ImageDiffServiceTests {
     @Test("An empty grid does not divide by zero")
     func guardsAgainstAnEmptyImage() {
         #expect(DefaultImageDiffService.percentage(of: 0, in: 0) == 0.0)
+    }
+
+    // MARK: - Tolerance
+
+    @Test("A pixel is no distance from itself")
+    func samePixelIsNoDistance() {
+        let grey: DefaultImageDiffService.Pixel = (120, 120, 120, 255)
+        #expect(DefaultImageDiffService.perceptualDistance(grey, grey) == 0)
+    }
+
+    @Test("Black and white are the whole scale apart")
+    func blackAndWhiteAreFarApart() {
+        let distance = DefaultImageDiffService.perceptualDistance((0, 0, 0, 255), (255, 255, 255, 255))
+        #expect(abs(distance - 100) < 0.01)
+    }
+
+    @Test("A one-step rounding change is below what anybody can see")
+    func roundingIsImperceptible() {
+        let distance = DefaultImageDiffService.perceptualDistance((120, 120, 120, 255), (121, 120, 120, 255))
+        #expect(distance > 0)
+        #expect(distance < 1)
+    }
+
+    @Test("A pixel that turns transparent is as different as it can be")
+    func alphaCountsOnTheSameScale() {
+        let distance = DefaultImageDiffService.perceptualDistance((0, 0, 0, 255), (0, 0, 0, 0))
+        #expect(distance == 100)
+    }
+
+    @Test("An exact comparison counts a one-step change and measures how small it is")
+    func exactCountsRounding() async throws {
+        let pair = try SolidImages(candidate: (121, 120, 120), baseline: (120, 120, 120))
+        defer { pair.remove() }
+
+        let report = try await makeService().compare(candidateURL: pair.candidate, baselineURL: pair.baseline)
+        defer { discard(report) }
+
+        #expect(report.differentPixelCount == 100)
+        #expect(report.toleratedPixelCount == 0)
+        #expect(report.maximumDeltaE > 0)
+        #expect(report.maximumDeltaE < 1)
+    }
+
+    @Test("A tolerance forgives a change below it, and says how much it forgave")
+    func toleranceForgivesSmallChanges() async throws {
+        let pair = try SolidImages(candidate: (121, 120, 120), baseline: (120, 120, 120))
+        defer { pair.remove() }
+
+        let report = try await makeService().compare(
+            candidateURL: pair.candidate,
+            baselineURL: pair.baseline,
+            tolerance: DiffTolerance(maximumDeltaE: 1)
+        )
+        defer { discard(report) }
+
+        #expect(report.differentPixelCount == 0)
+        #expect(report.toleratedPixelCount == 100)
+        #expect(report.isIdentical)
+    }
+
+    @Test("A tolerance does not forgive a change above it")
+    func toleranceKeepsLargeChanges() async throws {
+        let pair = try SolidImages(candidate: (255, 0, 0), baseline: (0, 0, 255))
+        defer { pair.remove() }
+
+        let report = try await makeService().compare(
+            candidateURL: pair.candidate,
+            baselineURL: pair.baseline,
+            tolerance: DiffTolerance(maximumDeltaE: 10)
+        )
+        defer { discard(report) }
+
+        #expect(report.differentPixelCount == 100)
+        #expect(report.toleratedPixelCount == 0)
+        #expect(report.maximumDeltaE > 10)
+    }
+
+    @Test("A negative tolerance is read as exact")
+    func negativeToleranceIsExact() {
+        #expect(DiffTolerance(maximumDeltaE: -3).isExact)
+    }
+}
+
+/// Two 10 × 10 opaque images of one colour each, written to a scratch folder.
+///
+/// Built at run time rather than checked in: the point is the exact byte values, and a
+/// fixture saved through an editor can come back colour-managed into different ones.
+private struct SolidImages {
+    let candidate: URL
+    let baseline: URL
+
+    init(candidate: (UInt8, UInt8, UInt8), baseline: (UInt8, UInt8, UInt8)) throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("GimDiffSolidImages-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        self.candidate = folder.appendingPathComponent("candidate.png")
+        self.baseline = folder.appendingPathComponent("baseline.png")
+        try Self.write(candidate, to: self.candidate)
+        try Self.write(baseline, to: self.baseline)
+    }
+
+    func remove() {
+        try? FileManager.default.removeItem(at: candidate.deletingLastPathComponent())
+    }
+
+    private static func write(_ color: (UInt8, UInt8, UInt8), to url: URL) throws {
+        let side = 10
+        var bytes = [UInt8](repeating: 255, count: side * side * 4)
+        for offset in stride(from: 0, to: bytes.count, by: 4) {
+            bytes[offset] = color.0
+            bytes[offset + 1] = color.1
+            bytes[offset + 2] = color.2
+        }
+        let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
+        let provider = try #require(CGDataProvider(data: Data(bytes) as CFData))
+        let image = try #require(CGImage(
+            width: side,
+            height: side,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: side * 4,
+            space: space,
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        ))
+        let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, image, nil)
+        #expect(CGImageDestinationFinalize(destination))
     }
 }

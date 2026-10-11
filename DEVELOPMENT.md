@@ -205,6 +205,18 @@ Both write through a scratch file rather than straight over the destination.
 the exchange atomic — so handing it the candidate directly would delete the image the canvas
 is still pointing at.
 
+Every action that writes or trashes a snapshot registers its way back on the window's
+undo manager (`AppState+Undo`). The file is copied aside *before* the write — a change
+that was never committed exists nowhere else — and undoing saves the current bytes again
+first, which is what Redo puts back. A trashed item is moved back out of the Trash and the
+project rescanned, since the watcher ignores GimDiff's own writes. File actions are dropped
+from the stack when another project loads; tests hand `AppState` an `UndoManager` with
+`groupsByEvent = false`.
+
+The diff mask's tolerance (`DiffTolerance`) is a perceptual distance, CIE76 ΔE, not a
+per-channel byte threshold, so it forgives rounding and anti-aliasing without forgiving a
+real change in a dark colour. Zero is the exact byte comparison.
+
 Three more rules that are easy to undo by accident:
 
 - **`diffMode` is the only thing that decides what is drawn.** The toolbar's segmented
@@ -394,7 +406,7 @@ into the tool from the same folders the app compiles them from.
 
 ```
 gimdiff scan <project-path> [--json]
-gimdiff diff <candidate> <baseline> [--out <mask.png>] [--json]
+gimdiff diff <candidate> <baseline> [--out <mask.png>] [--tolerance <ΔE>] [--json]
 gimdiff parse-clipboard [--input "<log text>"] [--json]
 gimdiff pr <url-or-number>             # hands a GitHub pull request to the running app
 gimdiff <project-path>                 # hands the path to the running app

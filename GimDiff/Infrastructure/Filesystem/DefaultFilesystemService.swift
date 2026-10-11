@@ -83,8 +83,16 @@ struct DefaultFilesystemService: FilesystemService {
         _ = try fileManager.replaceItemAt(destination, withItemAt: source)
     }
 
-    func trashFile(at url: URL) throws {
-        try fileManager.trashItem(at: url, resultingItemURL: nil)
+    @discardableResult
+    func trashFile(at url: URL) throws -> URL? {
+        var resulting: NSURL?
+        try fileManager.trashItem(at: url, resultingItemURL: &resulting)
+        return resulting as URL?
+    }
+
+    func moveItem(at source: URL, to destination: URL) throws {
+        try createParentDirectory(of: destination)
+        try fileManager.moveItem(at: source, to: destination)
     }
 
     func removeItem(at url: URL) throws {

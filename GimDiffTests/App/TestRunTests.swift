@@ -412,6 +412,28 @@ struct TestRunTests {
         #expect(fixture.state.isFailingInTestRun(header))
     }
 
+    @Test("Accept All is undone in one step, putting every recorded snapshot back")
+    func undoesAcceptAll() async throws {
+        let fixture = await openWithFailures()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        fixture.state.undoManager = undo
+        let header = try snapshot("header", in: fixture)
+        let menu = try snapshot("menu", in: fixture)
+
+        fixture.state.acceptAllTestRunFailures()
+        #expect(undo.undoActionName == "Accept All Test Run Failures")
+
+        undo.undo()
+        #expect(fixture.filesystem.contents(of: header.fileURL) == "header recorded")
+        #expect(fixture.filesystem.contents(of: menu.fileURL) == "menu recorded")
+        #expect(!undo.canUndo)
+
+        undo.redo()
+        #expect(fixture.filesystem.contents(of: header.fileURL) == "header rendered")
+        #expect(fixture.filesystem.contents(of: menu.fileURL) == "menu rendered")
+    }
+
     @Test("A write that fails keeps its snapshot listed while the others are accepted")
     func acceptingAllSurvivesAFailedWrite() async throws {
         let fixture = await openWithFailures()

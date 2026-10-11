@@ -47,6 +47,7 @@
 				"App/AppState+FileActions.swift",
 				"App/AppState+GitChanges.swift",
 				"App/AppState+TestRun.swift",
+				"App/AppState+Undo.swift",
 				"App/AppState+Watching.swift",
 				App/GimDiffApp.swift,
 				App/SnapshotPreview.swift,

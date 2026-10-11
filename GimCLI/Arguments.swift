@@ -24,6 +24,8 @@ struct Arguments: Sendable {
         case missingArgument(name: String)
         /// More positional arguments than the command accepts.
         case unexpectedArgument(String)
+        /// An option given a value it cannot take.
+        case invalidValue(option: String, value: String)
     }
 
     /// Values given without a leading dash, in the order they appeared.
@@ -109,6 +111,8 @@ extension Arguments.Failure: LocalizedError {
             "missing required argument <\(name)>."
         case let .unexpectedArgument(value):
             "unexpected argument “\(value)”."
+        case let .invalidValue(option, value):
+            "--\(option) cannot be “\(value)”."
         }
     }
 }
