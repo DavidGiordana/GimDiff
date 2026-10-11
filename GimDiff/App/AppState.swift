@@ -1056,8 +1056,9 @@ final class AppState {
         clipboard.copy(pngData: png)
     }
 
+    /// Formatted for the reader's locale, which puts the sign and the space where it goes.
     private static func percent(_ fraction: Double) -> String {
-        "\(Int((fraction * 100).rounded()))%"
+        fraction.formatted(.percent.precision(.fractionLength(0)))
     }
 
     /// What showing `snapshot` with its diff is called, in the menu bar and on the row alike.

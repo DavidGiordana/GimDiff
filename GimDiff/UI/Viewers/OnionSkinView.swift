@@ -83,7 +83,7 @@ struct OnionSkinView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-            Text("\(Int((state.canvas.onionOpacity * 100).rounded()))%")
+            Text(state.canvas.onionOpacity.formatted(.percent.precision(.fractionLength(0))))
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(width: 40, alignment: .trailing)

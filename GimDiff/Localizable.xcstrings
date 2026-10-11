@@ -1,20 +1,28 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    " (Latest)" : {},
-    "%.2f%% Diff (%@ pixels)" : {
+    " (Latest)" : {
+
+    },
+    "%@" : {
+
+    },
+    "%@ Diff (%@ pixels)" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$.2f%% Diff (%2$@ pixels)"
+            "value" : "%1$@ Diff (%2$@ pixels)"
           }
         }
       }
     },
-    "%@" : {},
-    "%@ Only" : {},
-    "%@ Opacity" : {},
+    "%@ Only" : {
+
+    },
+    "%@ Opacity" : {
+
+    },
     "%@ into %@" : {
       "localizations" : {
         "en" : {
@@ -85,7 +93,9 @@
         }
       }
     },
-    "%lld percent" : {},
+    "%lld percent" : {
+
+    },
     "%lld snapshots" : {
       "localizations" : {
         "en" : {
@@ -182,25 +192,60 @@
         }
       }
     },
-    "%lld%%" : {},
-    "(none)" : {},
-    "**Discard Changes** puts a modified snapshot back to its committed version; on a suite it does so for every modified snapshot in it. **Discard All…**, beside the filter chips (or **Snapshot ▸ Discard All Changes in Project…**), does it for the whole project after asking first. Untracked snapshots are left alone. A change that was never committed exists nowhere but in GimDiff's undo: **Edit ▸ Undo** (⌘Z) puts it back until you open another project or quit." : {},
-    "**File ▸ Open Recent** lists the same folders as the recent list. Hover over a folder in the list and click its **×**, or right-click it, to forget it or reveal it in the Finder; **Clear Recent Projects** forgets them all. The **×** beside the project's name (or **File ▸ Close Project**) goes back to the list." : {},
-    "**Paste** (⌘V, or the **Paste** button in the toolbar) works the same way. Copy a failure log from Xcode or Swift Testing and GimDiff reads the image paths out of it; copy files in the Finder and GimDiff opens them. A GitHub pull request link opens that pull request." : {},
-    "**Side by Side** shows the two images next to each other. **Split View** draws both in one frame under a split you drag across it. **Onion Skin** lays the candidate over the baseline; drag its slider to fade from one to the other, and whatever moves is what changed. **Diff Mask** paints every changed pixel in magenta and reports how much of the image changed. Switch between them from the toolbar or the **View** menu. **View ▸ Onion Skin** jumps the fade to either image or back to both equally, as the slider's **Reset** does." : {},
-    "100% Match" : {},
-    "@%@" : {},
-    "A link, owner/repo#123, or a number from the open project's repository." : {},
-    "A pair pasted from a failure log, dropped in, or opened by URL offers **Keep Baseline** and **Keep Candidate** instead. Keeping the baseline writes nothing; keeping the candidate copies it over the baseline. Either way the baseline is left on screen on its own." : {},
-    "A project opens on its own status. Switch the sidebar from **Project** to **Test Run** (or View ▸ Test Run) to read the newest run Xcode left in DerivedData; the menu under the switch (or View ▸ Test Runs) lists every run Xcode still keeps, to look at an older one instead. The sidebar lists only the snapshots the run failed on, and selecting one shows the image the test rendered against the recorded file. Use **Diff Mask** to see where they differ. **Accept** re-records the snapshot without running the test again, and **Accept All…** beside the run picker (or **Snapshot ▸ Accept All Test Run Failures…**) does so for every failure at once, after asking. When a test attached the snapshot more than once, click the candidate's file name (or use **Snapshot ▸ Test Run Candidate**) to choose which rendering to compare. Switch back to **Project** at any time; the run stays read, and a new one is picked up as soon as Xcode finishes writing it — unless you picked an older run, which stays until you pick the newest again." : {},
-    "A read-only review" : {},
-    "About GimDiff" : {},
-    "Accept" : {},
-    "Accept All" : {},
-    "Accept All Test Run Failures" : {},
-    "Accept All Test Run Failures…" : {},
-    "Accept All…" : {},
-    "Accept Candidate" : {},
+    "(none)" : {
+
+    },
+    "**Discard Changes** puts a modified snapshot back to its committed version; on a suite it does so for every modified snapshot in it. **Discard All…**, beside the filter chips (or **Snapshot ▸ Discard All Changes in Project…**), does it for the whole project after asking first. Untracked snapshots are left alone. A change that was never committed exists nowhere but in GimDiff's undo: **Edit ▸ Undo** (⌘Z) puts it back until you open another project or quit." : {
+
+    },
+    "**File ▸ Open Recent** lists the same folders as the recent list. Hover over a folder in the list and click its **×**, or right-click it, to forget it or reveal it in the Finder; **Clear Recent Projects** forgets them all. The **×** beside the project's name (or **File ▸ Close Project**) goes back to the list." : {
+
+    },
+    "**Paste** (⌘V, or the **Paste** button in the toolbar) works the same way. Copy a failure log from Xcode or Swift Testing and GimDiff reads the image paths out of it; copy files in the Finder and GimDiff opens them. A GitHub pull request link opens that pull request." : {
+
+    },
+    "**Side by Side** shows the two images next to each other. **Split View** draws both in one frame under a split you drag across it. **Onion Skin** lays the candidate over the baseline; drag its slider to fade from one to the other, and whatever moves is what changed. **Diff Mask** paints every changed pixel in magenta and reports how much of the image changed. Switch between them from the toolbar or the **View** menu. **View ▸ Onion Skin** jumps the fade to either image or back to both equally, as the slider's **Reset** does." : {
+
+    },
+    "100% Match" : {
+
+    },
+    "@%@" : {
+
+    },
+    "A link, owner/repo#123, or a number from the open project's repository." : {
+
+    },
+    "A pair pasted from a failure log, dropped in, or opened by URL offers **Keep Baseline** and **Keep Candidate** instead. Keeping the baseline writes nothing; keeping the candidate copies it over the baseline. Either way the baseline is left on screen on its own." : {
+
+    },
+    "A project opens on its own status. Switch the sidebar from **Project** to **Test Run** (or View ▸ Test Run) to read the newest run Xcode left in DerivedData; the menu under the switch (or View ▸ Test Runs) lists every run Xcode still keeps, to look at an older one instead. The sidebar lists only the snapshots the run failed on, and selecting one shows the image the test rendered against the recorded file. Use **Diff Mask** to see where they differ. **Accept** re-records the snapshot without running the test again, and **Accept All…** beside the run picker (or **Snapshot ▸ Accept All Test Run Failures…**) does so for every failure at once, after asking. When a test attached the snapshot more than once, click the candidate's file name (or use **Snapshot ▸ Test Run Candidate**) to choose which rendering to compare. Switch back to **Project** at any time; the run stays read, and a new one is picked up as soon as Xcode finishes writing it — unless you picked an older run, which stays until you pick the newest again." : {
+
+    },
+    "A read-only review" : {
+
+    },
+    "About GimDiff" : {
+
+    },
+    "Accept" : {
+
+    },
+    "Accept All" : {
+
+    },
+    "Accept All Test Run Failures" : {
+
+    },
+    "Accept All Test Run Failures…" : {
+
+    },
+    "Accept All…" : {
+
+    },
+    "Accept Candidate" : {
+
+    },
     "Accept all %lld failing snapshots?" : {
       "localizations" : {
         "en" : {
@@ -223,76 +268,216 @@
         }
       }
     },
-    "Accepting and rejecting" : {},
-    "Act on a snapshot" : {},
-    "Actual Size (1:1)" : {},
-    "Added by this pull request; the base branch has no version to compare with" : {},
-    "After re-running your tests" : {},
-    "Base Branch" : {},
-    "Baseline" : {},
-    "Black" : {},
-    "Both Equally" : {},
-    "Both images were downloaded from a GitHub pull request for review. Accept or reject the change on its branch; there is no file on disk here to overwrite." : {},
-    "Cancel" : {},
-    "Candidate" : {},
-    "Candidate and baseline" : {},
-    "Centre and Reset Focus" : {},
-    "Centre and Reset Zoom" : {},
-    "Centre the image and reset the zoom to 1.0" : {},
-    "Changed since the last commit" : {},
-    "Choose **File ▸ Open Project…** (⌘O), drag a folder onto the window, or pick one from the recent list. GimDiff finds every snapshot folder in it and groups the images under the test suite that recorded them." : {},
-    "Choose **File ▸ Open Pull Request…** (⇧⌘O), or paste a pull request link. The field takes a link, `owner/repo#123`, or a bare number from the open project's repository." : {},
-    "Choose which image the test attached to compare with the baseline" : {},
-    "Choose which of the test runs Xcode keeps for this project to show" : {},
-    "Clear" : {},
-    "Clear Canvas" : {},
-    "Clear Filters" : {},
-    "Clear Recent Messages" : {},
-    "Clear Recent Projects" : {},
-    "Clear all recent folders" : {},
-    "Clear the canvas" : {},
-    "Clear the canvas (⌘L)" : {},
-    "Clear the filter" : {},
-    "Clear the filters and go back to the tree" : {},
-    "Close %@" : {},
-    "Close Project" : {},
-    "Close Pull Request Review" : {},
-    "Close Review" : {},
-    "Close a suite, or step up to it" : {},
-    "Close the project and go back to the recent list" : {},
-    "Close the review and delete its downloaded snapshots" : {},
-    "Close this pane" : {},
-    "Collapse %@" : {},
-    "Collapse Sidebar" : {},
-    "Colour behind the image panes" : {},
-    "Colour painted behind the image itself, for reading a transparent snapshot" : {},
-    "Committed in Git" : {},
-    "Compare the snapshots a pull request changes, without checking it out." : {},
-    "Compare with Base Branch" : {},
-    "Compare with Test Run" : {},
-    "Comparing Snapshots" : {},
-    "Comparing…" : {},
-    "Comparison" : {},
-    "Comparison modes" : {},
-    "Comparison split" : {},
-    "Copy" : {},
-    "Copy Comparison Image" : {},
-    "Copy Name" : {},
-    "Copy Split View or the onion skin as an image" : {},
-    "Current" : {},
-    "Custom" : {},
-    "Custom %@" : {},
-    "Cut" : {},
-    "Dark Grey" : {},
-    "Deleted by this pull request; only the base branch's version exists" : {},
-    "Diff Mask" : {},
-    "Diff Tolerance" : {},
-    "Difference" : {},
-    "Discard All" : {},
-    "Discard All Changes in Project…" : {},
-    "Discard All…" : {},
-    "Discard Changes" : {},
-    "Discard Changes in Suite" : {},
+    "Accepting and rejecting" : {
+
+    },
+    "Act on a snapshot" : {
+
+    },
+    "Actual Size (1:1)" : {
+
+    },
+    "Added by this pull request; the base branch has no version to compare with" : {
+
+    },
+    "After re-running your tests" : {
+
+    },
+    "Base Branch" : {
+
+    },
+    "Baseline" : {
+
+    },
+    "Black" : {
+
+    },
+    "Both Equally" : {
+
+    },
+    "Both images were downloaded from a GitHub pull request for review. Accept or reject the change on its branch; there is no file on disk here to overwrite." : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Candidate" : {
+
+    },
+    "Candidate and baseline" : {
+
+    },
+    "Centre and Reset Focus" : {
+
+    },
+    "Centre and Reset Zoom" : {
+
+    },
+    "Centre the image and reset the zoom to 1.0" : {
+
+    },
+    "Changed since the last commit" : {
+
+    },
+    "Choose **File ▸ Open Project…** (⌘O), drag a folder onto the window, or pick one from the recent list. GimDiff finds every snapshot folder in it and groups the images under the test suite that recorded them." : {
+
+    },
+    "Choose **File ▸ Open Pull Request…** (⇧⌘O), or paste a pull request link. The field takes a link, `owner/repo#123`, or a bare number from the open project's repository." : {
+
+    },
+    "Choose which image the test attached to compare with the baseline" : {
+
+    },
+    "Choose which of the test runs Xcode keeps for this project to show" : {
+
+    },
+    "Clear" : {
+
+    },
+    "Clear Canvas" : {
+
+    },
+    "Clear Filters" : {
+
+    },
+    "Clear Recent Messages" : {
+
+    },
+    "Clear Recent Projects" : {
+
+    },
+    "Clear all recent folders" : {
+
+    },
+    "Clear the canvas" : {
+
+    },
+    "Clear the canvas (⌘L)" : {
+
+    },
+    "Clear the filter" : {
+
+    },
+    "Clear the filters and go back to the tree" : {
+
+    },
+    "Close %@" : {
+
+    },
+    "Close Project" : {
+
+    },
+    "Close Pull Request Review" : {
+
+    },
+    "Close Review" : {
+
+    },
+    "Close a suite, or step up to it" : {
+
+    },
+    "Close the project and go back to the recent list" : {
+
+    },
+    "Close the review and delete its downloaded snapshots" : {
+
+    },
+    "Close this pane" : {
+
+    },
+    "Collapse %@" : {
+
+    },
+    "Collapse Sidebar" : {
+
+    },
+    "Colour behind the image panes" : {
+
+    },
+    "Colour painted behind the image itself, for reading a transparent snapshot" : {
+
+    },
+    "Committed in Git" : {
+
+    },
+    "Compare the snapshots a pull request changes, without checking it out." : {
+
+    },
+    "Compare with Base Branch" : {
+
+    },
+    "Compare with Test Run" : {
+
+    },
+    "Comparing Snapshots" : {
+
+    },
+    "Comparing…" : {
+
+    },
+    "Comparison" : {
+
+    },
+    "Comparison modes" : {
+
+    },
+    "Comparison split" : {
+
+    },
+    "Copy" : {
+
+    },
+    "Copy Comparison Image" : {
+
+    },
+    "Copy Name" : {
+
+    },
+    "Copy Split View or the onion skin as an image" : {
+
+    },
+    "Current" : {
+
+    },
+    "Custom" : {
+
+    },
+    "Custom %@" : {
+
+    },
+    "Cut" : {
+
+    },
+    "Dark Grey" : {
+
+    },
+    "Deleted by this pull request; only the base branch's version exists" : {
+
+    },
+    "Diff Mask" : {
+
+    },
+    "Diff Tolerance" : {
+
+    },
+    "Difference" : {
+
+    },
+    "Discard All" : {
+
+    },
+    "Discard All Changes in Project…" : {
+
+    },
+    "Discard All…" : {
+
+    },
+    "Discard Changes" : {
+
+    },
+    "Discard Changes in Suite" : {
+
+    },
     "Discard Changes to %lld Snapshots" : {
       "localizations" : {
         "en" : {
@@ -315,7 +500,9 @@
         }
       }
     },
-    "Discard changes" : {},
+    "Discard changes" : {
+
+    },
     "Discard the changes to %lld snapshots?" : {
       "localizations" : {
         "en" : {
@@ -338,242 +525,714 @@
         }
       }
     },
-    "Dismiss" : {},
-    "Dismiss Message" : {},
-    "Display Mode" : {},
-    "Done" : {},
-    "Downloading snapshots…" : {},
-    "Drop one image on the window to look at it, or two to compare them: the first is read as the baseline and the second as the candidate." : {},
-    "Drop to process" : {},
-    "Drop to process!" : {},
-    "Each pane has its own display mode: **Fit**, **Actual Size (1:1)**, or **Free**. In Free, scroll or pinch over the image to zoom around the pointer, drag to move it, or use the **−** and **+** buttons and type a factor between them; the target button centres the image at 1.0 again. **View ▸ Image Size**, **Zoom In** (⌘=), **Zoom Out** (⌘-), and **Centre and Reset Zoom** do the same for every pane at once." : {},
-    "Every action that writes a snapshot — Accept, Reject, Keep, Accept All, Discard, and Move to Trash — can be taken back with **Edit ▸ Undo** (⌘Z) and repeated with **Redo** (⇧⌘Z), until you open another project or quit." : {},
-    "Every modified snapshot goes back to the committed version. Changes that were never committed can be put back with Edit ▸ Undo until you open another project or quit. Untracked snapshots are left alone." : {},
-    "Every pixel is byte for byte the same." : {},
-    "Exact" : {},
-    "Expand %@" : {},
-    "Expand Sidebar" : {},
-    "Fade from the baseline to the candidate. Whatever moves while you drag is what changed" : {},
-    "Failed in the test run" : {},
-    "Failures from your test runs" : {},
-    "Filter field" : {},
-    "Filter snapshots" : {},
-    "Filters" : {},
-    "Find" : {},
-    "Find a snapshot" : {},
-    "Fit" : {},
-    "Free" : {},
-    "Getting Started" : {},
-    "GimDiff" : {},
-    "GimDiff Help" : {},
-    "GimDiff borrows the GitHub CLI's login and stores no token of its own. Install `gh` and sign in once; only github.com is supported." : {},
-    "GimDiff can’t tell which image is the recorded snapshot. Keep the one that’s right; the other is overwritten with it." : {},
-    "GimDiff checks which side is which before showing the pair: a file Git tracks, or one inside the open project, is the baseline, even when the log listed it second. When nothing tells the two apart, the panes are called **Left** and **Right** instead, and the bar offers **Keep Left** and **Keep Right**: the image you keep is copied over the other one." : {},
-    "GimDiff could not find the test source for this suite" : {},
-    "GimDiff could not find the test source for “%@”." : {},
-    "GimDiff does not know how to handle the action “%@”." : {},
-    "GimDiff does not know which test recorded this image." : {},
-    "GimDiff downloads both versions of every changed image under a `Snapshots` or `__Snapshots__` folder, without checking the branch out. Each snapshot is marked **Added**, **Modified**, **Deleted**, or **Renamed**." : {},
-    "GimDiff found no snapshots it recognises under “%@”." : {},
-    "GimDiff watches the open project, so a test run shows up on its own: rewritten images are redrawn, new and deleted snapshots come and go in the tree, and the badges follow your commits — even while GimDiff is in the background. **Refresh Images** (⌘R) and **Reload Project** (⇧⌘R) are there for when you would rather ask: the first reads the images on screen off disk again, the second rescans the whole folder from scratch." : {},
-    "Git tracks the baseline and not the candidate" : {},
-    "Green" : {},
-    "Grey" : {},
-    "Hide Snapshot" : {},
-    "Hide the sidebar" : {},
-    "How different two pixels may look and still count as the same, as a perceptual distance (ΔE). ΔE 2.3 is about the smallest change anybody can see." : {},
-    "How the image is fitted into the pane" : {},
-    "How the two images are compared: next to each other, under a draggable split, faded one over the other, or with every changed pixel painted magenta" : {},
-    "Image Matte" : {},
-    "Image Not Found" : {},
-    "Image Size" : {},
-    "Image size in pixels" : {},
-    "In **Split View** and **Onion Skin**, **Snapshot ▸ Copy Comparison Image** (⇧⌘C) puts what you see on the clipboard as one picture, at the snapshots' own resolution: cut where the split stands or faded as far as the slider goes, with the sides and the setting written underneath. Paste it into a pull request, an issue, or a chat." : {},
-    "It exits with `0` when there is nothing to report, `1` when the images or the project differ, `2` when the command could not run, and `64` when the arguments were not usable." : {},
-    "Jump to the filter field" : {},
-    "Jump to the filter field from anywhere" : {},
-    "Jump to the next or previous changed snapshot" : {},
-    "Keep Baseline" : {},
-    "Keep Candidate" : {},
-    "Keep Left" : {},
-    "Keep Right" : {},
-    "Keyboard Shortcuts" : {},
-    "Leave the baseline as it is and set the candidate aside" : {},
-    "Left" : {},
-    "Light Grey" : {},
-    "Link Panes" : {},
-    "Looking for snapshot tests…" : {},
-    "Match within Tolerance" : {},
-    "Messages" : {},
-    "Modified" : {},
-    "Modified by this pull request" : {},
-    "Move Snapshot to Trash" : {},
-    "Move Snapshots Folder to Trash" : {},
-    "Move the selection to the Trash" : {},
-    "Move the selection, showing each snapshot" : {},
-    "Move to the first matching row" : {},
-    "Next Change" : {},
-    "No Matching Snapshots" : {},
-    "No Recent Projects" : {},
-    "No Snapshot Changes" : {},
-    "No Snapshot Failures" : {},
-    "No Snapshot Selected" : {},
-    "No Snapshots Discovered" : {},
-    "No Test Results" : {},
-    "No snapshot directories (Snapshots/ or __Snapshots__) were found in this project." : {},
-    "No snapshots match your query or filter chips." : {},
-    "None" : {},
-    "One of the two images could not be read, so there is nothing to copy." : {},
-    "Onion Skin" : {},
-    "Open Image in Preview" : {},
-    "Open PR" : {},
-    "Open Project" : {},
-    "Open Project…" : {},
-    "Open Pull Request…" : {},
-    "Open Recent" : {},
-    "Open Snapshots Folder" : {},
-    "Open Test File in Xcode" : {},
-    "Open Test Source in Xcode" : {},
-    "Open a GitHub pull request" : {},
-    "Open a project" : {},
-    "Open a project folder" : {},
-    "Open a project folder (⌘O)" : {},
-    "Open a project folder or drag a folder here" : {},
-    "Open a pull request" : {},
-    "Open a suite, or step into its first snapshot" : {},
-    "Open images directly" : {},
-    "Open in Preview" : {},
-    "Open the snapshots named on the clipboard: a failure log, copied files, or a pull request link (⌘V)" : {},
-    "Open the suite's test file in Xcode" : {},
-    "Open this help" : {},
-    "Opening “%@”" : {},
-    "Other tools can drive the open window with a link:" : {},
-    "Overwrite the baseline with the candidate" : {},
-    "Overwrite the candidate with the baseline" : {},
-    "Overwrite the left image with the right one" : {},
-    "Overwrite the right image with the left one" : {},
-    "PR #%lld" : {},
-    "PR #%lld contains no modified snapshot image files." : {},
-    "Panel Background" : {},
-    "Paste" : {},
-    "Paste a log, files, or a pull request link" : {},
-    "Paste from Clipboard" : {},
-    "Previous Change" : {},
-    "Project" : {},
-    "Project Status" : {},
-    "Pull Request Head" : {},
-    "Read the images on screen off disk again (⌘R)" : {},
-    "Reading test results…" : {},
-    "Recent Messages" : {},
-    "Recent Projects" : {},
-    "Record what the run rendered as the baseline of every snapshot it failed on" : {},
-    "Recorded on Disk" : {},
-    "Refresh" : {},
-    "Refresh Images" : {},
-    "Refresh the images on screen" : {},
-    "Reject" : {},
-    "Reject Candidate" : {},
-    "Reload" : {},
-    "Reload Project" : {},
-    "Remove %@ from the recent list" : {},
-    "Remove from Recents" : {},
-    "Remove “%@” from the recent list" : {},
-    "Renamed by this pull request" : {},
-    "Rescan the project" : {},
-    "Rescan the project for snapshots (⇧⌘R)" : {},
-    "Reset" : {},
-    "Restore every modified snapshot of the project to the committed version" : {},
-    "Reveal in Finder" : {},
-    "Reveal the selection in the Finder" : {},
-    "Review GitHub PR - ⌘⇧O" : {},
-    "Review GitHub Pull Request" : {},
-    "Review Snapshots" : {},
-    "Reviewing Pull Requests" : {},
-    "Right" : {},
-    "Right-click a row, or use the **Snapshot** menu on the selected one, to copy its name, open it in Preview, reveal it in the Finder, open its snapshots folder, open its test file in Xcode, or move it to the Trash. The buttons at the right of each pane's header do the same for the image in that pane." : {},
-    "Run" : {},
-    "Scale" : {},
-    "Scanning…" : {},
-    "Select All" : {},
-    "Select a snapshot test from the sidebar, or copy a failure log and paste it here (⌘V)." : {},
-    "Selecting a snapshot compares it with its committed version when git has one. **Snapshot ▸ Show Snapshot without Git Diff** shows the file on its own." : {},
-    "Show Only Modified Snapshots" : {},
-    "Show Only Suites with Warnings" : {},
-    "Show Project" : {},
-    "Show Pull Request Version Only" : {},
-    "Show Snapshot" : {},
-    "Show Snapshot with Git Diff" : {},
-    "Show Snapshot without Git Diff" : {},
-    "Show both images at equal strength again" : {},
-    "Show only snapshots that differ from the committed version" : {},
-    "Show only suites whose test source could not be found" : {},
-    "Show or hide the selected snapshot" : {},
-    "Show the project's snapshots, or the ones a test run in Xcode failed on" : {},
-    "Show the sidebar" : {},
-    "Side by Side" : {},
-    "Side by side, each pane zooms on its own. Click the link button in either pane's footer (or **View ▸ Link Panes**) to zoom and move both together, so the same part of each image stays under the same point." : {},
-    "Sidebar" : {},
-    "Sidebar Shows" : {},
-    "Sides chosen because %@." : {},
-    "Sides swapped from the order given: %@." : {},
-    "Signing in" : {},
-    "Snapshot" : {},
-    "Snapshots" : {},
-    "Snapshots in a pull request review are read-only; there is nothing on disk to delete." : {},
-    "Split View" : {},
-    "Test Run" : {},
-    "Test Run Candidate" : {},
-    "Test Runs" : {},
-    "Test source missing" : {},
-    "The **candidate** is the image your test just recorded: the file on disk. The **baseline** is what it is measured against — the version committed to git, or a reference image you opened beside it. The baseline is always on the left and the candidate on the right." : {},
-    "The **×** in a pane's header (or **Snapshot ▸ Close Baseline** and **Close Candidate**) closes that side and leaves the other on screen on its own." : {},
-    "The URL is missing the required “%@” parameter." : {},
-    "The bar under a comparison decides it. **Accept** copies the candidate over the baseline file. **Reject** copies the baseline over the candidate. Both overwrite a file on disk; when one is unavailable, the bar says why." : {},
-    "The baseline on screen was read out of %@ and exists only for this comparison. The candidate is already the file on disk — commit it to make it the recorded baseline." : {},
-    "The candidate is a copy of what the test run rendered, not a file in the project. Run the test again to replace it." : {},
-    "The clipboard holds no snapshot path GimDiff recognises." : {},
-    "The command-line tool hands work to the running app, or runs on its own:" : {},
-    "The comparison could not be drawn." : {},
-    "The downloaded images are scratch copies, so accepting, reverting, and deleting are turned off. **File ▸ Close Pull Request Review** deletes the copies and puts back the project you had open." : {},
-    "The file does not exist at this path or could not be decoded." : {},
-    "The gimdiff command" : {},
-    "The images are different sizes, so no pixel lines up with another." : {},
-    "The largest difference is ΔE %@. A tolerance at least that loose would call these images a match." : {},
-    "The mask's **Tolerance** menu (also **View ▸ Diff Tolerance**) lets through differences nobody could see. It measures how far apart two pixels look, as a ΔE: at ΔE 2.3, about the smallest visible change, anti-aliasing and rounding stop being painted while real changes still are. Hover over the result to see the largest difference between the two images. GimDiff remembers the setting." : {},
-    "The test results in “%@” could not be read." : {},
-    "The toolbar's colour wells set the panel background and a matte behind the image, which makes a transparent snapshot readable. **View ▸ Panel Background** and **View ▸ Image Matte** offer the same presets." : {},
-    "There is no baseline on screen to overwrite." : {},
-    "There is no comparison on screen to reject." : {},
-    "These images were copied out of a test run; there is nothing in the project to delete." : {},
-    "These keys work while the snapshot tree has focus." : {},
-    "This test run failed on no snapshot of this project." : {},
-    "Tolerance" : {},
-    "Type in the sidebar's filter field (⌘F) to narrow the tree by name. The **Modified** chip under it keeps only snapshots that differ from their committed version, and **Warnings** keeps only suites whose test source could not be found. Each chip appears only when the project has something it would keep. **Edit ▸ Clear Filters**, ⎋ in the field, or the field's **×** puts the whole tree back. To visit the changed snapshots without hiding the rest, use **Snapshot ▸ Next Change** (⌥↓) and **Previous Change** (⌥↑), which open each suite on the way." : {},
-    "URL Scheme and CLI" : {},
-    "Undo or redo the last change to a file" : {},
-    "Unmatched Test Run Attachments" : {},
-    "Warnings" : {},
-    "What GimDiff has to tell you appears in a strip under the canvas. An explanation — why an action is unavailable — goes away on its own after a few seconds, unless the pointer is on it; a failure stays until you dismiss it. **Window ▸ Recent Messages** keeps the last ten; choose one to copy it." : {},
-    "What the test run rendered replaces each snapshot's baseline on disk. Images that match no snapshot are left alone." : {},
-    "When the baseline is the committed version there is nothing to accept into: the candidate already is the working file, so commit it instead." : {},
-    "White" : {},
-    "Window" : {},
-    "Xcode has no test results for this project. Run its tests, then try again." : {},
-    "Zoom Factor" : {},
-    "Zoom In" : {},
-    "Zoom Out" : {},
-    "Zoom and backgrounds" : {},
-    "Zoom and move both panes together" : {},
-    "Zoom and move each pane on its own" : {},
-    "Zoom factor, between 0.1 and 10.0. Scroll over the image to zoom around the pointer" : {},
-    "Zoom the images in and out" : {},
-    "gimdiff:// links" : {},
-    "https://github.com/owner/repo/pull/123" : {},
-    "the baseline is in the open project and the candidate is not" : {},
-    "ΔE %@" : {},
-    "ΔE %@ (Just Noticeable)" : {},
-    "“%@” could not be prepared for comparison." : {},
-    "“%@” could not be read as an image." : {},
+    "Dismiss" : {
+
+    },
+    "Dismiss Message" : {
+
+    },
+    "Display Mode" : {
+
+    },
+    "Done" : {
+
+    },
+    "Downloading snapshots…" : {
+
+    },
+    "Drop one image on the window to look at it, or two to compare them: the first is read as the baseline and the second as the candidate." : {
+
+    },
+    "Drop to process" : {
+
+    },
+    "Drop to process!" : {
+
+    },
+    "Each pane has its own display mode: **Fit**, **Actual Size (1:1)**, or **Free**. In Free, scroll or pinch over the image to zoom around the pointer, drag to move it, or use the **−** and **+** buttons and type a factor between them; the target button centres the image at 1.0 again. **View ▸ Image Size**, **Zoom In** (⌘=), **Zoom Out** (⌘-), and **Centre and Reset Zoom** do the same for every pane at once." : {
+
+    },
+    "Every action that writes a snapshot — Accept, Reject, Keep, Accept All, Discard, and Move to Trash — can be taken back with **Edit ▸ Undo** (⌘Z) and repeated with **Redo** (⇧⌘Z), until you open another project or quit." : {
+
+    },
+    "Every modified snapshot goes back to the committed version. Changes that were never committed can be put back with Edit ▸ Undo until you open another project or quit. Untracked snapshots are left alone." : {
+
+    },
+    "Every pixel is byte for byte the same." : {
+
+    },
+    "Exact" : {
+
+    },
+    "Expand %@" : {
+
+    },
+    "Expand Sidebar" : {
+
+    },
+    "Fade from the baseline to the candidate. Whatever moves while you drag is what changed" : {
+
+    },
+    "Failed in the test run" : {
+
+    },
+    "Failures from your test runs" : {
+
+    },
+    "Filter field" : {
+
+    },
+    "Filter snapshots" : {
+
+    },
+    "Filters" : {
+
+    },
+    "Find" : {
+
+    },
+    "Find a snapshot" : {
+
+    },
+    "Fit" : {
+
+    },
+    "Free" : {
+
+    },
+    "Getting Started" : {
+
+    },
+    "GimDiff" : {
+
+    },
+    "GimDiff Help" : {
+
+    },
+    "GimDiff borrows the GitHub CLI's login and stores no token of its own. Install `gh` and sign in once; only github.com is supported." : {
+
+    },
+    "GimDiff can’t tell which image is the recorded snapshot. Keep the one that’s right; the other is overwritten with it." : {
+
+    },
+    "GimDiff checks which side is which before showing the pair: a file Git tracks, or one inside the open project, is the baseline, even when the log listed it second. When nothing tells the two apart, the panes are called **Left** and **Right** instead, and the bar offers **Keep Left** and **Keep Right**: the image you keep is copied over the other one." : {
+
+    },
+    "GimDiff could not find the test source for this suite" : {
+
+    },
+    "GimDiff could not find the test source for “%@”." : {
+
+    },
+    "GimDiff does not know how to handle the action “%@”." : {
+
+    },
+    "GimDiff does not know which test recorded this image." : {
+
+    },
+    "GimDiff downloads both versions of every changed image under a `Snapshots` or `__Snapshots__` folder, without checking the branch out. Each snapshot is marked **Added**, **Modified**, **Deleted**, or **Renamed**." : {
+
+    },
+    "GimDiff found no snapshots it recognises under “%@”." : {
+
+    },
+    "GimDiff watches the open project, so a test run shows up on its own: rewritten images are redrawn, new and deleted snapshots come and go in the tree, and the badges follow your commits — even while GimDiff is in the background. **Refresh Images** (⌘R) and **Reload Project** (⇧⌘R) are there for when you would rather ask: the first reads the images on screen off disk again, the second rescans the whole folder from scratch." : {
+
+    },
+    "Git tracks the baseline and not the candidate" : {
+
+    },
+    "Green" : {
+
+    },
+    "Grey" : {
+
+    },
+    "Hide Snapshot" : {
+
+    },
+    "Hide the sidebar" : {
+
+    },
+    "How different two pixels may look and still count as the same, as a perceptual distance (ΔE). ΔE 2.3 is about the smallest change anybody can see." : {
+
+    },
+    "How the image is fitted into the pane" : {
+
+    },
+    "How the two images are compared: next to each other, under a draggable split, faded one over the other, or with every changed pixel painted magenta" : {
+
+    },
+    "Image Matte" : {
+
+    },
+    "Image Not Found" : {
+
+    },
+    "Image Size" : {
+
+    },
+    "Image size in pixels" : {
+
+    },
+    "In **Split View** and **Onion Skin**, **Snapshot ▸ Copy Comparison Image** (⇧⌘C) puts what you see on the clipboard as one picture, at the snapshots' own resolution: cut where the split stands or faded as far as the slider goes, with the sides and the setting written underneath. Paste it into a pull request, an issue, or a chat." : {
+
+    },
+    "It exits with `0` when there is nothing to report, `1` when the images or the project differ, `2` when the command could not run, and `64` when the arguments were not usable." : {
+
+    },
+    "Jump to the filter field" : {
+
+    },
+    "Jump to the filter field from anywhere" : {
+
+    },
+    "Jump to the next or previous changed snapshot" : {
+
+    },
+    "Keep Baseline" : {
+
+    },
+    "Keep Candidate" : {
+
+    },
+    "Keep Left" : {
+
+    },
+    "Keep Right" : {
+
+    },
+    "Keyboard Shortcuts" : {
+
+    },
+    "Leave the baseline as it is and set the candidate aside" : {
+
+    },
+    "Left" : {
+
+    },
+    "Light Grey" : {
+
+    },
+    "Link Panes" : {
+
+    },
+    "Looking for snapshot tests…" : {
+
+    },
+    "Match within Tolerance" : {
+
+    },
+    "Messages" : {
+
+    },
+    "Modified" : {
+
+    },
+    "Modified by this pull request" : {
+
+    },
+    "Move Snapshot to Trash" : {
+
+    },
+    "Move Snapshots Folder to Trash" : {
+
+    },
+    "Move the selection to the Trash" : {
+
+    },
+    "Move the selection, showing each snapshot" : {
+
+    },
+    "Move to the first matching row" : {
+
+    },
+    "Next Change" : {
+
+    },
+    "No Matching Snapshots" : {
+
+    },
+    "No Recent Projects" : {
+
+    },
+    "No Snapshot Changes" : {
+
+    },
+    "No Snapshot Failures" : {
+
+    },
+    "No Snapshot Selected" : {
+
+    },
+    "No Snapshots Discovered" : {
+
+    },
+    "No Test Results" : {
+
+    },
+    "No snapshot directories (Snapshots/ or __Snapshots__) were found in this project." : {
+
+    },
+    "No snapshots match your query or filter chips." : {
+
+    },
+    "None" : {
+
+    },
+    "One of the two images could not be read, so there is nothing to copy." : {
+
+    },
+    "Onion Skin" : {
+
+    },
+    "Open Image in Preview" : {
+
+    },
+    "Open PR" : {
+
+    },
+    "Open Project" : {
+
+    },
+    "Open Project…" : {
+
+    },
+    "Open Pull Request…" : {
+
+    },
+    "Open Recent" : {
+
+    },
+    "Open Snapshots Folder" : {
+
+    },
+    "Open Test File in Xcode" : {
+
+    },
+    "Open Test Source in Xcode" : {
+
+    },
+    "Open a GitHub pull request" : {
+
+    },
+    "Open a project" : {
+
+    },
+    "Open a project folder" : {
+
+    },
+    "Open a project folder (⌘O)" : {
+
+    },
+    "Open a project folder or drag a folder here" : {
+
+    },
+    "Open a pull request" : {
+
+    },
+    "Open a suite, or step into its first snapshot" : {
+
+    },
+    "Open images directly" : {
+
+    },
+    "Open in Preview" : {
+
+    },
+    "Open the snapshots named on the clipboard: a failure log, copied files, or a pull request link (⌘V)" : {
+
+    },
+    "Open the suite's test file in Xcode" : {
+
+    },
+    "Open this help" : {
+
+    },
+    "Opening “%@”" : {
+
+    },
+    "Other tools can drive the open window with a link:" : {
+
+    },
+    "Overwrite the baseline with the candidate" : {
+
+    },
+    "Overwrite the candidate with the baseline" : {
+
+    },
+    "Overwrite the left image with the right one" : {
+
+    },
+    "Overwrite the right image with the left one" : {
+
+    },
+    "PR #%lld" : {
+
+    },
+    "PR #%lld contains no modified snapshot image files." : {
+
+    },
+    "Panel Background" : {
+
+    },
+    "Paste" : {
+
+    },
+    "Paste a log, files, or a pull request link" : {
+
+    },
+    "Paste from Clipboard" : {
+
+    },
+    "Previous Change" : {
+
+    },
+    "Project" : {
+
+    },
+    "Project Status" : {
+
+    },
+    "Pull Request Head" : {
+
+    },
+    "Read the images on screen off disk again (⌘R)" : {
+
+    },
+    "Reading test results…" : {
+
+    },
+    "Recent Messages" : {
+
+    },
+    "Recent Projects" : {
+
+    },
+    "Record what the run rendered as the baseline of every snapshot it failed on" : {
+
+    },
+    "Recorded on Disk" : {
+
+    },
+    "Refresh" : {
+
+    },
+    "Refresh Images" : {
+
+    },
+    "Refresh the images on screen" : {
+
+    },
+    "Reject" : {
+
+    },
+    "Reject Candidate" : {
+
+    },
+    "Reload" : {
+
+    },
+    "Reload Project" : {
+
+    },
+    "Remove %@ from the recent list" : {
+
+    },
+    "Remove from Recents" : {
+
+    },
+    "Remove “%@” from the recent list" : {
+
+    },
+    "Renamed by this pull request" : {
+
+    },
+    "Rescan the project" : {
+
+    },
+    "Rescan the project for snapshots (⇧⌘R)" : {
+
+    },
+    "Reset" : {
+
+    },
+    "Restore every modified snapshot of the project to the committed version" : {
+
+    },
+    "Reveal in Finder" : {
+
+    },
+    "Reveal the selection in the Finder" : {
+
+    },
+    "Review GitHub PR - ⌘⇧O" : {
+
+    },
+    "Review GitHub Pull Request" : {
+
+    },
+    "Review Snapshots" : {
+
+    },
+    "Reviewing Pull Requests" : {
+
+    },
+    "Right" : {
+
+    },
+    "Right-click a row, or use the **Snapshot** menu on the selected one, to copy its name, open it in Preview, reveal it in the Finder, open its snapshots folder, open its test file in Xcode, or move it to the Trash. The buttons at the right of each pane's header do the same for the image in that pane." : {
+
+    },
+    "Run" : {
+
+    },
+    "Scale" : {
+
+    },
+    "Scanning…" : {
+
+    },
+    "Select All" : {
+
+    },
+    "Select a snapshot test from the sidebar, or copy a failure log and paste it here (⌘V)." : {
+
+    },
+    "Selecting a snapshot compares it with its committed version when git has one. **Snapshot ▸ Show Snapshot without Git Diff** shows the file on its own." : {
+
+    },
+    "Show Only Modified Snapshots" : {
+
+    },
+    "Show Only Suites with Warnings" : {
+
+    },
+    "Show Project" : {
+
+    },
+    "Show Pull Request Version Only" : {
+
+    },
+    "Show Snapshot" : {
+
+    },
+    "Show Snapshot with Git Diff" : {
+
+    },
+    "Show Snapshot without Git Diff" : {
+
+    },
+    "Show both images at equal strength again" : {
+
+    },
+    "Show only snapshots that differ from the committed version" : {
+
+    },
+    "Show only suites whose test source could not be found" : {
+
+    },
+    "Show or hide the selected snapshot" : {
+
+    },
+    "Show the project's snapshots, or the ones a test run in Xcode failed on" : {
+
+    },
+    "Show the sidebar" : {
+
+    },
+    "Side by Side" : {
+
+    },
+    "Side by side, each pane zooms on its own. Click the link button in either pane's footer (or **View ▸ Link Panes**) to zoom and move both together, so the same part of each image stays under the same point." : {
+
+    },
+    "Sidebar" : {
+
+    },
+    "Sidebar Shows" : {
+
+    },
+    "Sides chosen because %@." : {
+
+    },
+    "Sides swapped from the order given: %@." : {
+
+    },
+    "Signing in" : {
+
+    },
+    "Snapshot" : {
+
+    },
+    "Snapshots" : {
+
+    },
+    "Snapshots in a pull request review are read-only; there is nothing on disk to delete." : {
+
+    },
+    "Split View" : {
+
+    },
+    "Test Run" : {
+
+    },
+    "Test Run Candidate" : {
+
+    },
+    "Test Runs" : {
+
+    },
+    "Test source missing" : {
+
+    },
+    "The **candidate** is the image your test just recorded: the file on disk. The **baseline** is what it is measured against — the version committed to git, or a reference image you opened beside it. The baseline is always on the left and the candidate on the right." : {
+
+    },
+    "The **×** in a pane's header (or **Snapshot ▸ Close Baseline** and **Close Candidate**) closes that side and leaves the other on screen on its own." : {
+
+    },
+    "The URL is missing the required “%@” parameter." : {
+
+    },
+    "The bar under a comparison decides it. **Accept** copies the candidate over the baseline file. **Reject** copies the baseline over the candidate. Both overwrite a file on disk; when one is unavailable, the bar says why." : {
+
+    },
+    "The baseline on screen was read out of %@ and exists only for this comparison. The candidate is already the file on disk — commit it to make it the recorded baseline." : {
+
+    },
+    "The candidate is a copy of what the test run rendered, not a file in the project. Run the test again to replace it." : {
+
+    },
+    "The clipboard holds no snapshot path GimDiff recognises." : {
+
+    },
+    "The command-line tool hands work to the running app, or runs on its own:" : {
+
+    },
+    "The comparison could not be drawn." : {
+
+    },
+    "The downloaded images are scratch copies, so accepting, reverting, and deleting are turned off. **File ▸ Close Pull Request Review** deletes the copies and puts back the project you had open." : {
+
+    },
+    "The file does not exist at this path or could not be decoded." : {
+
+    },
+    "The gimdiff command" : {
+
+    },
+    "The images are different sizes, so no pixel lines up with another." : {
+
+    },
+    "The largest difference is ΔE %@. A tolerance at least that loose would call these images a match." : {
+
+    },
+    "The mask's **Tolerance** menu (also **View ▸ Diff Tolerance**) lets through differences nobody could see. It measures how far apart two pixels look, as a ΔE: at ΔE 2.3, about the smallest visible change, anti-aliasing and rounding stop being painted while real changes still are. Hover over the result to see the largest difference between the two images. GimDiff remembers the setting." : {
+
+    },
+    "The test results in “%@” could not be read." : {
+
+    },
+    "The toolbar's colour wells set the panel background and a matte behind the image, which makes a transparent snapshot readable. **View ▸ Panel Background** and **View ▸ Image Matte** offer the same presets." : {
+
+    },
+    "There is no baseline on screen to overwrite." : {
+
+    },
+    "There is no comparison on screen to reject." : {
+
+    },
+    "These images were copied out of a test run; there is nothing in the project to delete." : {
+
+    },
+    "These keys work while the snapshot tree has focus." : {
+
+    },
+    "This test run failed on no snapshot of this project." : {
+
+    },
+    "Tolerance" : {
+
+    },
+    "Type in the sidebar's filter field (⌘F) to narrow the tree by name. The **Modified** chip under it keeps only snapshots that differ from their committed version, and **Warnings** keeps only suites whose test source could not be found. Each chip appears only when the project has something it would keep. **Edit ▸ Clear Filters**, ⎋ in the field, or the field's **×** puts the whole tree back. To visit the changed snapshots without hiding the rest, use **Snapshot ▸ Next Change** (⌥↓) and **Previous Change** (⌥↑), which open each suite on the way." : {
+
+    },
+    "URL Scheme and CLI" : {
+
+    },
+    "Undo or redo the last change to a file" : {
+
+    },
+    "Unmatched Test Run Attachments" : {
+
+    },
+    "Warnings" : {
+
+    },
+    "What GimDiff has to tell you appears in a strip under the canvas. An explanation — why an action is unavailable — goes away on its own after a few seconds, unless the pointer is on it; a failure stays until you dismiss it. **Window ▸ Recent Messages** keeps the last ten; choose one to copy it." : {
+
+    },
+    "What the test run rendered replaces each snapshot's baseline on disk. Images that match no snapshot are left alone." : {
+
+    },
+    "When the baseline is the committed version there is nothing to accept into: the candidate already is the working file, so commit it instead." : {
+
+    },
+    "White" : {
+
+    },
+    "Window" : {
+
+    },
+    "Xcode has no test results for this project. Run its tests, then try again." : {
+
+    },
+    "Zoom Factor" : {
+
+    },
+    "Zoom In" : {
+
+    },
+    "Zoom Out" : {
+
+    },
+    "Zoom and backgrounds" : {
+
+    },
+    "Zoom and move both panes together" : {
+
+    },
+    "Zoom and move each pane on its own" : {
+
+    },
+    "Zoom factor, between 0.1 and 10.0. Scroll over the image to zoom around the pointer" : {
+
+    },
+    "Zoom the images in and out" : {
+
+    },
+    "gimdiff:// links" : {
+
+    },
+    "https://github.com/owner/repo/pull/123" : {
+
+    },
+    "the baseline is in the open project and the candidate is not" : {
+
+    },
+    "ΔE %@" : {
+
+    },
+    "ΔE %@ (Just Noticeable)" : {
+
+    },
+    "“%@” could not be prepared for comparison." : {
+
+    },
+    "“%@” could not be read as an image." : {
+
+    },
     "“%@” failed with status %d: %@" : {
       "localizations" : {
         "en" : {
@@ -584,11 +1243,21 @@
         }
       }
     },
-    "“%@” is neither a folder nor an image GimDiff can open." : {},
-    "“%@” is not a GimDiff URL scheme." : {},
-    "“%@” is not a folder." : {},
-    "“%@” is not inside a Git repository." : {},
-    "⚠️ Size Mismatch" : {}
+    "“%@” is neither a folder nor an image GimDiff can open." : {
+
+    },
+    "“%@” is not a GimDiff URL scheme." : {
+
+    },
+    "“%@” is not a folder." : {
+
+    },
+    "“%@” is not inside a Git repository." : {
+
+    },
+    "⚠️ Size Mismatch" : {
+
+    }
   },
   "version" : "1.0"
 }

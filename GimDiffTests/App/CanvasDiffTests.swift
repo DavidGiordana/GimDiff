@@ -122,7 +122,12 @@ struct CanvasDiffTests {
             totalPixelCount: 100_000,
             diffPercentage: 0.45
         )
-        #expect(DiffReportPill.summary(of: changed) == "0.45% Diff (450 pixels)")
+        let english = Locale(identifier: "en_US")
+        #expect(DiffReportPill.summary(of: changed, locale: english) == "0.45% Diff (450 pixels)")
+        // The number follows the locale; the words come from the app's language, English.
+        let french = DiffReportPill.summary(of: changed, locale: Locale(identifier: "fr_FR"))
+        #expect(french.hasPrefix("0,45"))
+        #expect(french.hasSuffix(" Diff (450 pixels)"))
 
         let mismatched = ImageDiffReport(
             candidateSize: CGSize(width: 100, height: 100),

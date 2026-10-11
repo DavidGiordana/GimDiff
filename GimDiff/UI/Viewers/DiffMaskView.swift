@@ -101,14 +101,20 @@ struct DiffReportPill: View {
     ///
     /// Differently sized images are called out rather than reported as 100% changed: the
     /// percentage would be true and useless, and the size is the thing to go and fix.
-    static func summary(of report: ImageDiffReport) -> String {
+    ///
+    /// - Parameter locale: How the numbers are written; the reader's own unless a test
+    ///   needs one that does not depend on the machine it runs on.
+    static func summary(of report: ImageDiffReport, locale: Locale = .current) -> String {
         guard report.hasIdenticalDimensions else { return String(localized: "⚠️ Size Mismatch") }
         guard !report.isIdentical else {
             return report.toleratedPixelCount == 0 ? String(localized: "100% Match") : String(localized: "Match within Tolerance")
         }
 
         let pixels = report.differentPixelCount
-        let summary = String(format: String(localized: "%.2f%% Diff (%@ pixels)"), report.diffPercentage, pixels.formatted())
+        // Formatted for the reader's locale: "0.45%" in US English, "0,45 %" in French.
+        let share = (report.diffPercentage / 100).formatted(.percent.precision(.fractionLength(2)).locale(locale))
+        let count = pixels.formatted(.number.locale(locale))
+        let summary = String(localized: "\(share) Diff (\(count) pixels)")
         guard report.toleratedPixelCount > 0 else { return summary }
         return String(localized: "\(summary) · \(report.toleratedPixelCount) tolerated")
     }
