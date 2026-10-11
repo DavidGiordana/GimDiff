@@ -28,10 +28,31 @@ enum CanvasDisplayMode: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// What two linked panes share: how the image is fitted, and where a free zoom stands.
+///
+/// The pan is a fraction of the fitted image's size rather than a distance in points, so a
+/// pane showing a taller image puts the same part of it under the same point of the pane.
+struct LinkedPaneTransform: Equatable {
+    var displayMode: CanvasDisplayMode
+    var scale: CGFloat
+    var offset: CGSize
+
+    /// Equal but for rounding, which a round trip through two panes' sizes introduces and
+    /// which, taken as a change, would bounce between the two panes for ever.
+    func isClose(to other: LinkedPaneTransform) -> Bool {
+        let tolerance: CGFloat = 0.000_1
+        return displayMode == other.displayMode
+            && abs(scale - other.scale) < tolerance
+            && abs(offset.width - other.offset.width) < tolerance
+            && abs(offset.height - other.offset.height) < tolerance
+    }
+}
+
 /// One image on the canvas, with the controls that decide how it is drawn.
 ///
 /// The viewer owns its display mode and its transform, so the two panes of a comparison can
 /// be inspected independently — one held at 1:1 on a detail while the other stays fitted.
+/// Given a ``link``, it mirrors them into it and follows it, so two panes move as one.
 struct SnapshotImageViewer<Accessory: View>: View {
     /// How far in and out a free-mode zoom may go.
     static var scaleRange: ClosedRange<CGFloat> { 0.1...10.0 }
@@ -46,9 +67,16 @@ struct SnapshotImageViewer<Accessory: View>: View {
     let reloadToken: Int
     /// Painted directly behind the image, so a transparent snapshot can be read.
     let matte: Color?
+    /// Shared with the other pane while Link Panes is on, `nil` otherwise.
+    var link: Binding<LinkedPaneTransform?>?
+    /// Whether this pane's view becomes the shared one when linking starts. One pane must
+    /// win, or turning the link on would leave the two fighting over whose zoom it is.
+    var seedsLink = false
     @ViewBuilder let accessory: () -> Accessory
 
     @State private var image: CanvasImage?
+    /// The image area's size, which turns a shared fraction back into points.
+    @State private var areaSize: CGSize = .zero
     @State private var displayMode: CanvasDisplayMode = .free
     @State private var scale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
@@ -62,6 +90,13 @@ struct SnapshotImageViewer<Accessory: View>: View {
             imageArea
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear
+                            .onAppear { areaSize = proxy.size }
+                            .onChange(of: proxy.size) { areaSize = proxy.size }
+                    }
+                }
 
             Divider()
 
@@ -80,10 +115,87 @@ struct SnapshotImageViewer<Accessory: View>: View {
             image = nil
             resetTransform(animated: false)
         }
-        .onChange(of: displayMode) { resetTransform(animated: false) }
+        .onChange(of: displayMode) { _, mode in
+            // Switched to follow the other pane: take its zoom rather than resetting it.
+            if let shared = link?.wrappedValue, shared.displayMode == mode {
+                adopt(shared)
+            } else {
+                resetTransform(animated: false)
+                publishToLink()
+            }
+        }
         .onChange(of: state.canvasViewRequest) { _, request in
             if let request { perform(request.command) }
         }
+        .onChange(of: scale) { publishToLink() }
+        .onChange(of: offset) { publishToLink() }
+        .onChange(of: link != nil) { followLink() }
+        .onChange(of: link?.wrappedValue, initial: true) { followLink() }
+    }
+
+    // MARK: - Linking
+
+    /// Takes the shared view, or offers this pane's when there is none yet and it seeds.
+    private func followLink() {
+        guard let link else { return }
+        if let shared = link.wrappedValue {
+            adopt(shared)
+        } else if seedsLink {
+            publishToLink()
+        }
+    }
+
+    /// Writes this pane's view into the link, unless it already says the same.
+    private func publishToLink() {
+        guard let link else { return }
+        let fitted = fittedSize
+        let current = LinkedPaneTransform(
+            displayMode: displayMode,
+            scale: scale,
+            offset: CGSize(
+                width: fitted.width > 0 ? offset.width / fitted.width : 0,
+                height: fitted.height > 0 ? offset.height / fitted.height : 0
+            )
+        )
+        if let shared = link.wrappedValue, shared.isClose(to: current) { return }
+        link.wrappedValue = current
+    }
+
+    /// Moves this pane to the shared view. A display mode that differs is set first; its
+    /// change handler comes back here for the zoom.
+    private func adopt(_ shared: LinkedPaneTransform) {
+        guard shared.displayMode == displayMode else {
+            displayMode = shared.displayMode
+            return
+        }
+        let fitted = fittedSize
+        let target = CGSize(
+            width: shared.offset.width * fitted.width,
+            height: shared.offset.height * fitted.height
+        )
+        guard abs(scale - shared.scale) > 0.000_1
+            || abs(offset.width - target.width) > 0.01
+            || abs(offset.height - target.height) > 0.01
+        else { return }
+
+        scale = shared.scale
+        offset = target
+        anchoredScale = scale
+        anchoredOffset = offset
+        syncScaleText()
+    }
+
+    /// The size the image is drawn at before any zoom: fitted to the area, aspect kept.
+    private var fittedSize: CGSize {
+        guard case let .loaded(decoded) = image,
+              decoded.pixelSize.width > 0,
+              decoded.pixelSize.height > 0
+        else { return areaSize }
+        let ratio = min(
+            areaSize.width / decoded.pixelSize.width,
+            areaSize.height / decoded.pixelSize.height
+        )
+        return CGSize(width: decoded.pixelSize.width * ratio, height: decoded.pixelSize.height * ratio)
     }
 
     /// Carries out a View menu command, which reaches every pane on screen at once.

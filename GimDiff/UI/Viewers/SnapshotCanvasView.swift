@@ -21,12 +21,24 @@ struct SnapshotCanvasView: View {
     /// Colour painted behind the images themselves, for reading transparent snapshots.
     let imageMatte: Color?
 
+    /// The view both side-by-side panes follow while Link Panes is on. Dropped whenever the
+    /// link is broken or the pair changes, so the next link starts from the baseline pane.
+    @State private var linkedTransform: LinkedPaneTransform?
+
     var body: some View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(backdrop)
             .navigationTitle(preview?.title ?? "GimDiff")
             .navigationSubtitle(subtitle)
+            .onChange(of: panesAreLinked) { linkedTransform = nil }
+            .onChange(of: preview) { linkedTransform = nil }
+    }
+
+    /// Whether the two panes on screen move together: only side by side, the one mode that
+    /// draws them in two viewers.
+    private var panesAreLinked: Bool {
+        state.linksPanes && preview?.isComparison == true && state.diffMode == .sideBySide
     }
 
     /// The chosen panel colour, but only while there is a panel to put it behind.
@@ -148,8 +160,14 @@ struct SnapshotCanvasView: View {
             SnapshotImageViewer(
                 fileURL: pane.fileURL,
                 reloadToken: state.imageReloadToken,
-                matte: imageMatte
-            )
+                matte: imageMatte,
+                link: panesAreLinked ? $linkedTransform : nil,
+                seedsLink: pane.role == .baseline
+            ) {
+                if preview?.isComparison == true, state.diffMode == .sideBySide {
+                    LinkPanesButton()
+                }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(paneBackdrop)
@@ -183,6 +201,24 @@ struct SnapshotCanvasView: View {
     private var subtitle: String {
         guard preview?.isComparison == true else { return "" }
         return state.diffMode.title
+    }
+}
+
+/// Links or unlinks the zoom of the two side-by-side panes, from either pane's footer.
+struct LinkPanesButton: View {
+    @Environment(AppState.self) private var state
+
+    var body: some View {
+        @Bindable var state = state
+        Toggle(isOn: $state.linksPanes) {
+            Image(systemName: "link")
+        }
+        .toggleStyle(.button)
+        .buttonStyle(.borderless)
+        .help(state.linksPanes
+            ? "Zoom and move each pane on its own"
+            : "Zoom and move both panes together")
+        .accessibilityLabel("Link Panes")
     }
 }
 

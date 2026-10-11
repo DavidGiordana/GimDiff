@@ -177,6 +177,10 @@ struct AppCommands: Commands {
             Button("Centre and Reset Zoom") { state.requestCanvasView(.resetZoom) }
                 .disabled(!state.canvasHasZoomableImages)
 
+            // The link button in each side-by-side pane's footer.
+            Toggle("Link Panes", isOn: binding(\.linksPanes))
+                .disabled(state.preview?.isComparison != true || state.diffMode != .sideBySide)
+
             // The onion skin's slider, at the three places worth going to by name.
             Menu("Onion Skin") {
                 Button("\(onionSideTitle(.baseline)) Only") {

@@ -20,6 +20,8 @@ final class AppState {
     static let recentProjectsKey = "recent_projects"
     /// `UserDefaults` key the diff mask's tolerance is remembered under, as a ΔE.
     static let diffToleranceKey = "diff_tolerance_delta_e"
+    /// `UserDefaults` key Link Panes is remembered under.
+    static let linksPanesKey = "links_panes"
     /// How many folders the recent list keeps before it starts forgetting the oldest.
     static let recentProjectsLimit = 12
     /// Commit-ish a snapshot is compared against when its Git diff is shown.
@@ -64,6 +66,14 @@ final class AppState {
             defaults.set(diffTolerance.maximumDeltaE, forKey: Self.diffToleranceKey)
             updateDiffReport()
         }
+    }
+    /// Whether the two side-by-side panes zoom and pan together.
+    ///
+    /// Off by default, because the panes' independence is the point when one is held at 1:1
+    /// on a detail while the other stays fitted. Remembered once turned on, as a way of
+    /// working rather than a property of one comparison.
+    var linksPanes = false {
+        didSet { defaults.set(linksPanes, forKey: Self.linksPanesKey) }
     }
     /// How the sides of a loose pair were chosen, while one is on screen.
     ///
@@ -216,6 +226,7 @@ final class AppState {
         self.defaults = defaults
         recentProjects = Self.loadRecentProjects(from: defaults)
         diffTolerance = DiffTolerance(maximumDeltaE: defaults.double(forKey: Self.diffToleranceKey))
+        linksPanes = defaults.bool(forKey: Self.linksPanesKey)
     }
 
     deinit {

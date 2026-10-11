@@ -257,6 +257,11 @@ private extension HelpTopic {
                 for every pane at once.
                 """),
             .text("""
+                Side by side, each pane zooms on its own. Click the link button in either \
+                pane's footer (or **View ▸ Link Panes**) to zoom and move both together, so the \
+                same part of each image stays under the same point.
+                """),
+            .text("""
                 The toolbar's colour wells set the panel background and a matte behind the \
                 image, which makes a transparent snapshot readable. **View ▸ Panel Background** \
                 and **View ▸ Image Matte** offer the same presets.
