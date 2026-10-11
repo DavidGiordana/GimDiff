@@ -234,4 +234,78 @@ struct KeyboardNavigationTests {
         fixture.state.expandSidebar()
         #expect(fixture.state.isSidebarVisible)
     }
+
+    // MARK: - Stepping through changes
+
+    @Test("Next Change opens a closed suite and lands on its changed snapshot")
+    func nextChangeOpensTheSuite() {
+        let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
+        #expect(fixture.selectedRowDescription == "AlphaTests")
+
+        fixture.state.selectNextChange()
+
+        #expect(fixture.selectedRowDescription == "AlphaTests/header")
+        #expect(fixture.state.isExpanded(suiteWithID: fixture.suiteID("AlphaTests")))
+        #expect(fixture.state.preview?.snapshotID == fixture.state.selectedSnapshot?.id)
+    }
+
+    @Test("Next Change skips unchanged snapshots and wraps round at the bottom")
+    func nextChangeWraps() {
+        let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
+
+        fixture.state.selectNextChange()
+        fixture.state.selectNextChange()
+        #expect(fixture.selectedRowDescription == "BetaTests/toolbar")
+
+        fixture.state.selectNextChange()
+        #expect(fixture.selectedRowDescription == "AlphaTests/header")
+    }
+
+    @Test("Previous Change from the top wraps round to the last change")
+    func previousChangeWraps() {
+        let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
+
+        fixture.state.selectPreviousChange()
+        #expect(fixture.selectedRowDescription == "BetaTests/toolbar")
+
+        fixture.state.selectPreviousChange()
+        #expect(fixture.selectedRowDescription == "AlphaTests/header")
+    }
+
+    @Test("Stepping keeps to what the filter field shows")
+    func steppingFollowsTheQuery() {
+        let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
+        fixture.state.filterText = "tool"
+
+        fixture.state.selectNextChange()
+        fixture.state.selectNextChange()
+
+        #expect(fixture.selectedRowDescription == "BetaTests/toolbar")
+    }
+
+    @Test("A project with no changes has nothing to step to")
+    func nothingToStepTo() {
+        let fixture = AppStateFixture(bundle: ProjectBundle(
+            rootURL: AppStateFixture.root,
+            gitRootURL: AppStateFixture.root,
+            suites: [AppStateFixture.suite(named: "CleanTests", hasSourceCode: true, snapshots: [
+                ("one", .unmodified), ("two", .unmodified),
+            ])]
+        ))
+        let before = fixture.state.selectedRowID
+
+        #expect(!fixture.state.canStepThroughChanges)
+        fixture.state.selectNextChange()
+        #expect(fixture.state.selectedRowID == before)
+    }
+
+    @Test("A single change already selected leaves nothing to step to")
+    func onlyChangeSelected() {
+        let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
+        fixture.state.filterText = "header"
+        fixture.state.selectNextChange()
+
+        #expect(fixture.selectedRowDescription == "AlphaTests/header")
+        #expect(!fixture.state.canStepThroughChanges)
+    }
 }

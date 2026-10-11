@@ -247,6 +247,23 @@ struct AppCommands: Commands {
 
             Divider()
 
+            // ⌥ rather than bare arrows: the menu bar is matched before the tree's own key
+            // handling, so a bare ↓ here would take the tree's ↓ away. ⌥↓ in the filter field
+            // goes to the menu as well, which is the trade for reaching it from anywhere.
+            Button("Next Change") {
+                state.selectNextChange()
+            }
+            .keyboardShortcut(.downArrow, modifiers: .option)
+            .disabled(!state.canStepThroughChanges)
+
+            Button("Previous Change") {
+                state.selectPreviousChange()
+            }
+            .keyboardShortcut(.upArrow, modifiers: .option)
+            .disabled(!state.canStepThroughChanges)
+
+            Divider()
+
             Button("Copy Name") {
                 state.copySelectedRowName()
             }

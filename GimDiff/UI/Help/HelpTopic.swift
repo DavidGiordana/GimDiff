@@ -116,7 +116,9 @@ private extension HelpTopic {
                 committed version, and **Warnings** keeps only suites whose test source could \
                 not be found. Each chip appears only when the project has something it would \
                 keep. **Edit ▸ Clear Filters**, ⎋ in the field, or the field's **×** puts the \
-                whole tree back.
+                whole tree back. To visit the changed snapshots without hiding the rest, use \
+                **Snapshot ▸ Next Change** (⌥↓) and **Previous Change** (⌥↑), which open each \
+                suite on the way.
                 """),
         ]),
         HelpSection(title: "Act on a snapshot", blocks: [
@@ -186,6 +188,7 @@ private extension HelpTopic {
                 HelpShortcut("Space", "Show or hide the selected snapshot"),
                 HelpShortcut("↩", "Open the suite's test file in Xcode"),
                 HelpShortcut("/", "Jump to the filter field"),
+                HelpShortcut("⌥↓ ⌥↑", "Jump to the next or previous changed snapshot"),
                 HelpShortcut("⌘F", "Jump to the filter field from anywhere"),
             ]),
         ]),

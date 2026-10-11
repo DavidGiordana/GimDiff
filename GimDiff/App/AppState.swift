@@ -534,6 +534,12 @@ final class AppState {
     /// search query is active: a query that matches a method name has to show the match,
     /// not the closed folder holding it.
     var visibleRows: [TreeRowItem] {
+        treeRows(expandingAll: false)
+    }
+
+    /// ``visibleRows``, or the same rows with every suite open, for walking snapshots the
+    /// tree is hiding under a closed suite but would show once it was opened.
+    private func treeRows(expandingAll: Bool) -> [TreeRowItem] {
         guard var suites = currentProject?.suites else { return [] }
         let isShowingTestRun = sidebarSource == .testRun
         if isShowingTestRun {
@@ -562,7 +568,7 @@ final class AppState {
                 guard !children.isEmpty else { continue }
             }
 
-            let isExpanded = expandedSuiteIDs.contains(suite.id) || !query.isEmpty
+            let isExpanded = expandingAll || expandedSuiteIDs.contains(suite.id) || !query.isEmpty
             rows.append(.suite(suite, isExpanded: isExpanded, childCount: children.count))
             guard isExpanded else { continue }
             rows.append(contentsOf: children.map { .snapshot($0, parentSuiteID: suite.id) })
@@ -618,6 +624,60 @@ final class AppState {
               preview?.snapshotID != snapshot.id
         else { return }
         showSnapshot(snapshot, withGitDiff: true)
+    }
+
+    // MARK: - Stepping through changes
+
+    /// Selects the next changed snapshot below the selection, opening its suite on the way
+    /// and wrapping round from the bottom. Snapshot ▸ Next Change, ⌥↓.
+    func selectNextChange() {
+        stepToChange(forward: true)
+    }
+
+    /// Selects the previous changed snapshot above the selection. Snapshot ▸ Previous
+    /// Change, ⌥↑.
+    func selectPreviousChange() {
+        stepToChange(forward: false)
+    }
+
+    /// Whether there is a change to step to other than the one already selected.
+    var canStepThroughChanges: Bool {
+        let changes = changedRows(in: treeRows(expandingAll: true))
+        return changes.count > 1 || (changes.count == 1 && changes[0].id != selectedRowID)
+    }
+
+    /// The rows that count as a change in the view the sidebar is showing.
+    ///
+    /// In the project, a snapshot git reports modified or untracked: exactly what the
+    /// Modified chip would keep, without hiding the rest. Under the test run every row is a
+    /// failure, and under a pull request every row is something it changed, so there every
+    /// snapshot counts.
+    private func changedRows(in rows: [TreeRowItem]) -> [TreeRowItem] {
+        let everySnapshotIsAChange = isReviewingPullRequest || sidebarSource == .testRun
+        return rows.filter { row in
+            guard let snapshot = row.snapshot else { return false }
+            return everySnapshotIsAChange || snapshot.hasGitDiff
+        }
+    }
+
+    /// Walks the tree as if every suite were open, so a change under a closed suite is
+    /// found, and then opens that suite so the row it lands on can be seen.
+    private func stepToChange(forward: Bool) {
+        let rows = treeRows(expandingAll: true)
+        let changes = Set(changedRows(in: rows).map(\.id))
+        guard !changes.isEmpty else { return }
+
+        // From the selection, or from just outside the tree when nothing is selected, so the
+        // first step lands on the first change in either direction.
+        let start = rows.firstIndex { $0.id == selectedRowID } ?? (forward ? -1 : rows.count)
+        let order = forward
+            ? Array(rows.indices.dropFirst(start + 1)) + Array(rows.indices.prefix(max(start + 1, 0)))
+            : Array(rows.indices.prefix(max(start, 0)).reversed()) + Array(rows.indices.dropFirst(start).reversed())
+        guard let index = order.first(where: { changes.contains(rows[$0].id) }) else { return }
+
+        let target = rows[index]
+        expandedSuiteIDs.insert(target.suiteID)
+        selectRow(withID: target.id)
     }
 
     // MARK: - Keyboard navigation
