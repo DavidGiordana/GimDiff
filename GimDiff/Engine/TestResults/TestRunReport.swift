@@ -37,6 +37,12 @@ struct TestRunFailure: Identifiable, Sendable, Equatable {
     var name: String
     /// Empty when the test failed without attaching an image.
     var groups: [TestRunImageGroup]
+    /// When this test ran, for a report gathered from runs made at different times;
+    /// `nil` defers to ``TestRunReport/startedAt``.
+    ///
+    /// Paparazzi verifies each module on its own, and a module verified last week must not
+    /// date the failures of one verified a minute ago.
+    var startedAt: Date?
 }
 
 /// The images one step of a test attached together.

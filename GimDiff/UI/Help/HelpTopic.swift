@@ -162,6 +162,12 @@ private extension HelpTopic {
                 read, and a new one is picked up as soon as Xcode finishes writing it — unless \
                 you picked an older run, which stays until you pick the newest again.
                 """)),
+            .text(String(localized: """
+                For an Android project, the failures a Paparazzi verify task left in each \
+                module's `build/paparazzi/failures` folder are one more run in the same menu, \
+                compared against the recorded images the same way. GimDiff reads the rendering \
+                Paparazzi 1.3.2 and later write beside each delta image.
+                """)),
         ]),
         HelpSection(title: String(localized: "Messages"), blocks: [
             .text(String(localized: """

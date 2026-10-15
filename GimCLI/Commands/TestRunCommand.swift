@@ -14,18 +14,21 @@ import Foundation
 /// the tests rendered, and how far apart the two are, without opening the bundle in Xcode.
 enum TestRunCommand {
     static let name = "test-run"
-    static let summary = "Report the snapshots an Xcode test run failed on."
+    static let summary = "Report the snapshots an Xcode or Paparazzi test run failed on."
     static let usage = """
     Usage: gimdiff test-run <project-path> [--result <bundle.xcresult>] [--out <folder>]
                             [--tolerance <ΔE>] [--json]
 
-      Reads an Xcode test result bundle and lists every snapshot of the project a test
-      failed on, with the image the test rendered and how much of it differs, plus any
-      attached image that matches no snapshot.
+      Reads an Xcode test result bundle, or the failures a Paparazzi verify left in the
+      project's modules, and lists every snapshot of the project a test failed on, with
+      the image the test rendered and how much of it differs, plus any attached image
+      that matches no snapshot.
 
-      --result <path>     The .xcresult bundle to read. Defaults to the newest one Xcode
-                          keeps in DerivedData for the project; CI that sets its own
-                          DerivedData folder should pass the bundle.
+      --result <path>     The .xcresult bundle, or a module's build/paparazzi/failures
+                          folder, to read. Defaults to the newest run found: the bundles
+                          Xcode keeps in DerivedData for the project, and every module's
+                          Paparazzi failures. CI that sets its own DerivedData folder
+                          should pass the bundle.
       --out <folder>      Write <name>.baseline.png, <name>.candidate.png, and
                           <name>.diff.png for each failure into <folder>, and
                           <name>.png for each unmatched image.
@@ -33,7 +36,9 @@ enum TestRunCommand {
                           count as the same. Defaults to 0.
       --json              Emit the result as JSON instead of text.
 
-    Needs Xcode: the bundle is read with xcrun xcresulttool.
+    Needs Xcode for a result bundle, which is read with xcrun xcresulttool. Paparazzi
+    failures are read from the renderings Paparazzi 1.3.2 and later write beside each
+    delta image.
 
     Exits 0 when the run failed on no snapshot, 1 when it did, 2 when the bundle could
     not be read.
@@ -47,7 +52,7 @@ enum TestRunCommand {
         let projectURL: URL
 
         var errorDescription: String? {
-            "Xcode has no test results for \(projectURL.path). Run its tests, or pass --result."
+            "No test results for \(projectURL.path). Run its tests, or pass --result."
         }
     }
 
@@ -64,12 +69,24 @@ enum TestRunCommand {
         let project = try await ProjectScanner(filesystem: filesystem, gitService: gitService)
             .scan(projectRoot: projectURL)
 
-        guard let bundleURL = arguments.fileURL(of: "result")
-            ?? DerivedDataLocator().latestResultBundle(forProjectAt: project.rootURL, gitRootURL: project.gitRootURL)
-        else { throw NoResultBundle(projectURL: projectURL) }
-
-        let report = try await XcresultReader(runner: SystemCommandRunner(), filesystem: filesystem)
-            .report(forBundleAt: bundleURL)
+        let reader = CombinedTestResultReader(
+            xcode: XcresultReader(runner: SystemCommandRunner(), filesystem: filesystem),
+            paparazzi: PaparazziFailureReader(filesystem: filesystem)
+        )
+        let report: TestRunReport
+        if let resultURL = arguments.fileURL(of: "result") {
+            report = try await reader.report(forBundleAt: resultURL)
+        } else {
+            let locator = CombinedTestResultLocator([
+                DerivedDataLocator(),
+                PaparazziFailureLocator(filesystem: filesystem),
+            ])
+            guard let bundle = locator.resultBundles(for: project).first else {
+                throw NoResultBundle(projectURL: projectURL)
+            }
+            report = try await reader.report(for: bundle)
+        }
+        let bundleURL = report.bundleURL
         // The exported attachments are copies made for this run of the tool alone.
         defer { try? filesystem.removeItem(at: report.scratchDirectory) }
 

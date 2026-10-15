@@ -451,6 +451,25 @@ own structure or from bytes.
   second, because a bundle is written for as long as the run lasts. The scratch folder is
   deleted when the results are replaced, the project closes, or the app quits.
 
+**Paparazzi's failures are a run too.** A verify task leaves, per module and variant,
+`build/paparazzi/failures[/<variant>]/<name>.png` — the rendering, written by 1.3.2 and
+later — beside `delta-<name>.png`. `PaparazziFailureLocator` finds those folders from the
+project's Paparazzi suites (never by walking the tree) and offers them all as one run named
+*Paparazzi*; `CombinedTestResultLocator` lists it beside Xcode's bundles, newest first, and
+`CombinedTestResultReader` sends each run to the reader that understands it. Two decisions
+keep the rest of the pipeline unchanged:
+
+- **The matcher is fed, not bypassed.** `PaparazziFailureReader` makes each rendering a step
+  holding a copy of the recorded snapshot and a copy of the rendering. The copy equals the
+  snapshot byte for byte, so `TestRunMatcher` pairs them as it pairs Xcode's attachments, and
+  staleness, Accept, and Accept All need nothing new.
+- **Each failure carries its own date** (`TestRunFailure.startedAt`, the rendering's
+  modification date). Modules are verified separately, and one run-wide date would drop a
+  module's real failures because another module's snapshot was recorded since.
+
+The deltas are composites with labels drawn over them and are never read. A version that
+writes only deltas has no Paparazzi run.
+
 Tests that load a project should hand `AppState` a `StubTestResults`, as `AppStateFixture`
 does, so the developer's own DerivedData never decides what an assertion sees.
 
@@ -470,8 +489,8 @@ gimdiff <project-path>                 # hands the path to the running app
 gimdiff <candidate> <baseline>         # hands one comparison to the running app
 ```
 
-`test-run` is the sidebar's Test Run view for a build machine. It reads the newest bundle in
-DerivedData, or the one `--result` names, through the same `XcresultReader` and
+`test-run` is the sidebar's Test Run view for a build machine. It reads the newest run — a
+bundle in DerivedData or the project's Paparazzi failures — or the one `--result` names, through the same `XcresultReader` and
 `TestRunMatcher` the app uses, and `TestRunExport` in `Engine/` flattens the result into
 entries with file names safe on any volume — the part that is unit tested, since the CLI
 target has no tests of its own. `--out` writes a baseline, candidate, and mask per failure

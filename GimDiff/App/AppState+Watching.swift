@@ -35,9 +35,12 @@ extension AppState {
             roots.append(gitDirectory)
         }
 
-        // Where Xcode writes the next run's results, which is outside the project entirely.
+        // Where the next run's results are written: outside the project entirely for Xcode,
+        // inside a module's build folder for Paparazzi, which the root already covers.
         testRuns.updateResultDirectories(for: project)
-        roots += testRuns.resultDirectories.map { URL(fileURLWithPath: $0, isDirectory: true) }
+        roots += testRuns.resultDirectories
+            .map { URL(fileURLWithPath: $0, isDirectory: true) }
+            .filter { Self.relativePath(of: $0, under: project.rootURL) == nil }
 
         let batches = watcher.changes(under: roots)
         // Weakly held: the loop only ends when the stream does, and a strong reference

@@ -68,7 +68,7 @@ struct TestRunMatcher: Sendable {
                     contentsOf: self.differences(
                         in: group,
                         of: failure,
-                        since: report.startedAt,
+                        since: failure.startedAt ?? report.startedAt,
                         restored: restored,
                         index: &index
                     )

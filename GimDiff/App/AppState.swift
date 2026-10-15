@@ -136,7 +136,7 @@ final class AppState {
         workspace: WorkspaceService = WorkspaceService(),
         pullRequests: (any GitHubPRService)? = nil,
         testResults: (any TestResultReading)? = nil,
-        testResultLocator: any TestResultLocating = DerivedDataLocator(),
+        testResultLocator: (any TestResultLocating)? = nil,
         defaults: UserDefaults = .standard
     ) {
         let git = gitService ?? DefaultGitService(filesystem: filesystem)
@@ -159,8 +159,14 @@ final class AppState {
             filesystem: filesystem
         )
         testRuns = TestRunModel(
-            reader: testResults ?? XcresultReader(runner: SystemCommandRunner(), filesystem: filesystem),
-            locator: testResultLocator,
+            reader: testResults ?? CombinedTestResultReader(
+                xcode: XcresultReader(runner: SystemCommandRunner(), filesystem: filesystem),
+                paparazzi: PaparazziFailureReader(filesystem: filesystem)
+            ),
+            locator: testResultLocator ?? CombinedTestResultLocator([
+                DerivedDataLocator(),
+                PaparazziFailureLocator(filesystem: filesystem),
+            ]),
             filesystem: filesystem
         )
         self.defaults = defaults

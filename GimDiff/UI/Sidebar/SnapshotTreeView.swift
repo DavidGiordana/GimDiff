@@ -292,7 +292,7 @@ private struct SidebarSourcePicker: View {
                 PickerOption(title: String(localized: "Test Run"), value: SidebarSource.testRun),
             ],
             selection: source,
-            help: String(localized: "Show the project's snapshots, or the ones a test run in Xcode failed on"),
+            help: String(localized: "Show the project's snapshots, or the ones a test run failed on"),
             accessibilityIdentifier: "SidebarSource"
         )
     }
@@ -325,7 +325,7 @@ private struct TestRunHistoryPicker: View {
                     )
                 },
                 selection: bundle,
-                help: String(localized: "Choose which of the test runs Xcode keeps for this project to show"),
+                help: String(localized: "Choose which of this project's test runs to show"),
                 accessibilityLabel: String(localized: "Run"),
                 accessibilityIdentifier: "TestRunHistory"
             )

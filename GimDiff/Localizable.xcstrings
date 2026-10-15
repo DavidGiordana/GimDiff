@@ -328,7 +328,7 @@
     "Choose which image the test attached to compare with the baseline" : {
 
     },
-    "Choose which of the test runs Xcode keeps for this project to show" : {
+    "Choose which of this project's test runs to show" : {
 
     },
     "Clear" : {
@@ -595,6 +595,9 @@
 
     },
     "Fit" : {
+
+    },
+    "For an Android project, the failures a Paparazzi verify task left in each module's `build/paparazzi/failures` folder are one more run in the same menu, compared against the recorded images the same way. GimDiff reads the rendering Paparazzi 1.3.2 and later write beside each delta image." : {
 
     },
     "Free" : {
@@ -918,6 +921,9 @@
     "Record what the run rendered as the baseline of every snapshot it failed on" : {
 
     },
+    "Recorded" : {
+
+    },
     "Recorded on Disk" : {
 
     },
@@ -952,6 +958,9 @@
 
     },
     "Renamed by this pull request" : {
+
+    },
+    "Rendered" : {
 
     },
     "Rescan the project" : {
@@ -1041,7 +1050,7 @@
     "Show or hide the selected snapshot" : {
 
     },
-    "Show the project's snapshots, or the ones a test run in Xcode failed on" : {
+    "Show the project's snapshots, or the ones a test run failed on" : {
 
     },
     "Show the sidebar" : {
@@ -1143,6 +1152,9 @@
     "The toolbar's colour wells set the panel background and a matte behind the image, which makes a transparent snapshot readable. **View ▸ Panel Background** and **View ▸ Image Matte** offer the same presets." : {
 
     },
+    "There are no test results for this project. Run its tests, then try again." : {
+
+    },
     "There is no baseline on screen to overwrite." : {
 
     },
@@ -1189,9 +1201,6 @@
 
     },
     "Window" : {
-
-    },
-    "Xcode has no test results for this project. Run its tests, then try again." : {
 
     },
     "Zoom Factor" : {

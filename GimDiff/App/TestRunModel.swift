@@ -103,8 +103,7 @@ final class TestRunModel {
     /// Finds where Xcode writes `project`'s bundles, for the watcher, or forgets them.
     func updateResultDirectories(for project: ProjectBundle?) {
         resultDirectories = project.map { project in
-            locator.resultDirectories(forProjectAt: project.rootURL, gitRootURL: project.gitRootURL)
-                .map(\.standardizedFileURL.path)
+            locator.resultDirectories(for: project).map(\.standardizedFileURL.path)
         } ?? []
     }
 
@@ -154,14 +153,14 @@ final class TestRunModel {
             if let pinned = pinnedBundleURL, !bundles.contains(where: { $0.url == pinned }) {
                 pinnedBundleURL = nil
             }
-            guard let bundle = selectedBundle?.url else {
-                // The run the tree was showing has gone with its derived data.
+            guard let bundle = selectedBundle else {
+                // The run the tree was showing has gone with its derived data or build folder.
                 if let forget { forget() } else { forgetResults() }
-                error = String(localized: "Xcode has no test results for this project. Run its tests, then try again.")
+                error = String(localized: "There are no test results for this project. Run its tests, then try again.")
                 return
             }
             // A run picked from the history is finished; only the newest can still be growing.
-            if pinnedBundleURL != nil, results?.bundleURL == bundle {
+            if pinnedBundleURL != nil, results?.bundleURL == bundle.url {
                 isReading = false
                 return
             }
@@ -191,25 +190,25 @@ final class TestRunModel {
     var currentRead: Task<Void, Never>? { readTask }
 
     /// Off the main actor: finding the bundles reads a property list per workspace Xcode
-    /// has ever built, and one per bundle.
+    /// has ever built, and one per bundle, and lists every module's Paparazzi failures.
     @concurrent
     private static func bundles(
         of project: ProjectBundle,
         locator: any TestResultLocating
     ) async -> [TestRunBundle] {
-        locator.resultBundles(forProjectAt: project.rootURL, gitRootURL: project.gitRootURL)
+        locator.resultBundles(for: project)
     }
 
     /// Off the main actor as well: matching reads the attached images and every snapshot
     /// of the same length.
     @concurrent
     private static func results(
-        of bundle: URL,
+        of bundle: TestRunBundle,
         in project: ProjectBundle,
         reader: any TestResultReading,
         filesystem: any FilesystemService
     ) async throws -> TestRunResults {
-        let report = try await reader.report(forBundleAt: bundle)
+        let report = try await reader.report(for: bundle)
         do {
             let differences = try TestRunMatcher(filesystem: filesystem)
                 .differences(in: report, against: project)
