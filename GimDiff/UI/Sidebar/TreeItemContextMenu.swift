@@ -47,7 +47,7 @@ struct TreeItemContextMenu: View {
             Button {
                 state.openTestSource(for: suite)
             } label: {
-                Label("Open Test File in Xcode", systemImage: "ellipsis.curlybraces")
+                Label("Open Test File", systemImage: "ellipsis.curlybraces")
             }
         }
 
@@ -75,7 +75,11 @@ struct TreeItemContextMenu: View {
             Button(role: .destructive) {
                 state.delete(suite: suite)
             } label: {
-                Label("Move Snapshots Folder to Trash", systemImage: "trash")
+                if suite.sharesFolder {
+                    Label("Move Snapshots to Trash", systemImage: "trash")
+                } else {
+                    Label("Move Snapshots Folder to Trash", systemImage: "trash")
+                }
             }
         }
     }
@@ -121,7 +125,7 @@ struct TreeItemContextMenu: View {
                 Button {
                     state.openTestSource(for: suite)
                 } label: {
-                    Label("Open Test File in Xcode", systemImage: "ellipsis.curlybraces")
+                    Label("Open Test File", systemImage: "ellipsis.curlybraces")
                 }
             }
 

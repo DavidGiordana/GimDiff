@@ -323,11 +323,30 @@ open 'gimdiff://open?path=/path/to/snapshots'
 `PBXFileSystemSynchronizedBuildFileExceptionSet`; keep that exception if you add files
 that should not ship as resources.
 
+### Paparazzi: a suite is a class, not a folder
+
+`PaparazziProvider` reads Android projects recorded with Paparazzi, which writes every test
+class of a module into one flat `src/test/snapshots/images/` folder as
+`<package>_<Class>_<method>[_<label>].png`. The provider makes a suite per class and marks
+it `sharesFolder`, which changes two things elsewhere:
+
+- **Deleting such a suite trashes its files, never its folder** — the folder still holds every
+  other class's images. The files go as one undo step, and the menu says *Move Snapshots to
+  Trash* rather than *Folder*.
+- **Its `id` is not its folder's path**, since several suites share that path. Nothing may
+  look a suite up by `snapshotsFolderURL`.
+
+An underscore is legal in a Java package or class name, so the file name alone cannot say
+where the class ends: a class the test sources declare (`src/*test*/kotlin|java/<package>/`)
+is matched first, and only then do the first two separators decide. A failing run writes
+under `build/`, which discovery prunes, so only recorded images are listed.
+
 ## Pull request review
 
 GimDiff can review the snapshots a GitHub pull request changes without checking it out.
 `Engine/GitHub/` reads the pull request through the REST API and downloads both versions
-of every changed image under `Snapshots/` or `__Snapshots__/` into a scratch folder; the
+of every changed image under `Snapshots/`, `__Snapshots__/`, or Paparazzi's
+`src/<set>/snapshots/images/` into a scratch folder; the
 review then stands in for the open project until it is closed.
 
 The review lives in `PullRequestReviewModel` (`AppState.pullRequestReview`): the session,

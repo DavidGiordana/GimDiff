@@ -1138,7 +1138,11 @@ final class AppState {
         }
         let replacement = selection(surviving: removedRowIDs)
 
-        guard trash(suite.snapshotsFolderURL, actionName: String(localized: "Move Snapshots Folder to Trash")) else { return }
+        // A folder other suites record into is left standing; only this suite's files go.
+        let trashed = suite.sharesFolder
+            ? trash(suite.snapshots.map(\.fileURL), actionName: String(localized: "Move Snapshots to Trash"))
+            : trash(suite.snapshotsFolderURL, actionName: String(localized: "Move Snapshots Folder to Trash"))
+        guard trashed else { return }
 
         currentProject?.suites.removeAll { $0.id == suite.id }
         expandedSuiteIDs.remove(suite.id)
@@ -1167,6 +1171,22 @@ final class AppState {
             report(error)
             return false
         }
+    }
+
+    /// Trashes each of `urls` as a single step of the undo stack.
+    ///
+    /// Stops at the first file that cannot be trashed. Those before it are already in the
+    /// Trash, so the project is rescanned to show what is left rather than what was meant.
+    private func trash(_ urls: [URL], actionName: String) -> Bool {
+        let needsGroup = undoManager.map { $0.groupingLevel == 0 } ?? false
+        if needsGroup { undoManager?.beginUndoGrouping() }
+        defer { if needsGroup { undoManager?.endUndoGrouping() } }
+
+        for (index, url) in urls.enumerated() where !trash(url, actionName: actionName) {
+            if index > 0 { rescanAfterOwnEdit() }
+            return false
+        }
+        return true
     }
 
     /// Rescans the project after GimDiff itself put files back or took them away again.

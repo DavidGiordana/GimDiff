@@ -11,11 +11,12 @@ import Foundation
 /// Picks the provider that understands a project and annotates what it finds with Git status.
 final class ProviderRegistry: Sendable {
     /// Providers in priority order: a project that describes itself wins, then the modern
-    /// module layout, then the legacy one.
+    /// Swift module layout, then the legacy one, then Paparazzi's.
     static let defaultProviders: [any SnapshotProvider] = [
         ConfigDrivenProvider(),
         SwiftModularProvider(),
         SwiftPointFreeLegacyProvider(),
+        PaparazziProvider(),
     ]
 
     let providers: [any SnapshotProvider]

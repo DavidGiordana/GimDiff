@@ -97,4 +97,26 @@ final class ProjectFixture {
 
         return fixture
     }
+
+    /// A two-module Android project recorded with Paparazzi: every class of a module shares
+    /// one flat `images` folder, and a failing run's output sits under `build`.
+    static func paparazziProject() throws -> ProjectFixture {
+        let fixture = try ProjectFixture()
+
+        try fixture.write("settings.gradle.kts", contents: "include(\":app\", \":feature\")")
+
+        try fixture.write("app/src/test/kotlin/com/example/LaunchViewTest.kt", contents: "// LaunchViewTest")
+        try fixture.write("app/src/test/snapshots/images/com.example_LaunchViewTest_pixel5.png")
+        try fixture.write("app/src/test/snapshots/images/com.example_LaunchViewTest_pixel5_dark_mode.png")
+        try fixture.write("app/src/test/snapshots/images/com.example_ButtonTest_primary.png")
+        try fixture.write("app/src/test/snapshots/videos/com.example_LaunchViewTest_intro.mov")
+        try fixture.write("app/src/main/kotlin/com/example/ButtonTest.kt", contents: "// not a test")
+
+        try fixture.write("feature/src/test/java/com/example/feature/LaunchViewTest.java", contents: "// tests")
+        try fixture.write("feature/src/test/snapshots/images/com.example.feature_LaunchViewTest_tablet.png")
+
+        try fixture.write("app/build/paparazzi/failures/delta-com.example_LaunchViewTest_pixel5.png")
+
+        return fixture
+    }
 }

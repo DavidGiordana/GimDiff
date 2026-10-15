@@ -164,6 +164,15 @@ struct ProjectChangeClassifierTests {
         #expect(classify(file("Tests/BetaTests.swift")).needsRescan)
     }
 
+    @Test("A Kotlin or Java source arriving for a suite that had none makes the tree stale")
+    func kotlinSourceForAnOrphanedSuite() {
+        filesystem.stub(url("src/test/kotlin/BetaTests.kt"), contents: "// beta")
+        filesystem.stub(url("src/test/java/BetaTests.java"), contents: "// beta")
+
+        #expect(classify(file("src/test/kotlin/BetaTests.kt")).needsRescan)
+        #expect(classify(file("src/test/java/BetaTests.java")).needsRescan)
+    }
+
     @Test("The project's own configuration makes the tree stale, but only at the root")
     func configurationFile() {
         #expect(classify(file(".gimdiffrc.json")).needsRescan)

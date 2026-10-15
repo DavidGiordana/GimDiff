@@ -65,6 +65,26 @@ struct GitHubPRServiceTests {
         #expect(everySnapshot.allSatisfy { $0.gitStatus == .modified })
     }
 
+    @Test("Groups Paparazzi images by test class, each suite sharing its module's folder")
+    func groupsPaparazziSuites() async throws {
+        let fixture = Fixture(files: [
+            .modified("app/src/test/snapshots/images/com.example_LaunchViewTest_pixel5.png"),
+            .modified("app/src/test/snapshots/images/com.example_LaunchViewTest_pixel5_dark.png"),
+            .modified("app/src/test/snapshots/images/com.example_ButtonTest_primary.png"),
+            .modified("app/src/test/snapshots/videos/com.example_LaunchViewTest_intro.mov"),
+            .modified("docs/images/com.example_LaunchViewTest_pixel5.png"),
+        ])
+
+        let session = try await fixture.service.fetchPRSession(reference: Self.reference)
+
+        #expect(session.suites.map(\.name) == ["ButtonTest", "LaunchViewTest"])
+        #expect(session.suites.allSatisfy { $0.providerId == "android.paparazzi" && $0.sharesFolder })
+
+        let launch = try #require(session.suites.first { $0.name == "LaunchViewTest" })
+        #expect(launch.id == "app/src/test/snapshots/images/com.example_LaunchViewTest")
+        #expect(launch.snapshots.map(\.displayName) == ["pixel5", "pixel5_dark"])
+    }
+
     @Test("Ignores files that are not images inside a snapshot folder")
     func filtersNonSnapshots() async throws {
         let fixture = Fixture(files: [

@@ -14,9 +14,11 @@ import Testing
 struct ProviderRegistryTests {
     private let filesystem = DefaultFilesystemService()
 
-    @Test("Ships the three providers in priority order")
+    @Test("Ships the four providers in priority order")
     func defaultOrder() {
-        #expect(ProviderRegistry().providers.map(\.id) == ["config", "swift.modular", "swift.pointfree"])
+        #expect(ProviderRegistry().providers.map(\.id) == [
+            "config", "swift.modular", "swift.pointfree", "android.paparazzi",
+        ])
     }
 
     @Test("A configured project is read by the configuration provider")

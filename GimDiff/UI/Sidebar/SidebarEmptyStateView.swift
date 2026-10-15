@@ -44,7 +44,7 @@ extension SidebarEmptyStateView {
             systemImage: "photo.on.rectangle.angled",
             title: "No Snapshots Discovered",
             message: """
-                No snapshot directories (Snapshots/ or __Snapshots__) were found in this project.
+                No snapshot directories (Snapshots/, __Snapshots__, or Paparazzi’s snapshots/images) were found in this project.
                 """,
             actionTitle: "Reload",
             action: reload

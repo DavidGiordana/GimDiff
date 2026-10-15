@@ -630,7 +630,7 @@
     "GimDiff does not know which test recorded this image." : {
 
     },
-    "GimDiff downloads both versions of every changed image under a `Snapshots` or `__Snapshots__` folder, without checking the branch out. Each snapshot is marked **Added**, **Modified**, **Deleted**, or **Renamed**." : {
+    "GimDiff downloads both versions of every changed image under a `Snapshots` or `__Snapshots__` folder, or a Paparazzi `snapshots/images` folder, without checking the branch out. Each snapshot is marked **Added**, **Modified**, **Deleted**, or **Renamed**." : {
 
     },
     "GimDiff found no snapshots it recognises under “%@”." : {
@@ -679,6 +679,9 @@
 
     },
     "It exits with `0` when there is nothing to report, `1` when the images or the project differ, `2` when the command could not run, and `64` when the arguments were not usable." : {
+
+    },
+    "It reads swift-snapshot-testing's `__Snapshots__` folders, a `Snapshots` folder per module, and Android projects recorded with Paparazzi, whose `src/test/snapshots/images` folder is grouped by test class. A `.gimdiffrc.json` at the project root can point it anywhere else." : {
 
     },
     "Jump to the filter field" : {
@@ -738,6 +741,9 @@
     "Move Snapshots Folder to Trash" : {
 
     },
+    "Move Snapshots to Trash" : {
+
+    },
     "Move the selection to the Trash" : {
 
     },
@@ -771,7 +777,7 @@
     "No Test Results" : {
 
     },
-    "No snapshot directories (Snapshots/ or __Snapshots__) were found in this project." : {
+    "No snapshot directories (Snapshots/, __Snapshots__, or Paparazzi’s snapshots/images) were found in this project." : {
 
     },
     "No snapshots match your query or filter chips." : {
@@ -807,10 +813,10 @@
     "Open Snapshots Folder" : {
 
     },
-    "Open Test File in Xcode" : {
+    "Open Test File" : {
 
     },
-    "Open Test Source in Xcode" : {
+    "Open Test Source" : {
 
     },
     "Open a GitHub pull request" : {
@@ -843,7 +849,7 @@
     "Open the snapshots named on the clipboard: a failure log, copied files, or a pull request link (⌘V)" : {
 
     },
-    "Open the suite's test file in Xcode" : {
+    "Open the suite's test file" : {
 
     },
     "Open this help" : {
@@ -981,7 +987,7 @@
     "Right" : {
 
     },
-    "Right-click a row, or use the **Snapshot** menu on the selected one, to copy its name, open it in Preview, reveal it in the Finder, open its snapshots folder, open its test file in Xcode, or move it to the Trash. The buttons at the right of each pane's header do the same for the image in that pane." : {
+    "Right-click a row, or use the **Snapshot** menu on the selected one, to copy its name, open it in Preview, reveal it in the Finder, open its snapshots folder, open its test file, or move it to the Trash. The buttons at the right of each pane's header do the same for the image in that pane." : {
 
     },
     "Run" : {

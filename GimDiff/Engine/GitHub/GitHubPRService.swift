@@ -119,7 +119,8 @@ struct DefaultGitHubPRService: GitHubPRService {
     static let maximumPages = 30
     /// Enough to hide latency without inviting GitHub's secondary rate limit.
     static let maximumConcurrentDownloads = 6
-    /// Folder names that mark a snapshot, matching the two layouts the providers read.
+    /// Folder names that mark a Swift snapshot. Paparazzi's folder is recognised by its
+    /// whole tail instead, through ``PaparazziProvider/isImagesFolder(_:)``.
     static let snapshotFolderNames: Set<String> = [
         SwiftModularProvider.snapshotsFolderName,
         SwiftPointFreeLegacyProvider.snapshotsFolderName,
@@ -232,7 +233,9 @@ struct DefaultGitHubPRService: GitHubPRService {
               ImageFormat(fileExtension: (file as NSString).pathExtension).isRecognized
         else { return false }
 
-        return components.dropLast().contains { snapshotFolderNames.contains($0) }
+        let folders = Array(components.dropLast())
+        return folders.contains { snapshotFolderNames.contains($0) }
+            || PaparazziProvider.isImagesFolder(folders)
     }
 
     // MARK: - Downloading
@@ -309,38 +312,36 @@ struct DefaultGitHubPRService: GitHubPRService {
     /// `…/Snapshots/<Suite>/…` and `…/__Snapshots__/<Suite>/…` are one suite per folder,
     /// with anything nested deeper prefixed onto the snapshot's name. An image directly
     /// inside the snapshot folder belongs to a suite named after the folder above it, which
-    /// is the older swift-snapshot-testing layout.
+    /// is the older swift-snapshot-testing layout. Paparazzi's flat `images` folder is a
+    /// suite per test class, read from each file's name as ``PaparazziProvider`` reads it.
     static func suites(from changes: [PRSnapshotChange], candidateRoot: URL) -> [SnapshotSuite] {
-        var suitesByFolder: [String: SnapshotSuite] = [:]
+        var suitesByID: [String: SnapshotSuite] = [:]
 
         for change in changes {
             guard let placement = placement(of: change.path) else { continue }
-            let decomposed = SnapshotItem.decomposeName(of: URL(fileURLWithPath: change.path))
-            let name = placement.nestedFolders.isEmpty
-                ? decomposed.name
-                : placement.nestedFolders.joined(separator: "/") + "/" + decomposed.name
 
             let item = SnapshotItem(
                 id: change.path,
-                name: name,
-                variantIndex: decomposed.variantIndex,
+                name: placement.snapshotName,
+                variantIndex: placement.variantIndex,
                 // A removed snapshot has only its baseline, which is then what there is to see.
                 fileURL: change.candidateURL ?? change.baselineURL ?? candidateRoot,
                 gitStatus: .modified
             )
 
-            if suitesByFolder[placement.suiteFolder] == nil {
-                suitesByFolder[placement.suiteFolder] = SnapshotSuite(
-                    id: placement.suiteFolder,
+            if suitesByID[placement.suiteID] == nil {
+                suitesByID[placement.suiteID] = SnapshotSuite(
+                    id: placement.suiteID,
                     name: placement.suiteName,
                     snapshotsFolderURL: url(forRepositoryPath: placement.suiteFolder, under: candidateRoot),
-                    providerId: placement.providerId
+                    providerId: placement.providerId,
+                    sharesFolder: placement.sharesFolder
                 )
             }
-            suitesByFolder[placement.suiteFolder]?.snapshots.append(item)
+            suitesByID[placement.suiteID]?.snapshots.append(item)
         }
 
-        return suitesByFolder.values
+        return suitesByID.values
             .map { suite in
                 var sorted = suite
                 sorted.snapshots.sort { $0.id < $1.id }
@@ -350,19 +351,69 @@ struct DefaultGitHubPRService: GitHubPRService {
     }
 
     private struct Placement {
+        var suiteID: String
+        var suiteName: String
+        var suiteFolder: String
+        var providerId: String
+        var sharesFolder = false
+        var snapshotName: String
+        var variantIndex: Int?
+    }
+
+    /// Where a snapshot path sits: its suite, and the name it is listed under.
+    private static func placement(of path: String) -> Placement? {
+        let components = path.split(separator: "/").map(String.init)
+        let folders = components.dropLast()
+
+        if PaparazziProvider.isImagesFolder(Array(folders)) {
+            return paparazziPlacement(of: path, in: Array(folders))
+        }
+
+        guard let placement = swiftPlacement(in: folders) else { return nil }
+        let decomposed = SnapshotItem.decomposeName(of: URL(fileURLWithPath: path))
+        return Placement(
+            suiteID: placement.suiteFolder,
+            suiteName: placement.suiteName,
+            suiteFolder: placement.suiteFolder,
+            providerId: placement.providerId,
+            snapshotName: placement.nestedFolders.isEmpty
+                ? decomposed.name
+                : placement.nestedFolders.joined(separator: "/") + "/" + decomposed.name,
+            variantIndex: decomposed.variantIndex
+        )
+    }
+
+    /// A Paparazzi image's class, read from its name alone: the review has no sources to
+    /// settle where an underscored package ends, so the first two separators decide.
+    private static func paparazziPlacement(of path: String, in folders: [String]) -> Placement {
+        let folder = folders.joined(separator: "/")
+        let stem = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+        let module = folders.dropLast(4).last ?? folder
+        let recorded = PaparazziProvider.recordedName(of: stem)
+            ?? PaparazziProvider.RecordedName(packageName: "", className: module, snapshotName: stem)
+
+        return Placement(
+            suiteID: folder + "/" + recorded.packageName + PaparazziProvider.delimiter + recorded.className,
+            suiteName: recorded.className,
+            suiteFolder: folder,
+            providerId: PaparazziProvider().id,
+            sharesFolder: true,
+            snapshotName: recorded.snapshotName
+        )
+    }
+
+    private struct SwiftPlacement {
         var suiteName: String
         var suiteFolder: String
         var nestedFolders: [String]
         var providerId: String
     }
 
-    /// Where a snapshot path sits: its suite, and the folders between the suite and the file.
+    /// The suite a Swift snapshot folder holds, and the folders between it and the file.
     ///
     /// The snapshot folder nearest the file wins, so a repository that happens to keep a
     /// `Snapshots` folder further up its tree still groups by the one that holds the image.
-    private static func placement(of path: String) -> Placement? {
-        let components = path.split(separator: "/").map(String.init)
-        let folders = components.dropLast()
+    private static func swiftPlacement(in folders: ArraySlice<String>) -> SwiftPlacement? {
         guard let markerIndex = folders.lastIndex(where: { snapshotFolderNames.contains($0) }) else {
             return nil
         }
@@ -374,7 +425,7 @@ struct DefaultGitHubPRService: GitHubPRService {
 
         if markerIndex == folders.index(before: folders.endIndex) {
             let parent = markerIndex > folders.startIndex ? folders[markerIndex - 1] : marker
-            return Placement(
+            return SwiftPlacement(
                 suiteName: parent,
                 suiteFolder: folders[...markerIndex].joined(separator: "/"),
                 nestedFolders: [],
@@ -383,7 +434,7 @@ struct DefaultGitHubPRService: GitHubPRService {
         }
 
         let suiteIndex = markerIndex + 1
-        return Placement(
+        return SwiftPlacement(
             suiteName: folders[suiteIndex],
             suiteFolder: folders[...suiteIndex].joined(separator: "/"),
             nestedFolders: Array(folders[(suiteIndex + 1)...]),

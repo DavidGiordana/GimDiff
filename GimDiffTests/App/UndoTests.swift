@@ -98,6 +98,51 @@ struct UndoTests {
         #expect(suite.snapshots.allSatisfy { fixture.filesystem.contents(of: $0.fileURL) == "png" })
     }
 
+    @Test("A suite sharing its folder trashes only its own files, and undoes as one step")
+    func trashesASharedFolderSuite() throws {
+        let fixture = AppStateFixture(bundle: Self.sharedFolderSuites())
+        let undo = undoManager(for: fixture.state)
+        let suites = try #require(fixture.state.currentProject?.suites)
+        let launch = try #require(suites.first { $0.name == "LaunchViewTest" })
+        let button = try #require(suites.first { $0.name == "ButtonTest" })
+
+        fixture.state.delete(suite: launch)
+        #expect(launch.snapshots.allSatisfy { !fixture.filesystem.fileExists(at: $0.fileURL) })
+        #expect(button.snapshots.allSatisfy { fixture.filesystem.fileExists(at: $0.fileURL) })
+        #expect(fixture.filesystem.isDirectory(at: launch.snapshotsFolderURL))
+        #expect(fixture.state.currentProject?.suites.map(\.name) == ["ButtonTest"])
+        #expect(undo.undoActionName == "Move Snapshots to Trash")
+
+        undo.undo()
+        #expect(launch.snapshots.allSatisfy { fixture.filesystem.contents(of: $0.fileURL) == "png" })
+        #expect(!undo.canUndo)
+    }
+
+    /// Two Paparazzi classes recording into one module's `images` folder.
+    private static func sharedFolderSuites() -> ProjectBundle {
+        let folder = AppStateFixture.root.appendingPathComponent("app/src/test/snapshots/images", isDirectory: true)
+        func suite(_ name: String, _ snapshots: [String]) -> SnapshotSuite {
+            SnapshotSuite(
+                id: folder.path + "/com.example_" + name,
+                name: name,
+                snapshotsFolderURL: folder,
+                snapshots: snapshots.map {
+                    SnapshotItem(name: $0, fileURL: folder.appendingPathComponent("com.example_\(name)_\($0).png"))
+                },
+                providerId: "android.paparazzi",
+                sharesFolder: true
+            )
+        }
+        return ProjectBundle(
+            rootURL: AppStateFixture.root,
+            gitRootURL: AppStateFixture.root,
+            suites: [
+                suite("ButtonTest", ["primary"]),
+                suite("LaunchViewTest", ["pixel5", "pixel5_dark"]),
+            ]
+        )
+    }
+
     // MARK: - Stack
 
     @Test("Opening another project forgets what could be undone in the last one")

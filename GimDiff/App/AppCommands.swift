@@ -282,7 +282,7 @@ struct AppCommands: Commands {
 
             Divider()
 
-            Button("Open Test File in Xcode") {
+            Button("Open Test File") {
                 state.openTestSource()
             }
             .disabled(state.isReviewingPullRequest || state.selectedSuite?.sourceCodeURL == nil)
@@ -383,7 +383,7 @@ struct AppCommands: Commands {
             }
             .disabled(state.discardableProjectSnapshots.isEmpty)
 
-            Button(state.selectedSnapshot == nil ? "Move Snapshots Folder to Trash" : "Move Snapshot to Trash") {
+            Button(trashMenuTitle) {
                 state.deleteSelection()
             }
             .keyboardShortcut(.delete, modifiers: .command)
@@ -416,6 +416,14 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("?", modifiers: .command)
         }
+    }
+
+    /// Names what ⌘⌫ removes: a snapshot, a suite's folder, or a suite's files when other
+    /// suites record into the same folder.
+    private var trashMenuTitle: LocalizedStringKey {
+        if state.selectedSnapshot != nil { return "Move Snapshot to Trash" }
+        if state.selectedSuite?.sharesFolder == true { return "Move Snapshots to Trash" }
+        return "Move Snapshots Folder to Trash"
     }
 
     /// A binding onto one of the state's properties, which `Commands` cannot take with `$`.

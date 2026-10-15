@@ -384,7 +384,7 @@ struct SnapshotPaneHeader: View {
             }
             .buttonStyle(.borderless)
             .disabled(state.previewSuite == nil)
-            .help("Open Test Source in Xcode")
+            .help("Open Test Source")
         }
     }
 }

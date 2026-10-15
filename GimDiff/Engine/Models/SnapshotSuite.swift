@@ -20,6 +20,12 @@ struct SnapshotSuite: Identifiable, Sendable, Hashable {
     var snapshots: [SnapshotItem]
     /// Identifier of the ``SnapshotProviding`` implementation that produced this suite.
     var providerId: String
+    /// Whether other suites keep their images in the same folder.
+    ///
+    /// Paparazzi records every test class of a module into one flat folder, so such a suite
+    /// is its snapshots rather than its folder: deleting it must trash those files and
+    /// leave the folder, which still holds every other class's images.
+    var sharesFolder: Bool
 
     init(
         id: String? = nil,
@@ -27,7 +33,8 @@ struct SnapshotSuite: Identifiable, Sendable, Hashable {
         sourceCodeURL: URL? = nil,
         snapshotsFolderURL: URL,
         snapshots: [SnapshotItem] = [],
-        providerId: String
+        providerId: String,
+        sharesFolder: Bool = false
     ) {
         self.id = id ?? snapshotsFolderURL.path
         self.name = name
@@ -35,6 +42,7 @@ struct SnapshotSuite: Identifiable, Sendable, Hashable {
         self.snapshotsFolderURL = snapshotsFolderURL
         self.snapshots = snapshots
         self.providerId = providerId
+        self.sharesFolder = sharesFolder
     }
 
     /// Whether the provider could not locate the test source that records this suite.

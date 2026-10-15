@@ -41,6 +41,8 @@ struct ProjectChange: Sendable, Equatable {
 struct ProjectChangeClassifier: Sendable {
     /// Marker that identifies a working tree root; a file in a worktree, a folder otherwise.
     static let gitDirectoryName = ".git"
+    /// Extensions of the files a suite can be linked to as its test source.
+    static let testSourceExtensions: Set<String> = PaparazziProvider.sourceExtensions.union(["swift"])
 
     private let filesystem: any FilesystemService
     private let filter: ProviderIgnoreFilter
@@ -116,7 +118,7 @@ struct ProjectChangeClassifier: Sendable {
             if filesystem.fileExists(at: url) { change.needsRescan = true }
         } else if relativePath == ConfigDrivenProvider.configurationFileName {
             change.needsRescan = true
-        } else if fileExtension == "swift" {
+        } else if Self.testSourceExtensions.contains(fileExtension) {
             // Saving a test file says nothing about its snapshots. Only a source that went
             // away, or one arriving under the name of a suite that had none, moves a warning.
             if known.sourcePaths.contains(path) {

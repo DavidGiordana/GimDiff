@@ -91,6 +91,12 @@ private extension HelpTopic {
                 images under the test suite that recorded them.
                 """)),
             .text(String(localized: """
+                It reads swift-snapshot-testing's `__Snapshots__` folders, a `Snapshots` folder \
+                per module, and Android projects recorded with Paparazzi, whose \
+                `src/test/snapshots/images` folder is grouped by test class. A \
+                `.gimdiffrc.json` at the project root can point it anywhere else.
+                """)),
+            .text(String(localized: """
                 **File ▸ Open Recent** lists the same folders as the recent list. Hover over a \
                 folder in the list and click its **×**, or right-click it, to forget it or \
                 reveal it in the Finder; **Clear Recent Projects** forgets them all. The **×** \
@@ -125,7 +131,7 @@ private extension HelpTopic {
             .text(String(localized: """
                 Right-click a row, or use the **Snapshot** menu on the selected one, to copy its \
                 name, open it in Preview, reveal it in the Finder, open its snapshots folder, \
-                open its test file in Xcode, or move it to the Trash. The buttons at the right \
+                open its test file, or move it to the Trash. The buttons at the right \
                 of each pane's header do the same for the image in that pane.
                 """)),
         ]),
@@ -194,7 +200,7 @@ private extension HelpTopic {
                 HelpShortcut("→", String(localized: "Open a suite, or step into its first snapshot")),
                 HelpShortcut("←", String(localized: "Close a suite, or step up to it")),
                 HelpShortcut("Space", String(localized: "Show or hide the selected snapshot")),
-                HelpShortcut("↩", String(localized: "Open the suite's test file in Xcode")),
+                HelpShortcut("↩", String(localized: "Open the suite's test file")),
                 HelpShortcut("/", String(localized: "Jump to the filter field")),
                 HelpShortcut("⌥↓ ⌥↑", String(localized: "Jump to the next or previous changed snapshot")),
                 HelpShortcut("⌘F", String(localized: "Jump to the filter field from anywhere")),
@@ -326,7 +332,8 @@ private extension HelpTopic {
                 """)),
             .text(String(localized: """
                 GimDiff downloads both versions of every changed image under a `Snapshots` or \
-                `__Snapshots__` folder, without checking the branch out. Each snapshot is \
+                `__Snapshots__` folder, or a Paparazzi `snapshots/images` folder, without \
+                checking the branch out. Each snapshot is \
                 marked **Added**, **Modified**, **Deleted**, or **Renamed**.
                 """)),
         ]),
