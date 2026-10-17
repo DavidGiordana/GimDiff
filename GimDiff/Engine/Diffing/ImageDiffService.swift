@@ -98,6 +98,11 @@ protocol ImageDiffService: Sendable {
     ///   - diffColor: Colour painted over every pixel that differs.
     ///   - tolerance: How far apart two pixels may be and still count as the same.
     /// - Returns: A report, carrying a highlight image when the two images were comparable.
+    ///
+    /// `@concurrent` because the work is all synchronous: decoding, a pass over every
+    /// pixel, and encoding the mask. Left to run on its caller's executor it would hold the
+    /// main actor for the whole comparison, freezing the window each time the canvas asks.
+    @concurrent
     func compare(
         candidateURL: URL,
         baselineURL: URL,

@@ -26,6 +26,8 @@ struct DefaultImageDiffService: ImageDiffService {
     /// Dark enough that the highlight colour dominates at a glance, bright enough that the
     /// shape of the snapshot still shows through and locates the change.
     static let unchangedPixelBrightness = 0.35
+    /// How many rows the comparison runs between looks at whether it is still wanted.
+    static let rowsBetweenCancellationChecks = 64
 
     /// Rec. 601 luma weights, used to flatten an unchanged pixel to grey.
     private static let lumaWeights = (red: 0.299, green: 0.587, blue: 0.114)
@@ -36,6 +38,7 @@ struct DefaultImageDiffService: ImageDiffService {
         self.filesystem = filesystem
     }
 
+    @concurrent
     func compare(
         candidateURL: URL,
         baselineURL: URL,
@@ -79,7 +82,16 @@ struct DefaultImageDiffService: ImageDiffService {
         var toleratedPixelCount = 0
         var maximumDeltaE = 0.0
 
+        // Checked every so many rows: stepping through snapshots supersedes a comparison
+        // long before a large one is done, and nothing would want the rest of its answer.
+        let pixelsBetweenChecks = width * Self.rowsBetweenCancellationChecks
+        var pixelsUntilCheck = 0
         for offset in stride(from: 0, to: byteCount, by: Self.bytesPerPixel) {
+            if pixelsUntilCheck == 0 {
+                try Task.checkCancellation()
+                pixelsUntilCheck = pixelsBetweenChecks
+            }
+            pixelsUntilCheck -= 1
             var differs = candidatePixels[offset] != baselinePixels[offset]
                 || candidatePixels[offset + 1] != baselinePixels[offset + 1]
                 || candidatePixels[offset + 2] != baselinePixels[offset + 2]

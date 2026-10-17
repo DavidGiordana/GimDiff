@@ -26,6 +26,79 @@ struct ImageDiffServiceTests {
         try? FileManager.default.removeItem(at: url)
     }
 
+    /// A large opaque PNG of `width` × `height`, filled with `grey`, in the scratch directory.
+    private func writeLargeImage(width: Int, height: Int, grey: CGFloat) throws -> URL {
+        let context = try #require(CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.setFillColor(CGColor(gray: grey, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        let image = try #require(context.makeImage())
+
+        let url = filesystem.createTemporaryFile(prefix: "large", extension: "png")
+        let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, image, nil)
+        #expect(CGImageDestinationFinalize(destination))
+        return url
+    }
+
+    // MARK: - Threading
+
+    @Test("A comparison started on the main actor leaves it free while it runs")
+    @MainActor
+    func leavesTheMainActorFree() async throws {
+        let candidate = try writeLargeImage(width: 2_500, height: 3_500, grey: 0.2)
+        let baseline = try writeLargeImage(width: 2_500, height: 3_500, grey: 0.8)
+        defer {
+            try? FileManager.default.removeItem(at: candidate)
+            try? FileManager.default.removeItem(at: baseline)
+        }
+
+        // Counts the turns the main actor gets while the comparison is in flight. Held on
+        // the main actor for the whole of it, it would get none.
+        var turns = 0
+        var isDone = false
+        let heartbeat = Task { @MainActor in
+            while !isDone {
+                turns += 1
+                try? await Task.sleep(for: .milliseconds(5))
+            }
+        }
+
+        let report = try await makeService().compare(candidateURL: candidate, baselineURL: baseline)
+        isDone = true
+        await heartbeat.value
+        defer { discard(report) }
+
+        #expect(report.differentPixelCount == 2_500 * 3_500)
+        #expect(turns > 1)
+    }
+
+    @Test("A cancelled comparison stops instead of finishing")
+    func stopsWhenCancelled() async throws {
+        let candidate = try writeLargeImage(width: 2_500, height: 3_500, grey: 0.2)
+        let baseline = try writeLargeImage(width: 2_500, height: 3_500, grey: 0.8)
+        defer {
+            try? FileManager.default.removeItem(at: candidate)
+            try? FileManager.default.removeItem(at: baseline)
+        }
+
+        let comparison = Task {
+            try await makeService().compare(candidateURL: candidate, baselineURL: baseline)
+        }
+        comparison.cancel()
+
+        await #expect(throws: CancellationError.self) {
+            try await comparison.value
+        }
+    }
+
     // MARK: - Identical
 
     @Test("Identical images differ nowhere")
