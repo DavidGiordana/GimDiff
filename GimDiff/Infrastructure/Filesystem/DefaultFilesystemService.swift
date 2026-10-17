@@ -12,6 +12,26 @@ import Foundation
 struct DefaultFilesystemService: FilesystemService {
     /// Scratch directory holding the committed images extracted for a comparison.
     static let temporaryDirectoryName = "com.davidgiordana.GimDiff"
+    /// Where every process's scratch folder is made.
+    static let scratchRoot = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent(temporaryDirectoryName, isDirectory: true)
+    /// The folder this process's scratch files go in, named after the process.
+    ///
+    /// One per process because the app and any number of `gimdiff` invocations can run at
+    /// once: the name is what lets a sweep tell a folder whose owner is gone from one still
+    /// in use. Masks, committed versions, undo copies, a test run's exports, and a pull
+    /// request's downloads all live under it, so removing it removes the lot.
+    static let sessionDirectory = scratchRoot
+        .appendingPathComponent(String(ProcessInfo.processInfo.processIdentifier), isDirectory: true)
+    /// Scratch roots of versions before per-process folders, swept but no longer written.
+    static let legacyScratchRoots = [
+        scratchRoot,
+        URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(temporaryDirectoryName).TestRuns"),
+        URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(temporaryDirectoryName).PullRequests"),
+    ]
+    /// How old a file of a legacy root must be before a sweep takes it: an older GimDiff
+    /// may still be running and writing there.
+    static let legacyScratchLifetime: TimeInterval = 24 * 60 * 60
 
     private var fileManager: FileManager { .default }
 
@@ -100,13 +120,62 @@ struct DefaultFilesystemService: FilesystemService {
     }
 
     func createTemporaryFile(prefix: String, extension fileExtension: String) -> URL {
-        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent(Self.temporaryDirectoryName, isDirectory: true)
+        let directory = Self.sessionDirectory
         try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
 
         return directory
             .appendingPathComponent("\(prefix)-\(UUID().uuidString)")
             .appendingPathExtension(fileExtension)
+    }
+
+    // MARK: - Scratch lifetime
+
+    /// Deletes this process's scratch folder, for a process on its way out.
+    static func removeSessionScratch() {
+        try? FileManager.default.removeItem(at: sessionDirectory)
+    }
+
+    /// Deletes what processes that are no longer running left behind.
+    ///
+    /// A folder named after a process is kept while that process runs, and goes with
+    /// everything in it once it does not: a crash, a force quit, or a debugger stopping the
+    /// app never reached ``removeSessionScratch()``. Anything else in a scratch root
+    /// predates per-process folders and goes once ``legacyScratchLifetime`` has passed.
+    ///
+    /// - Parameters:
+    ///   - isRunning: Whether a process is alive, replaced by tests.
+    static func removeAbandonedScratch(
+        sessionsIn root: URL = scratchRoot,
+        legacyRoots: [URL] = legacyScratchRoots,
+        isRunning: (pid_t) -> Bool = DefaultFilesystemService.isRunning,
+        now: Date = Date()
+    ) {
+        let fileManager = FileManager.default
+        let keys: [URLResourceKey] = [.contentModificationDateKey]
+
+        for entry in (try? fileManager.contentsOfDirectory(at: root, includingPropertiesForKeys: keys)) ?? [] {
+            guard let pid = pid_t(entry.lastPathComponent) else { continue }
+            if !isRunning(pid) { try? fileManager.removeItem(at: entry) }
+        }
+
+        for legacyRoot in legacyRoots {
+            for entry in (try? fileManager.contentsOfDirectory(at: legacyRoot, includingPropertiesForKeys: keys)) ?? [] {
+                // A session folder is the sweep above's to judge, whichever root it is in.
+                guard legacyRoot != root || pid_t(entry.lastPathComponent) == nil else { continue }
+                let modified = (try? entry.resourceValues(forKeys: Set(keys)))?.contentModificationDate ?? .distantPast
+                if now.timeIntervalSince(modified) > legacyScratchLifetime {
+                    try? fileManager.removeItem(at: entry)
+                }
+            }
+            if legacyRoot != root, (try? fileManager.contentsOfDirectory(atPath: legacyRoot.path))?.isEmpty == true {
+                try? fileManager.removeItem(at: legacyRoot)
+            }
+        }
+    }
+
+    /// Whether the process `pid` is alive. `EPERM` means it is, and belongs to someone else.
+    static func isRunning(_ pid: pid_t) -> Bool {
+        pid == getpid() || kill(pid, 0) == 0 || errno == EPERM
     }
 
     /// Overrides the protocol's walk with a single `FileManager` enumeration.

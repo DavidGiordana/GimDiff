@@ -38,6 +38,7 @@ extension AppState {
             )
             do {
                 try filesystem.copyFile(from: file, to: copy)
+                undoCopies.insert(copy)
                 return SavedFile(file: file, copy: copy)
             } catch {
                 return nil
@@ -60,6 +61,7 @@ extension AppState {
     func discardSaved(_ saved: [SavedFile]) {
         for copy in saved.compactMap(\.copy) {
             try? filesystem.removeItem(at: copy)
+            undoCopies.remove(copy)
         }
     }
 
@@ -77,6 +79,10 @@ extension AppState {
     /// nobody is looking at, with nothing on screen to say so.
     func forgetFileUndo() {
         undoManager?.removeAllActions(withTarget: self)
+        for copy in undoCopies {
+            try? filesystem.removeItem(at: copy)
+        }
+        undoCopies = []
     }
 
     // MARK: - Performing

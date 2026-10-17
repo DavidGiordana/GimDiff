@@ -272,6 +272,9 @@ struct GitServiceIntegrationTests {
                 gitRef: "HEAD"
             )
         }
+        // The file made for git to write into is not left behind.
+        let leftovers = (try? FileManager.default.contentsOfDirectory(atPath: DefaultFilesystemService.sessionDirectory.path)) ?? []
+        #expect(!leftovers.contains { $0.hasPrefix("never-committed-HEAD") })
     }
 
     @Test("Status reports a modified file and an untracked one")

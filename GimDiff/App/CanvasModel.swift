@@ -85,15 +85,23 @@ final class CanvasModel {
 
     @ObservationIgnored private let imageDiff: any ImageDiffService
     @ObservationIgnored private let gitService: any GitService
+    /// Deletes the scratch files the canvas stops showing: masks and committed versions.
+    @ObservationIgnored private let filesystem: any FilesystemService
     @ObservationIgnored private let defaults: UserDefaults
     /// Held so a second diff request supersedes the first rather than racing it.
     @ObservationIgnored private var diffTask: Task<Void, Never>?
     @ObservationIgnored private var committedVersionTask: Task<Void, Never>?
     @ObservationIgnored private var looseRoleTask: Task<Void, Never>?
 
-    init(imageDiff: any ImageDiffService, gitService: any GitService, defaults: UserDefaults) {
+    init(
+        imageDiff: any ImageDiffService,
+        gitService: any GitService,
+        filesystem: any FilesystemService,
+        defaults: UserDefaults
+    ) {
         self.imageDiff = imageDiff
         self.gitService = gitService
+        self.filesystem = filesystem
         self.defaults = defaults
         // Assigned here, where the property observers do not run, so loading a setting does
         // not write it straight back.
@@ -112,9 +120,16 @@ final class CanvasModel {
         // Whatever the canvas shows next, a pair still being decided is no longer wanted.
         looseRoleTask?.cancel()
         looseRoleCertainty = nil
+        let leaving = preview?.panes.filter { $0.origin == .committedVersion }.map(\.fileURL) ?? []
         preview = newValue
-        diffReport = nil
-        isComputingDiff = false
+        setDiffReport(nil)
+
+        // A committed version was written for this comparison alone, and selecting the
+        // snapshot again extracts it afresh.
+        let staying = Set(newValue?.panes.map(\.fileURL) ?? [])
+        for file in leaving where !staying.contains(file) {
+            try? filesystem.removeItem(at: file)
+        }
     }
 
     /// Clears the canvas, abandoning a committed version still being extracted.
@@ -146,7 +161,7 @@ final class CanvasModel {
               let relativePath = AppState.relativePath(of: snapshot.fileURL, under: gitRoot)
         else { return }
 
-        committedVersionTask = Task { [gitService] in
+        committedVersionTask = Task { [gitService, filesystem] in
             // An untracked or newly added snapshot has nothing at HEAD to compare with, so
             // a failure here is ordinary: the image stays on screen on its own.
             guard let committed = try? await gitService.extractCommittedVersion(
@@ -155,7 +170,11 @@ final class CanvasModel {
                 gitRef: Self.comparisonGitRef
             ) else { return }
 
-            guard !Task.isCancelled, preview?.snapshotID == snapshot.id else { return }
+            guard !Task.isCancelled, preview?.snapshotID == snapshot.id else {
+                // Superseded while git was writing it; nothing will ever show it.
+                try? filesystem.removeItem(at: committed)
+                return
+            }
             show(.comparison(
                 SnapshotPair(reference: committed, failure: snapshot.fileURL),
                 snapshotID: snapshot.id,
@@ -262,7 +281,13 @@ final class CanvasModel {
     /// The pixel comparison in flight, if any, so a caller can wait for it.
     var currentDiffComparison: Task<Void, Never>? { diffTask }
 
+    /// Replaces the measurement, deleting the mask of the one it replaces: every comparison
+    /// draws a new mask, so keeping the old ones would fill the scratch folder a selection
+    /// at a time.
     private func setDiffReport(_ report: ImageDiffReport?, isComputing: Bool = false) {
+        if let mask = diffReport?.diffMaskURL, mask != report?.diffMaskURL {
+            try? filesystem.removeItem(at: mask)
+        }
         diffReport = report
         isComputingDiff = isComputing
     }

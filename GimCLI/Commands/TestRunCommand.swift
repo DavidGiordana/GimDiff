@@ -69,9 +69,11 @@ enum TestRunCommand {
         let project = try await ProjectScanner(filesystem: filesystem, gitService: gitService)
             .scan(projectRoot: projectURL)
 
+        // In the tool's own scratch folder, which it deletes before exiting.
+        let scratch = DefaultFilesystemService.sessionDirectory.appendingPathComponent("TestRuns", isDirectory: true)
         let reader = CombinedTestResultReader(
-            xcode: XcresultReader(runner: SystemCommandRunner(), filesystem: filesystem),
-            paparazzi: PaparazziFailureReader(filesystem: filesystem)
+            xcode: XcresultReader(runner: SystemCommandRunner(), filesystem: filesystem, temporaryRoot: scratch),
+            paparazzi: PaparazziFailureReader(filesystem: filesystem, temporaryRoot: scratch)
         )
         let report: TestRunReport
         if let resultURL = arguments.fileURL(of: "result") {

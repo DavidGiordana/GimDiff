@@ -55,6 +55,9 @@ final class AppState {
     /// The window's rather than one of GimDiff's own, so Edit ▸ Undo, ⌘Z, and the filter
     /// field's typing share the one stack a Mac user expects. Handed over by ``RootView``.
     @ObservationIgnored weak var undoManager: UndoManager?
+    /// The copies the undo stack holds, deleted with it by ``forgetFileUndo()``: once the
+    /// steps that would read them are gone, nothing else knows they exist.
+    @ObservationIgnored var undoCopies: Set<URL> = []
     /// The message on screen, under the canvas, if any.
     private(set) var currentMessage: AppMessage?
     /// The last few messages, newest first, so one that closed itself or was replaced can
@@ -156,15 +159,20 @@ final class AppState {
             service: pullRequests ?? DefaultGitHubPRService(
                 http: URLSessionHTTPClient(),
                 tokens: GitHubTokenResolver(),
-                filesystem: filesystem
+                filesystem: filesystem,
+                temporaryRoot: Self.scratchFolder("PullRequests")
             ),
             resolver: GitHubPRReferenceResolver(gitService: git),
             filesystem: filesystem
         )
         testRuns = TestRunModel(
             reader: testResults ?? CombinedTestResultReader(
-                xcode: XcresultReader(runner: SystemCommandRunner(), filesystem: filesystem),
-                paparazzi: PaparazziFailureReader(filesystem: filesystem)
+                xcode: XcresultReader(
+                    runner: SystemCommandRunner(),
+                    filesystem: filesystem,
+                    temporaryRoot: Self.scratchFolder("TestRuns")
+                ),
+                paparazzi: PaparazziFailureReader(filesystem: filesystem, temporaryRoot: Self.scratchFolder("TestRuns"))
             ),
             locator: testResultLocator ?? CombinedTestResultLocator([
                 DerivedDataLocator(),
@@ -174,13 +182,19 @@ final class AppState {
         )
         self.defaults = defaults
         recentProjects = Self.loadRecentProjects(from: defaults)
-        canvas = CanvasModel(imageDiff: self.imageDiff, gitService: git, defaults: defaults)
+        canvas = CanvasModel(imageDiff: self.imageDiff, gitService: git, filesystem: filesystem, defaults: defaults)
         pullRequestReview.reportError = { [weak self] error in self?.report(error) }
         canvas.reportError = { [weak self] error in self?.report(error) }
     }
 
     deinit {
         watchTask?.cancel()
+    }
+
+    /// A folder inside this process's scratch folder, which the app deletes on its way out
+    /// and a later launch deletes when it never got there.
+    private static func scratchFolder(_ name: String) -> URL {
+        DefaultFilesystemService.sessionDirectory.appendingPathComponent(name, isDirectory: true)
     }
 
     // MARK: - Opening

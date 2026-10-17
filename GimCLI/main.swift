@@ -8,4 +8,7 @@
 
 import Foundation
 
-exit(await GimDiffCLI.run(arguments: CommandLine.arguments).rawValue)
+let status = await GimDiffCLI.run(arguments: CommandLine.arguments)
+// Nothing the tool hands back lives in its scratch folder: `--out` writes elsewhere.
+DefaultFilesystemService.removeSessionScratch()
+exit(status.rawValue)

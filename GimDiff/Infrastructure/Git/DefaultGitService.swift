@@ -158,10 +158,16 @@ struct DefaultGitService: GitService {
             in: repositoryRoot
         ).arguments
 
-        return try await withCheckedThrowingContinuation { continuation in
+        return try await withCheckedThrowingContinuation { [filesystem] continuation in
             Self.queue.async {
                 continuation.resume(with: Result {
-                    try Self.stream(arguments: arguments, in: repositoryRoot, to: destination)
+                    do {
+                        try Self.stream(arguments: arguments, in: repositoryRoot, to: destination)
+                    } catch {
+                        // Whatever git managed to write is not the committed file.
+                        try? filesystem.removeItem(at: destination)
+                        throw error
+                    }
                     return destination
                 })
             }

@@ -34,13 +34,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+        // What a crash or a force quit left behind. Off the main actor, since a session
+        // that read a large test run can leave a lot to delete.
+        Task.detached(priority: .utility) {
+            DefaultFilesystemService.removeAbandonedScratch()
+        }
     }
 
-    /// A pull request's downloaded snapshots, and the images copied out of a test run, are
-    /// the session's alone; nothing reopens them.
+    /// Every scratch file is the session's alone — a pull request's downloads, a test run's
+    /// exports, masks, committed versions, undo copies — and nothing reopens them.
     func applicationWillTerminate(_ notification: Notification) {
         state.pullRequestReview.discardFiles()
         state.testRuns.discardFiles()
+        DefaultFilesystemService.removeSessionScratch()
     }
 
     /// Nothing outlives the window, so closing it quits rather than leaving a menu bar behind.
