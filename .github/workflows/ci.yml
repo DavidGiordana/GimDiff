@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Engine imports no UI framework
+        run: |
+          if grep -rn '^import \(SwiftUI\|AppKit\|Cocoa\)' GimDiff/Engine; then
+            echo "::error::GimDiff/Engine must not import SwiftUI, AppKit, or Cocoa"
+            exit 1
+          fi
+
+      - name: No trailing whitespace
+        run: |
+          if grep -rn '[[:space:]]\+$' --include='*.swift' GimDiff GimCLI GimDiffTests GimDiffUITests; then
+            echo "::error::Trailing whitespace found"
+            exit 1
+          fi
+
+      - name: Build the app
+        run: xcodebuild -scheme GimDiff -destination 'platform=macOS' build
+
+      - name: Build the command-line tool
+        run: xcodebuild -scheme gimdiff -destination 'platform=macOS' build
+
+      # The UI tests need a logged-in desktop session, which hosted runners don't offer
+      # reliably, so only the unit tests run here.
+      - name: Unit tests
+        run: xcodebuild -scheme GimDiff -destination 'platform=macOS' test -only-testing:GimDiffTests

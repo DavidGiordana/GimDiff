@@ -1,0 +1,36 @@
+name: Bug report
+description: Something in GimDiff doesn't work as it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: A small project that shows the problem helps most.
+    validations:
+      required: true
+  - type: input
+    id: library
+    attributes:
+      label: Snapshot library
+      placeholder: swift-snapshot-testing 1.17, Paparazzi 1.3.5, …
+  - type: input
+    id: gimdiff-version
+    attributes:
+      label: GimDiff version
+      description: GimDiff ▸ About GimDiff, or the commit you built.
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+    validations:
+      required: true
