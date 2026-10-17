@@ -103,6 +103,31 @@ struct ClipboardIngestionTests {
         #expect(payload.rolesAreStated == false)
     }
 
+    @Test("One labelled path settles both sides, wherever it appears", arguments: [
+        "Failure: /tmp/fail.png\n/Snapshots/ref.png",
+        "/tmp/fail.png\nReference: /Snapshots/ref.png",
+        "/Snapshots/ref.png\nActual: /tmp/fail.png",
+        "Expected: /Snapshots/ref.png\n/tmp/fail.png",
+    ])
+    func oneLabelSettlesBothSides(log: String) throws {
+        let payload = try #require(service.parseClipboardText(log))
+
+        #expect(payload.baselineURL == URL(fileURLWithPath: "/Snapshots/ref.png"))
+        #expect(payload.candidateURL == URL(fileURLWithPath: "/tmp/fail.png"))
+        #expect(payload.rolesAreStated)
+    }
+
+    @Test("Two paths with the same label say nothing about the sides")
+    func sameLabelTwiceUsesOrder() throws {
+        let log = "Reference: /Snapshots/a.png\nReference: /Snapshots/b.png"
+
+        let payload = try #require(service.parseClipboardText(log))
+
+        #expect(payload.baselineURL == URL(fileURLWithPath: "/Snapshots/a.png"))
+        #expect(payload.candidateURL == URL(fileURLWithPath: "/Snapshots/b.png"))
+        #expect(payload.rolesAreStated == false)
+    }
+
     @Test("A single path becomes the candidate, with no baseline")
     func singlePathHasNoBaseline() throws {
         let payload = try #require(

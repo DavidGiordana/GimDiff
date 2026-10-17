@@ -46,9 +46,20 @@ struct DefaultIngestionService: IngestionService {
         let rolesAreStated: Bool
         let baselineIndex = references.firstIndex { $0.role == .baseline }
         let candidateIndex = references.firstIndex { $0.role == .candidate }
+        let unlabelledIndex = references.firstIndex { $0.role == nil }
 
         if let baselineIndex, let candidateIndex, baselineIndex != candidateIndex {
             baseline = references[baselineIndex]
+            candidate = references[candidateIndex]
+            rolesAreStated = true
+        } else if let baselineIndex, candidateIndex == nil, let unlabelledIndex {
+            // One label settles both sides: a log that names the reference has said the
+            // other path is the image the run produced, wherever either one appears.
+            baseline = references[baselineIndex]
+            candidate = references[unlabelledIndex]
+            rolesAreStated = true
+        } else if let candidateIndex, baselineIndex == nil, let unlabelledIndex {
+            baseline = references[unlabelledIndex]
             candidate = references[candidateIndex]
             rolesAreStated = true
         } else {
