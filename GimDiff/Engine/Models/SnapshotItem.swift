@@ -39,7 +39,7 @@ struct SnapshotItem: Identifiable, Sendable, Hashable {
     }
 
     /// Whether this snapshot differs from what the repository has committed.
-    var hasGitDiff: Bool { gitStatus == .modified || gitStatus == .untracked }
+    var hasGitDiff: Bool { gitStatus == .modified || gitStatus == .added || gitStatus == .untracked }
 
     /// Name shown in the sidebar, disambiguated when a test records several snapshots.
     var displayName: String {

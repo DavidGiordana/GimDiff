@@ -65,7 +65,11 @@ struct GitStatusParsingTests {
         (" M", GitFileStatus.modified),
         ("M ", GitFileStatus.modified),
         ("MM", GitFileStatus.modified),
-        ("A ", GitFileStatus.modified),
+        ("A ", GitFileStatus.added),
+        ("AM", GitFileStatus.added),
+        ("R ", GitFileStatus.added),
+        ("RM", GitFileStatus.added),
+        ("C ", GitFileStatus.added),
         ("??", GitFileStatus.untracked),
         (" D", GitFileStatus.deleted),
         ("D ", GitFileStatus.deleted),
@@ -107,14 +111,17 @@ struct GitStatusParsingTests {
         #expect(statuses == [URL(fileURLWithPath: "/repo/Snapshots/home screen.png"): .modified])
     }
 
-    @Test("A rename is reported against the path that now exists on disk")
+    @Test("A rename is added at the path on disk and deleted at the path HEAD has")
     func renameUsesDestination() {
         let statuses = DefaultGitService.parseStatus(
             "R  Snapshots/old.png -> Snapshots/new.png\n",
             repositoryRoot: repositoryRoot
         )
 
-        #expect(statuses == [URL(fileURLWithPath: "/repo/Snapshots/new.png"): .modified])
+        #expect(statuses == [
+            URL(fileURLWithPath: "/repo/Snapshots/new.png"): .added,
+            URL(fileURLWithPath: "/repo/Snapshots/old.png"): .deleted,
+        ])
     }
 
     @Test("Quoting applied by git is undone")

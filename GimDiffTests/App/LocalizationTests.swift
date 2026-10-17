@@ -24,6 +24,12 @@ struct LocalizationTests {
         #expect(String(localized: "Accept all \(1) failing snapshots?") == "Accept the failing snapshot?")
         #expect(String(localized: "Accept all \(4) failing snapshots?") == "Accept all 4 failing snapshots?")
         #expect(String(localized: "\(1) snapshots failed in the test run") == "1 snapshot failed in the test run")
+        #expect(String(localized: "\(1) snapshots are restored from the last commit.")
+            == "1 snapshot is restored from the last commit.")
+        #expect(String(localized: "\(2) snapshots the last commit does not have are moved to the Trash.")
+            == "2 snapshots the last commit does not have are moved to the Trash.")
+        #expect(String(localized: "\(1) snapshots the last commit does not have are moved to the Trash.")
+            == "1 snapshot the last commit does not have is moved to the Trash.")
     }
 
     @Test("The project summary agrees with each of its two counts separately")

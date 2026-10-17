@@ -172,8 +172,13 @@ struct DefaultGitService: GitService {
             guard let status = status(forCode: String(line.prefix(2))) else { continue }
 
             var path = String(line.dropFirst(3))
-            // A rename reads "old -> new"; the new path is the one on disk.
+            // A rename reads "old -> new"; the new path is the one on disk. The old one is
+            // reported deleted: `HEAD` still has it, and restoring the project brings it back.
             if let arrow = path.range(of: " -> ") {
+                let source = unquote(String(path[..<arrow.lowerBound]).trimmingCharacters(in: .whitespaces))
+                if !source.isEmpty {
+                    statuses[repositoryRoot.appendingPathComponent(source).standardizedFileURL] = .deleted
+                }
                 path = String(path[arrow.upperBound...])
             }
             path = unquote(path.trimmingCharacters(in: .whitespaces))
@@ -194,6 +199,9 @@ struct DefaultGitService: GitService {
         case "!!": nil
         case _ where code.contains("D"): .deleted
         case _ where code.trimmingCharacters(in: .whitespaces).isEmpty: nil
+        // The index column names a path new to the index: added, or a rename's or copy's
+        // destination. None of them is at `HEAD`.
+        case _ where "ARC".contains(code.prefix(1)): .added
         default: .modified
         }
     }

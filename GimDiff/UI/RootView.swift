@@ -76,16 +76,29 @@ struct RootView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("""
-            Every modified snapshot goes back to the committed version. Changes that were \
-            never committed can be put back with Edit ▸ Undo until you open another project \
-            or quit. Untracked snapshots are left alone.
-            """)
+            Text(discardAllMessage)
         }
     }
 
     private var discardAllTitle: String {
-        String(localized: "Discard the changes to \(state.discardableProjectSnapshots.count) snapshots?")
+        String(localized: "Put every snapshot back to the committed version?")
+    }
+
+    /// What Discard All will do, counted from the status read before asking.
+    private var discardAllMessage: String {
+        let restored = state.headRestorePlan?.committedURLs.count ?? 0
+        let trashed = state.headRestorePlan?.trashedURLs.count ?? 0
+        var sentences: [String] = []
+        if restored > 0 {
+            sentences.append(String(localized: "\(restored) snapshots are restored from the last commit."))
+        }
+        if trashed > 0 {
+            sentences.append(String(localized: "\(trashed) snapshots the last commit does not have are moved to the Trash."))
+        }
+        sentences.append(String(localized: """
+            Edit ▸ Undo puts everything back until you open another project or quit.
+            """))
+        return sentences.joined(separator: " ")
     }
 
     private var discardAllConfirmation: Binding<Bool> {

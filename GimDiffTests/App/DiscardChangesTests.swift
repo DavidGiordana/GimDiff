@@ -45,6 +45,24 @@ struct DiscardChangesTests {
         #expect(try snapshot("toolbar", in: fixture).gitStatus == .untracked)
     }
 
+    @Test("An added snapshot is not at HEAD either, and is not offered")
+    func leavesAddedSnapshotsAlone() async throws {
+        var bundle = AppStateFixture.twoSuites()
+        let suiteIndex = try #require(bundle.suites.firstIndex { $0.snapshots.contains { $0.name == "toolbar" } })
+        let snapshotIndex = try #require(bundle.suites[suiteIndex].snapshots.firstIndex { $0.name == "toolbar" })
+        bundle.suites[suiteIndex].snapshots[snapshotIndex].gitStatus = .added
+        let fixture = AppStateFixture(bundle: bundle)
+        let toolbar = try snapshot("toolbar", in: fixture)
+
+        #expect(toolbar.hasGitDiff)
+        #expect(!fixture.state.canDiscardGitChanges(of: toolbar))
+        fixture.state.discardGitChanges(of: [toolbar])
+        await fixture.state.currentDiscard?.value
+
+        #expect(fixture.gitService.discarded.recorded.isEmpty)
+        #expect(try snapshot("toolbar", in: fixture).gitStatus == .added)
+    }
+
     @Test("A suite offers only its modified snapshots")
     func discardsASuite() throws {
         let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
@@ -114,49 +132,122 @@ struct DiscardChangesTests {
         )
     }
 
-    @Test("Discarding all asks first, then restores every modified snapshot of the project")
-    func discardsTheWholeProject() async throws {
+    /// A fixture whose stub git reports the project's changes, with every file on disk.
+    private func projectWithChanges(statuses extra: [URL: GitFileStatus] = [:]) -> AppStateFixture {
         let bundle = Self.changesInBothSuites()
-        // The status read that follows the discard must still see the untracked snapshot.
-        let toolbar = try #require(bundle.suites.flatMap(\.snapshots).first { $0.name == "toolbar" })
         var git = StubGitService()
-        git.statuses = [toolbar.fileURL.standardizedFileURL: .untracked]
+        for snapshot in bundle.suites.flatMap(\.snapshots) where snapshot.gitStatus != .unmodified {
+            git.statuses[snapshot.fileURL.standardizedFileURL] = snapshot.gitStatus
+        }
+        git.statuses.merge(extra) { _, new in new }
         let fixture = AppStateFixture(bundle: bundle, gitService: git)
-        let header = try snapshot("header", in: fixture)
-        let menu = try snapshot("menu", in: fixture)
-        #expect(fixture.state.discardableProjectSnapshots.map(\.name) == ["header", "menu"])
+        for snapshot in bundle.suites.flatMap(\.snapshots) {
+            fixture.filesystem.stub(snapshot.fileURL, contents: "\(snapshot.name) on disk")
+        }
+        return fixture
+    }
+
+    private static var deletedSnapshot: URL {
+        AppStateFixture.root.appendingPathComponent("Snapshots/BetaTests/gone.png")
+    }
+
+    @Test("Discarding all asks first, saying what comes back and what goes to the Trash")
+    func asksWithTheCounts() async throws {
+        let fixture = projectWithChanges(statuses: [Self.deletedSnapshot: .deleted])
 
         fixture.state.requestDiscardAllGitChanges()
+        await fixture.state.currentDiscard?.value
 
         #expect(fixture.state.isConfirmingDiscardAllGitChanges)
+        #expect(fixture.state.headRestorePlan?.committedURLs.count == 3)
+        #expect(fixture.state.headRestorePlan?.trashedURLs.count == 1)
         #expect(fixture.gitService.discarded.recorded.isEmpty)
+    }
+
+    @Test("Discarding all leaves every snapshot as HEAD holds it")
+    func restoresTheWholeProject() async throws {
+        let fixture = projectWithChanges(statuses: [Self.deletedSnapshot: .deleted])
+        let header = try snapshot("header", in: fixture)
+        let menu = try snapshot("menu", in: fixture)
+        let toolbar = try snapshot("toolbar", in: fixture)
 
         fixture.state.discardAllGitChanges()
         await fixture.state.currentDiscard?.value
-        await fixture.state.currentGitStatusRefresh?.value
 
         #expect(!fixture.state.isConfirmingDiscardAllGitChanges)
-        #expect(Set(fixture.gitService.discarded.recorded) == [header.fileURL, menu.fileURL])
-        #expect(try snapshot("header", in: fixture).gitStatus == .unmodified)
-        #expect(try snapshot("menu", in: fixture).gitStatus == .unmodified)
-        #expect(try snapshot("toolbar", in: fixture).gitStatus == .untracked)
-        #expect(fixture.state.discardableProjectSnapshots.isEmpty)
+        #expect(Set(fixture.gitService.discarded.recorded) == [header.fileURL, menu.fileURL, Self.deletedSnapshot])
+        #expect(!fixture.filesystem.fileExists(at: toolbar.fileURL))
+        #expect(!fixture.state.currentProject!.suites.flatMap(\.snapshots).contains { $0.id == toolbar.id })
+        #expect(fixture.state.lastError == nil)
     }
 
-    @Test("Nothing modified means nothing to confirm")
-    func discardAllNeedsAChange() throws {
-        let untrackedOnly = ProjectBundle(
+    @Test("A staged snapshot is trashed before git restores, never deleted by it")
+    func trashesStagedSnapshots() async throws {
+        let staged = AppStateFixture.root.appendingPathComponent("Snapshots/BetaTests/toolbar.png")
+        let fixture = projectWithChanges(statuses: [staged: .added])
+
+        fixture.state.discardAllGitChanges()
+        await fixture.state.currentDiscard?.value
+
+        #expect(!fixture.filesystem.fileExists(at: staged))
+        #expect(fixture.filesystem.trashedPaths.contains(staged.standardizedFileURL.path))
+        // Handed to git as well, which takes it out of the index.
+        #expect(fixture.gitService.discarded.recorded.contains(staged))
+    }
+
+    @Test("Discard All is undone in one step")
+    func undoesInOneStep() async throws {
+        let fixture = projectWithChanges(statuses: [Self.deletedSnapshot: .deleted])
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        fixture.state.undoManager = undo
+        let header = try snapshot("header", in: fixture)
+        let toolbar = try snapshot("toolbar", in: fixture)
+
+        fixture.state.discardAllGitChanges()
+        await fixture.state.currentDiscard?.value
+        // What `git restore` would leave behind.
+        fixture.filesystem.stub(header.fileURL, contents: "header committed")
+        fixture.filesystem.stub(Self.deletedSnapshot, contents: "gone committed")
+
+        #expect(undo.canUndo)
+        undo.undo()
+
+        #expect(fixture.filesystem.fileExists(at: toolbar.fileURL))
+        #expect(try fixture.filesystem.readFile(at: header.fileURL) == Data("header on disk".utf8))
+        #expect(!fixture.filesystem.fileExists(at: Self.deletedSnapshot))
+        #expect(!undo.canUndo)
+    }
+
+    @Test("A file that cannot be trashed stops the restore before git runs")
+    func stopsWhenTheTrashFails() async throws {
+        let fixture = projectWithChanges()
+        // Gone from disk, so the untracked snapshot cannot be moved to the Trash.
+        try fixture.filesystem.removeItem(at: try snapshot("toolbar", in: fixture).fileURL)
+
+        fixture.state.discardAllGitChanges()
+        await fixture.state.currentDiscard?.value
+
+        #expect(fixture.gitService.discarded.recorded.isEmpty)
+        #expect(fixture.state.lastError != nil)
+    }
+
+    @Test("A project matching HEAD has nothing to confirm")
+    func discardAllNeedsAChange() async throws {
+        let clean = ProjectBundle(
             rootURL: AppStateFixture.root,
             gitRootURL: AppStateFixture.root,
             suites: [
-                AppStateFixture.suite(named: "BetaTests", hasSourceCode: true, snapshots: [("toolbar", .untracked)]),
+                AppStateFixture.suite(named: "BetaTests", hasSourceCode: true, snapshots: [("toolbar", .unmodified)]),
             ]
         )
-        let fixture = AppStateFixture(bundle: untrackedOnly)
+        let fixture = AppStateFixture(bundle: clean)
 
+        #expect(!fixture.state.projectHasGitChanges)
         fixture.state.requestDiscardAllGitChanges()
+        await fixture.state.currentDiscard?.value
 
-        #expect(fixture.state.discardableProjectSnapshots.isEmpty)
         #expect(!fixture.state.isConfirmingDiscardAllGitChanges)
+        #expect(fixture.state.lastError == String(localized: "Every snapshot already matches the committed version."))
     }
 }

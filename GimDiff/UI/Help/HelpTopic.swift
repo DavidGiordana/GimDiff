@@ -140,7 +140,9 @@ private extension HelpTopic {
                 **Discard Changes** puts a modified snapshot back to its committed version; on \
                 a suite it does so for every modified snapshot in it. **Discard All…**, beside \
                 the filter chips (or **Snapshot ▸ Discard All Changes in Project…**), does it \
-                for the whole project after asking first. Untracked snapshots are left alone. \
+                for the whole project after asking first, and goes further: every snapshot \
+                ends up as the last commit holds it. Deleted snapshots come back, and those the \
+                commit does not have — added, untracked, or renamed — are moved to the Trash. \
                 A change that was never committed exists nowhere but in GimDiff's undo: \
                 **Edit ▸ Undo** (⌘Z) puts it back until you open another project or quit.
                 """)),

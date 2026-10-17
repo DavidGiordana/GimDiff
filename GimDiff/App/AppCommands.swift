@@ -381,7 +381,7 @@ struct AppCommands: Commands {
             Button("Discard All Changes in Project…") {
                 state.requestDiscardAllGitChanges()
             }
-            .disabled(state.discardableProjectSnapshots.isEmpty)
+            .disabled(!state.canDiscardAllGitChanges)
 
             Button(trashMenuTitle) {
                 state.deleteSelection()

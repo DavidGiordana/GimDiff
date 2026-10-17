@@ -118,6 +118,28 @@
         }
       }
     },
+    "%lld snapshots are restored from the last commit." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld snapshot is restored from the last commit."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld snapshots are restored from the last commit."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld snapshots failed in the test run" : {
       "localizations" : {
         "en" : {
@@ -133,6 +155,28 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld snapshots failed in the test run"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld snapshots the last commit does not have are moved to the Trash." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld snapshot the last commit does not have is moved to the Trash."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld snapshots the last commit does not have are moved to the Trash."
                 }
               }
             }
@@ -195,7 +239,7 @@
     "(none)" : {
 
     },
-    "**Discard Changes** puts a modified snapshot back to its committed version; on a suite it does so for every modified snapshot in it. **Discard All…**, beside the filter chips (or **Snapshot ▸ Discard All Changes in Project…**), does it for the whole project after asking first. Untracked snapshots are left alone. A change that was never committed exists nowhere but in GimDiff's undo: **Edit ▸ Undo** (⌘Z) puts it back until you open another project or quit." : {
+    "**Discard Changes** puts a modified snapshot back to its committed version; on a suite it does so for every modified snapshot in it. **Discard All…**, beside the filter chips (or **Snapshot ▸ Discard All Changes in Project…**), does it for the whole project after asking first, and goes further: every snapshot ends up as the last commit holds it. Deleted snapshots come back, and those the commit does not have — added, untracked, or renamed — are moved to the Trash. A change that was never committed exists nowhere but in GimDiff's undo: **Edit ▸ Undo** (⌘Z) puts it back until you open another project or quit." : {
 
     },
     "**File ▸ Open Recent** lists the same folders as the recent list. Hover over a folder in the list and click its **×**, or right-click it, to forget it or reveal it in the Finder; **Clear Recent Projects** forgets them all. The **×** beside the project's name (or **File ▸ Close Project**) goes back to the list." : {
@@ -466,6 +510,9 @@
     "Discard All" : {
 
     },
+    "Discard All Changes" : {
+
+    },
     "Discard All Changes in Project…" : {
 
     },
@@ -503,28 +550,6 @@
     "Discard changes" : {
 
     },
-    "Discard the changes to %lld snapshots?" : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Discard the changes to %lld snapshot?"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Discard the changes to %lld snapshots?"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "Dismiss" : {
 
     },
@@ -552,13 +577,16 @@
     "Each pane has its own display mode: **Fit**, **Actual Size (1:1)**, or **Free**. In Free, scroll or pinch over the image to zoom around the pointer, drag to move it, or use the **−** and **+** buttons and type a factor between them; the target button centres the image at 1.0 again. **View ▸ Image Size**, **Zoom In** (⌘=), **Zoom Out** (⌘-), and **Centre and Reset Zoom** do the same for every pane at once." : {
 
     },
+    "Edit ▸ Undo puts everything back until you open another project or quit." : {
+
+    },
     "Every action that writes a snapshot — Accept, Reject, Keep, Accept All, Discard, and Move to Trash — can be taken back with **Edit ▸ Undo** (⌘Z) and repeated with **Redo** (⇧⌘Z), until you open another project or quit." : {
 
     },
-    "Every modified snapshot goes back to the committed version. Changes that were never committed can be put back with Edit ▸ Undo until you open another project or quit. Untracked snapshots are left alone." : {
+    "Every pixel is byte for byte the same." : {
 
     },
-    "Every pixel is byte for byte the same." : {
+    "Every snapshot already matches the committed version." : {
 
     },
     "Exact" : {
@@ -906,6 +934,12 @@
     "Pull Request Head" : {
 
     },
+    "Put every snapshot back to the committed version?" : {
+
+    },
+    "Put every snapshot of the project back to the committed version" : {
+
+    },
     "Read the images on screen off disk again (⌘R)" : {
 
     },
@@ -970,9 +1004,6 @@
 
     },
     "Reset" : {
-
-    },
-    "Restore every modified snapshot of the project to the committed version" : {
 
     },
     "Reveal in Finder" : {

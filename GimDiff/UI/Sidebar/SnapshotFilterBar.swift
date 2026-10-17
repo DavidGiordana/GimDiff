@@ -91,11 +91,11 @@ struct SnapshotFilterBar: View {
 
                     Spacer()
 
-                    if !state.discardableProjectSnapshots.isEmpty {
+                    if state.projectHasGitChanges {
                         Button("Discard All…") {
                             state.requestDiscardAllGitChanges()
                         }
-                        .help("Restore every modified snapshot of the project to the committed version")
+                        .help("Put every snapshot of the project back to the committed version")
                         .accessibilityIdentifier("DiscardAllGitChanges")
                     }
                 }

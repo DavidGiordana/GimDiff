@@ -69,7 +69,11 @@ enum ScanCommand {
             )
 
             for snapshot in suite.snapshots where snapshot.hasGitDiff {
-                let marker = snapshot.gitStatus == .untracked ? "?" : "M"
+                let marker = switch snapshot.gitStatus {
+                case .untracked: "?"
+                case .added: "A"
+                default: "M"
+                }
                 console.write("  \(marker)  \(snapshot.fileURL.path(relativeTo: bundle.rootURL))")
             }
         }
@@ -122,7 +126,11 @@ enum ScanCommand {
             init(_ snapshot: SnapshotItem, relativeTo root: URL) {
                 name = snapshot.displayName
                 path = snapshot.fileURL.path(relativeTo: root)
-                status = snapshot.gitStatus == .untracked ? "untracked" : "modified"
+                status = switch snapshot.gitStatus {
+                case .untracked: "untracked"
+                case .added: "added"
+                default: "modified"
+                }
             }
         }
     }

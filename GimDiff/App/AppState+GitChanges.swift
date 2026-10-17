@@ -41,31 +41,161 @@ extension AppState {
         discardGitChanges(of: discardableSelection)
     }
 
-    /// Every snapshot of the project Discard All would restore, listed once each.
+    /// Whether Discard All can be asked for: a project under Git, in the project's own view.
     ///
-    /// Empty under the test run's view: that view lists failures, not changes, so a button
-    /// over it would act on rows nobody can see.
-    var discardableProjectSnapshots: [SnapshotItem] {
-        guard sidebarSource == .project else { return [] }
-        var seen: Set<SnapshotItem.ID> = []
-        return (currentProject?.suites ?? [])
-            .flatMap(discardableSnapshots(in:))
-            .filter { seen.insert($0.id).inserted }
+    /// Not under the test run's view: that view lists failures, not changes, so a button
+    /// over it would act on rows nobody can see. Not conditional on a row showing a change
+    /// either, because a snapshot deleted from disk has no row and still differs from `HEAD`.
+    var canDiscardAllGitChanges: Bool {
+        sidebarSource == .project && !isReviewingPullRequest && currentProject?.gitRootURL != nil
+    }
+
+    /// Whether a snapshot on disk differs from `HEAD`, which is when the filter bar offers
+    /// Discard All beside its chips.
+    var projectHasGitChanges: Bool {
+        canDiscardAllGitChanges && currentProject?.suites.contains(where: \.hasGitDiff) == true
     }
 
     /// Asks before ``discardAllGitChanges()``, which every route to it goes through.
     ///
-    /// Git keeps no copy of a change that was never staged, so nothing would bring back what
-    /// a stray click threw away.
+    /// Git's status is read first, so the question can say how many snapshots come back and
+    /// how many go to the Trash. Git keeps no copy of a change that was never staged, so
+    /// nothing would bring back what a stray click threw away.
     func requestDiscardAllGitChanges() {
-        guard !discardableProjectSnapshots.isEmpty else { return }
-        isConfirmingDiscardAllGitChanges = true
+        guard canDiscardAllGitChanges, let project = currentProject, let gitRoot = project.gitRootURL else { return }
+
+        discardTask?.cancel()
+        discardTask = Task { [gitService] in
+            let plan: HEADRestorePlan
+            do {
+                plan = HEADRestorePlan(
+                    suites: project.suites,
+                    statuses: try await gitService.status(repositoryRoot: gitRoot)
+                )
+            } catch {
+                report(error)
+                return
+            }
+            guard !Task.isCancelled, currentProject?.rootURL == project.rootURL else { return }
+            guard !plan.isEmpty else {
+                report(String(localized: "Every snapshot already matches the committed version."))
+                return
+            }
+            headRestorePlan = plan
+            isConfirmingDiscardAllGitChanges = true
+        }
     }
 
-    /// Restores every modified snapshot of the project to what `HEAD` holds.
+    /// Puts every snapshot of the project back to what `HEAD` holds.
+    ///
+    /// Modified and deleted snapshots, and a rename's old name, are restored. Snapshots
+    /// `HEAD` does not have — added, untracked, a rename's new name — go to the Trash. The
+    /// status is read again rather than taken from the question: a test run may have written
+    /// since it was asked.
     func discardAllGitChanges() {
         isConfirmingDiscardAllGitChanges = false
-        discardGitChanges(of: discardableProjectSnapshots)
+        headRestorePlan = nil
+        guard canDiscardAllGitChanges, let project = currentProject, let gitRoot = project.gitRootURL else { return }
+
+        discardTask?.cancel()
+        discardTask = Task { [gitService] in
+            let plan: HEADRestorePlan
+            do {
+                plan = HEADRestorePlan(
+                    suites: project.suites,
+                    statuses: try await gitService.status(repositoryRoot: gitRoot)
+                )
+            } catch {
+                report(error)
+                return
+            }
+            guard !Task.isCancelled, currentProject?.rootURL == project.rootURL, !plan.isEmpty else { return }
+            await restoreToHEAD(plan, repositoryRoot: gitRoot)
+        }
+    }
+
+    /// Carries out `plan`: the Trash first, then one `git restore` over everything else.
+    ///
+    /// The order is what keeps a staged snapshot: `git restore --source=HEAD` deletes a path
+    /// `HEAD` does not have, so it must already be in the Trash. A file that cannot be
+    /// trashed therefore stops the whole restore before git runs.
+    private func restoreToHEAD(_ plan: HEADRestorePlan, repositoryRoot: URL) async {
+        let actionName = String(localized: "Discard All Changes")
+        // Saved before anything moves: a change that was never staged exists nowhere else.
+        let saved = saveForUndo(plan.committedURLs)
+
+        var trashed: [(original: URL, location: URL)] = []
+        for url in plan.trashedURLs {
+            do {
+                if let location = try filesystem.trashFile(at: url) {
+                    trashed.append((url, location))
+                }
+            } catch {
+                registerHEADRestoreUndo(saved: [], trashed: trashed, actionName: actionName)
+                discardSaved(saved)
+                report(error)
+                rescanAfterOwnEdit()
+                return
+            }
+        }
+
+        do {
+            try await gitService.discardChanges(to: plan.restoredURLs, repositoryRoot: repositoryRoot)
+        } catch {
+            // What reached the Trash stays undoable; git changed nothing.
+            registerHEADRestoreUndo(saved: [], trashed: trashed, actionName: actionName)
+            discardSaved(saved)
+            report(error)
+            rescanAfterOwnEdit()
+            return
+        }
+
+        registerHEADRestoreUndo(saved: saved, trashed: trashed, actionName: actionName)
+        finishRestoringToHEAD(plan)
+    }
+
+    /// Registers the Trash and the restore as one step, which is how the question asked
+    /// about them.
+    private func registerHEADRestoreUndo(
+        saved: [SavedFile],
+        trashed: [(original: URL, location: URL)],
+        actionName: String
+    ) {
+        let needsGroup = undoManager.map { $0.groupingLevel == 0 } ?? false
+        if needsGroup { undoManager?.beginUndoGrouping() }
+        defer { if needsGroup { undoManager?.endUndoGrouping() } }
+
+        for item in trashed {
+            registerUndoOfTrash(original: item.original, trashed: item.location, actionName: actionName)
+        }
+        registerUndo(restoring: saved, actionName: actionName)
+    }
+
+    /// Takes the trashed snapshots out of the tree and clears the restored ones' badges.
+    ///
+    /// A deleted snapshot git put back has no row yet, so when there is one the project is
+    /// rescanned to list it.
+    private func finishRestoringToHEAD(_ plan: HEADRestorePlan) {
+        let trashedPaths = Set(plan.trashedURLs.map(\.path))
+        let committedPaths = Set(plan.committedURLs.map(\.path))
+        let snapshots = currentProject?.suites.flatMap(\.snapshots) ?? []
+        let trashedIDs = Set(snapshots.filter { trashedPaths.contains($0.fileURL.standardizedFileURL.path) }.map(\.id))
+        let restoredIDs = Set(snapshots.filter { committedPaths.contains($0.fileURL.standardizedFileURL.path) }.map(\.id))
+
+        let rowsBefore = visibleRows
+        removeSnapshots(trashedIDs)
+        if let selected = selectedRowID, !visibleRows.contains(where: { $0.id == selected }) {
+            selectedRowID = Self.survivor(of: selected, among: rowsBefore, in: visibleRows)
+        }
+        if let shown = canvas.preview?.snapshotID, trashedIDs.contains(shown) {
+            canvas.close()
+        }
+
+        finishDiscarding(restoredIDs)
+        let listedPaths = Set(snapshots.map(\.fileURL.standardizedFileURL.path))
+        if !committedPaths.isSubset(of: listedPaths) {
+            rescanAfterOwnEdit()
+        }
     }
 
     /// Restores `snapshots` to what `HEAD` holds, dropping staged and unstaged changes alike.

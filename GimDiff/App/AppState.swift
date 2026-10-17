@@ -90,6 +90,9 @@ final class AppState {
     var isConfirmingAcceptAllTestRunFailures = false
     /// Whether the window is asking before every changed snapshot of the project is restored.
     var isConfirmingDiscardAllGitChanges = false
+    /// What that question is about: how many snapshots come back and how many go to the
+    /// Trash. Set when the question is raised, cleared when it is answered.
+    var headRestorePlan: HEADRestorePlan?
 
     // MARK: - Test run
 
@@ -892,6 +895,16 @@ final class AppState {
             }
         }
         currentProject?.suites = suites
+    }
+
+    /// Takes snapshots GimDiff moved to the Trash out of the tree, without a rescan.
+    func removeSnapshots(_ snapshotIDs: Set<String>) {
+        guard !snapshotIDs.isEmpty, var suites = currentProject?.suites else { return }
+        for index in suites.indices {
+            suites[index].snapshots.removeAll { snapshotIDs.contains($0.id) }
+        }
+        currentProject?.suites = suites
+        projectEdits += 1
     }
 
     /// Reads a comparison out of whatever is on the pasteboard.
