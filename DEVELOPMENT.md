@@ -42,6 +42,18 @@ developer sets their own `DEVELOPMENT_TEAM` (start from `Config/Local.xcconfig.t
 Never set `DEVELOPMENT_TEAM` in `project.pbxproj`: a target-level value overrides the
 xcconfig and puts one person's team in everyone's build.
 
+### Releasing
+
+`Scripts/release.sh <name>` archives the app, signs it with Developer ID
+(`Scripts/ExportOptions.plist`), notarizes it, staples the ticket, and leaves
+`build/release/GimDiff-<name>.zip` to attach to the GitHub release of tag `v<name>`. It needs
+a Developer ID Application certificate, the team in `Config/Local.xcconfig`, and notary
+credentials saved once with `xcrun notarytool store-credentials gimdiff-notary`. The script
+checks the last two before it builds anything.
+
+Zip with `ditto -c -k --keepParent`, never the Finder: a Finder archive adds `__MACOSX`
+folders of extended attributes to the download.
+
 ### If a test run leaves the app wedged
 
 A cancelled test run can orphan `debugserver` with the host app stopped under it (`ps`
