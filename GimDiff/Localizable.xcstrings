@@ -1168,7 +1168,7 @@
     "The gimdiff command" : {
 
     },
-    "The images are different sizes, so no pixel lines up with another." : {
+    "The images are different sizes, so they are laid over each other from the top-left corner. Pixels only one of them has are marked as changed." : {
 
     },
     "The largest difference is ΔE %@. A tolerance at least that loose would call these images a match." : {
@@ -1302,6 +1302,12 @@
 
     },
     "⚠️ Size Mismatch" : {
+
+    },
+    "⚠️ Size Mismatch · %@ of Overlap Differs" : {
+
+    },
+    "⚠️ Size Mismatch · Overlap Matches" : {
 
     }
   },

@@ -109,21 +109,23 @@ enum DiffCommand {
         console.write("Candidate", dimensions(report.candidateSize))
         console.write("Baseline", dimensions(report.baselineSize))
 
-        if report.hasIdenticalDimensions {
+        console.write(
+            "Pixels",
+            "\(report.differentPixelCount) of \(report.totalPixelCount) differ"
+        )
+        if let overlap = report.overlap {
+            // Sizes that differ are laid over each other from the top-left corner; what
+            // only one image covers is counted above, and the shared area is told apart.
             console.write(
-                "Pixels",
-                "\(report.differentPixelCount) of \(report.totalPixelCount) differ"
+                "Overlap",
+                "\(overlap.differentPixelCount) of \(overlap.pixelCount) differ (\(percentage(overlap.diffPercentage)), top-left aligned)"
             )
-        } else {
-            console.write("Pixels", "not comparable — the two images are different sizes")
         }
 
         if report.toleratedPixelCount > 0 {
             console.write("Tolerated", "\(report.toleratedPixelCount) within tolerance")
         }
-        if report.hasIdenticalDimensions {
-            console.write("Largest ΔE", String(format: "%.2f", report.maximumDeltaE))
-        }
+        console.write("Largest ΔE", String(format: "%.2f", report.maximumDeltaE))
 
         console.write("Difference", percentage(report.diffPercentage))
         if let maskURL {
@@ -153,6 +155,10 @@ enum DiffCommand {
         var diffPercentage: Double
         var toleratedPixelCount: Int
         var maximumDeltaE: Double
+        /// Present only when the sizes differ: the area both images cover.
+        var overlapPixelCount: Int?
+        var overlapDifferentPixelCount: Int?
+        var overlapDiffPercentage: Double?
         var maskPath: String?
 
         init(_ report: ImageDiffReport, maskURL: URL?) {
@@ -167,6 +173,9 @@ enum DiffCommand {
             diffPercentage = report.diffPercentage
             toleratedPixelCount = report.toleratedPixelCount
             maximumDeltaE = report.maximumDeltaE
+            overlapPixelCount = report.overlap?.pixelCount
+            overlapDifferentPixelCount = report.overlap?.differentPixelCount
+            overlapDiffPercentage = report.overlap?.diffPercentage
             maskPath = maskURL?.path
         }
     }

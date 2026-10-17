@@ -237,7 +237,9 @@ enum TestRunCommand {
     private static func difference(of report: ImageDiffReport?) -> String {
         guard let report else { return "not measured — the images could not be read" }
         guard report.hasIdenticalDimensions else {
-            return "sizes differ: \(DiffCommand.dimensions(report.candidateSize)) against \(DiffCommand.dimensions(report.baselineSize))"
+            let sizes = "sizes differ: \(DiffCommand.dimensions(report.candidateSize)) against \(DiffCommand.dimensions(report.baselineSize))"
+            guard let overlap = report.overlap else { return sizes }
+            return "\(sizes); \(DiffCommand.percentage(overlap.diffPercentage)) of the overlap differs"
         }
         return "\(DiffCommand.percentage(report.diffPercentage)) (\(report.differentPixelCount) pixels)"
     }
@@ -287,6 +289,8 @@ enum TestRunCommand {
             var differentPixelCount: Int?
             var diffPercentage: Double?
             var maximumDeltaE: Double?
+            /// Present only when the sizes differ: how the area both images cover compares.
+            var overlapDiffPercentage: Double?
 
             init(_ row: Row) {
                 kind = row.entry.kind.rawValue
@@ -301,6 +305,7 @@ enum TestRunCommand {
                 differentPixelCount = row.diff?.differentPixelCount
                 diffPercentage = row.diff?.diffPercentage
                 maximumDeltaE = row.diff?.maximumDeltaE
+                overlapDiffPercentage = row.diff?.overlap?.diffPercentage
             }
         }
     }

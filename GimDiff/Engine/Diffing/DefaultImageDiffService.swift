@@ -51,83 +51,51 @@ struct DefaultImageDiffService: ImageDiffService {
         let candidateSize = CGSize(width: candidate.width, height: candidate.height)
         let baselineSize = CGSize(width: baseline.width, height: baseline.height)
 
+        let candidateContext = try Self.bitmapContext(rendering: candidate, at: candidateURL)
+        let baselineContext = try Self.bitmapContext(rendering: baseline, at: baselineURL)
+        guard let candidatePixels = candidateContext.data?.assumingMemoryBound(to: UInt8.self),
+              let baselinePixels = baselineContext.data?.assumingMemoryBound(to: UInt8.self)
+        else { throw GimDiffError.imageProcessingFailed(candidateURL) }
+
+        let highlight = Self.components(of: diffColor)
+        var tally = Tally()
+
         guard candidate.width == baseline.width, candidate.height == baseline.height else {
-            // Differently sized images share no pixel grid, so there is nothing to count and
-            // no mask to draw: the whole comparison is the mismatch.
-            let pixels = candidate.width * candidate.height
-            return ImageDiffReport(
-                candidateSize: candidateSize,
-                baselineSize: baselineSize,
-                hasIdenticalDimensions: false,
-                differentPixelCount: pixels,
-                totalPixelCount: pixels,
-                diffPercentage: 100.0
+            return try compareMismatched(
+                candidate: (candidatePixels, candidate.width, candidate.height),
+                baseline: (baselinePixels, baseline.width, baseline.height),
+                highlight: highlight,
+                tolerance: tolerance,
+                candidateURL: candidateURL
             )
         }
 
         let width = candidate.width
         let height = candidate.height
         let byteCount = width * height * Self.bytesPerPixel
-
-        let candidateContext = try Self.bitmapContext(rendering: candidate, at: candidateURL)
-        let baselineContext = try Self.bitmapContext(rendering: baseline, at: baselineURL)
         guard let maskContext = Self.bitmapContext(width: width, height: height),
-              let candidatePixels = candidateContext.data?.assumingMemoryBound(to: UInt8.self),
-              let baselinePixels = baselineContext.data?.assumingMemoryBound(to: UInt8.self),
               let maskPixels = maskContext.data?.assumingMemoryBound(to: UInt8.self)
         else { throw GimDiffError.imageProcessingFailed(candidateURL) }
-
-        let highlight = Self.components(of: diffColor)
-        var differentPixelCount = 0
-        var toleratedPixelCount = 0
-        var maximumDeltaE = 0.0
 
         // Checked every so many rows: stepping through snapshots supersedes a comparison
         // long before a large one is done, and nothing would want the rest of its answer.
         let pixelsBetweenChecks = width * Self.rowsBetweenCancellationChecks
         var pixelsUntilCheck = 0
+        // One flat run, since the two buffers share a layout byte for byte.
         for offset in stride(from: 0, to: byteCount, by: Self.bytesPerPixel) {
             if pixelsUntilCheck == 0 {
                 try Task.checkCancellation()
                 pixelsUntilCheck = pixelsBetweenChecks
             }
             pixelsUntilCheck -= 1
-            var differs = candidatePixels[offset] != baselinePixels[offset]
-                || candidatePixels[offset + 1] != baselinePixels[offset + 1]
-                || candidatePixels[offset + 2] != baselinePixels[offset + 2]
-                || candidatePixels[offset + 3] != baselinePixels[offset + 3]
-
-            // The distance is measured only where the bytes moved, which in a snapshot is
-            // almost nowhere, so the colour maths costs nothing on a matching image.
-            if differs {
-                let distance = Self.perceptualDistance(
-                    Self.pixel(candidatePixels, at: offset),
-                    Self.pixel(baselinePixels, at: offset)
-                )
-                maximumDeltaE = max(maximumDeltaE, distance)
-                if !tolerance.isExact, distance <= tolerance.maximumDeltaE {
-                    differs = false
-                    toleratedPixelCount += 1
-                }
-            }
-
-            if differs {
-                differentPixelCount += 1
-                maskPixels[offset] = highlight.red
-                maskPixels[offset + 1] = highlight.green
-                maskPixels[offset + 2] = highlight.blue
-                maskPixels[offset + 3] = highlight.alpha
-            } else {
-                let grey = Self.dimmedGrey(
-                    red: candidatePixels[offset],
-                    green: candidatePixels[offset + 1],
-                    blue: candidatePixels[offset + 2]
-                )
-                maskPixels[offset] = grey
-                maskPixels[offset + 1] = grey
-                maskPixels[offset + 2] = grey
-                maskPixels[offset + 3] = UInt8.max
-            }
+            Self.measure(
+                candidatePixels, at: offset,
+                against: baselinePixels, at: offset,
+                into: maskPixels, at: offset,
+                highlight: highlight,
+                tolerance: tolerance,
+                tally: &tally
+            )
         }
 
         let totalPixelCount = width * height
@@ -135,13 +103,154 @@ struct DefaultImageDiffService: ImageDiffService {
             candidateSize: candidateSize,
             baselineSize: baselineSize,
             hasIdenticalDimensions: true,
-            differentPixelCount: differentPixelCount,
+            differentPixelCount: tally.differentPixelCount,
             totalPixelCount: totalPixelCount,
-            diffPercentage: Self.percentage(of: differentPixelCount, in: totalPixelCount),
+            diffPercentage: Self.percentage(of: tally.differentPixelCount, in: totalPixelCount),
             diffMaskURL: try writeMask(from: maskContext, for: candidateURL),
-            toleratedPixelCount: toleratedPixelCount,
-            maximumDeltaE: maximumDeltaE
+            toleratedPixelCount: tally.toleratedPixelCount,
+            maximumDeltaE: tally.maximumDeltaE
         )
+    }
+
+    // MARK: - Mismatched sizes
+
+    /// One image's decoded pixels and the grid they cover.
+    private typealias Grid = (pixels: UnsafeMutablePointer<UInt8>, width: Int, height: Int)
+
+    /// Compares two images of different sizes, laid over each other from the top-left
+    /// corner at one pixel to one pixel.
+    ///
+    /// The top-left corner because that is where a screen grows from: a row added below,
+    /// a column to the right. Scaling either image would line up no pixel at all. The
+    /// overlap is compared as two same-sized images are; a pixel only one image covers is
+    /// a change, because something is there that the other lacks; the corner neither covers,
+    /// when one is wider and the other taller, is left transparent and counted in nothing.
+    private func compareMismatched(
+        candidate: Grid,
+        baseline: Grid,
+        highlight: (red: UInt8, green: UInt8, blue: UInt8, alpha: UInt8),
+        tolerance: DiffTolerance,
+        candidateURL: URL
+    ) throws -> ImageDiffReport {
+        let width = max(candidate.width, baseline.width)
+        let height = max(candidate.height, baseline.height)
+        guard let maskContext = Self.bitmapContext(width: width, height: height),
+              let maskPixels = maskContext.data?.assumingMemoryBound(to: UInt8.self)
+        else { throw GimDiffError.imageProcessingFailed(candidateURL) }
+
+        var overlap = Tally()
+        var unmatchedPixelCount = 0
+        var coveredPixelCount = 0
+
+        for y in 0..<height {
+            if y % Self.rowsBetweenCancellationChecks == 0 { try Task.checkCancellation() }
+            for x in 0..<width {
+                let maskOffset = (y * width + x) * Self.bytesPerPixel
+                let inCandidate = x < candidate.width && y < candidate.height
+                let inBaseline = x < baseline.width && y < baseline.height
+
+                switch (inCandidate, inBaseline) {
+                case (true, true):
+                    coveredPixelCount += 1
+                    Self.measure(
+                        candidate.pixels, at: (y * candidate.width + x) * Self.bytesPerPixel,
+                        against: baseline.pixels, at: (y * baseline.width + x) * Self.bytesPerPixel,
+                        into: maskPixels, at: maskOffset,
+                        highlight: highlight,
+                        tolerance: tolerance,
+                        tally: &overlap
+                    )
+                case (true, false), (false, true):
+                    coveredPixelCount += 1
+                    unmatchedPixelCount += 1
+                    Self.paint(maskPixels, at: maskOffset, with: highlight)
+                case (false, false):
+                    break
+                }
+            }
+        }
+
+        let overlapPixelCount = min(candidate.width, baseline.width) * min(candidate.height, baseline.height)
+        let differentPixelCount = overlap.differentPixelCount + unmatchedPixelCount
+        return ImageDiffReport(
+            candidateSize: CGSize(width: candidate.width, height: candidate.height),
+            baselineSize: CGSize(width: baseline.width, height: baseline.height),
+            hasIdenticalDimensions: false,
+            differentPixelCount: differentPixelCount,
+            totalPixelCount: coveredPixelCount,
+            diffPercentage: Self.percentage(of: differentPixelCount, in: coveredPixelCount),
+            diffMaskURL: try writeMask(from: maskContext, for: candidateURL),
+            toleratedPixelCount: overlap.toleratedPixelCount,
+            maximumDeltaE: overlap.maximumDeltaE,
+            overlap: ImageDiffReport.Overlap(
+                pixelCount: overlapPixelCount,
+                differentPixelCount: overlap.differentPixelCount,
+                diffPercentage: Self.percentage(of: overlap.differentPixelCount, in: overlapPixelCount)
+            )
+        )
+    }
+
+    // MARK: - One pixel
+
+    /// What the pixels measured so far add up to.
+    private struct Tally {
+        var differentPixelCount = 0
+        var toleratedPixelCount = 0
+        var maximumDeltaE = 0.0
+    }
+
+    /// Compares one pixel of each image and paints the mask's pixel for the result.
+    @inline(__always)
+    private static func measure(
+        _ candidate: UnsafeMutablePointer<UInt8>, at candidateOffset: Int,
+        against baseline: UnsafeMutablePointer<UInt8>, at baselineOffset: Int,
+        into mask: UnsafeMutablePointer<UInt8>, at maskOffset: Int,
+        highlight: (red: UInt8, green: UInt8, blue: UInt8, alpha: UInt8),
+        tolerance: DiffTolerance,
+        tally: inout Tally
+    ) {
+        var differs = candidate[candidateOffset] != baseline[baselineOffset]
+            || candidate[candidateOffset + 1] != baseline[baselineOffset + 1]
+            || candidate[candidateOffset + 2] != baseline[baselineOffset + 2]
+            || candidate[candidateOffset + 3] != baseline[baselineOffset + 3]
+
+        // The distance is measured only where the bytes moved, which in a snapshot is
+        // almost nowhere, so the colour maths costs nothing on a matching image.
+        if differs {
+            let distance = perceptualDistance(pixel(candidate, at: candidateOffset), pixel(baseline, at: baselineOffset))
+            tally.maximumDeltaE = max(tally.maximumDeltaE, distance)
+            if !tolerance.isExact, distance <= tolerance.maximumDeltaE {
+                differs = false
+                tally.toleratedPixelCount += 1
+            }
+        }
+
+        if differs {
+            tally.differentPixelCount += 1
+            paint(mask, at: maskOffset, with: highlight)
+        } else {
+            let grey = dimmedGrey(
+                red: candidate[candidateOffset],
+                green: candidate[candidateOffset + 1],
+                blue: candidate[candidateOffset + 2]
+            )
+            mask[maskOffset] = grey
+            mask[maskOffset + 1] = grey
+            mask[maskOffset + 2] = grey
+            mask[maskOffset + 3] = UInt8.max
+        }
+    }
+
+    @inline(__always)
+    private static func paint(
+        _ mask: UnsafeMutablePointer<UInt8>,
+        at offset: Int,
+        with highlight: (red: UInt8, green: UInt8, blue: UInt8, alpha: UInt8)
+    ) {
+        mask[offset] = highlight.red
+        mask[offset + 1] = highlight.green
+        mask[offset + 2] = highlight.blue
+        mask[offset + 3] = highlight.alpha
     }
 
     /// Share of a grid that differs, guarding the empty image rather than dividing by zero.

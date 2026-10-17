@@ -238,7 +238,7 @@ struct ImageDiffServiceTests {
 
     // MARK: - Mismatched dimensions
 
-    @Test("Differently sized images are flagged rather than compared")
+    @Test("Differently sized images are flagged, measured, and given a mask as large as both")
     func flagsMismatchedDimensions() async throws {
         let report = try await makeService().compare(
             candidateURL: ImageFixtures.mismatchedDimensions,
@@ -247,11 +247,18 @@ struct ImageDiffServiceTests {
         defer { discard(report) }
 
         #expect(!report.hasIdenticalDimensions)
-        #expect(report.diffPercentage == 100.0)
+        #expect(!report.isIdentical)
         #expect(report.candidateSize == CGSize(width: 100, height: 150))
         #expect(report.baselineSize == CGSize(width: 100, height: 100))
-        #expect(report.diffMaskURL == nil)
-        #expect(!report.isIdentical)
+        // Every pixel either image has, the 50 rows only the candidate has among them.
+        #expect(report.totalPixelCount == 15_000)
+        #expect(report.differentPixelCount >= 5_000)
+        #expect(report.overlap?.pixelCount == 10_000)
+
+        let maskURL = try #require(report.diffMaskURL)
+        let metadata = try MetadataReader().metadata(for: maskURL)
+        #expect(metadata.pixelWidth == 100)
+        #expect(metadata.pixelHeight == 150)
     }
 
     @Test("A mismatch is flagged whichever side is the larger")
@@ -263,7 +270,53 @@ struct ImageDiffServiceTests {
         defer { discard(report) }
 
         #expect(!report.hasIdenticalDimensions)
-        #expect(report.diffPercentage == 100.0)
+        #expect(report.totalPixelCount == 15_000)
+        #expect(report.overlap?.pixelCount == 10_000)
+    }
+
+    @Test("A screen that grew rows at the bottom matches above them and is marked below")
+    func alignsMismatchedSizesTopLeft() async throws {
+        let taller = try writeLargeImage(width: 100, height: 120, grey: 0.5)
+        let shorter = try writeLargeImage(width: 100, height: 100, grey: 0.5)
+        defer {
+            try? FileManager.default.removeItem(at: taller)
+            try? FileManager.default.removeItem(at: shorter)
+        }
+
+        let report = try await makeService().compare(candidateURL: taller, baselineURL: shorter)
+        defer { discard(report) }
+
+        #expect(report.overlap == ImageDiffReport.Overlap(pixelCount: 10_000, differentPixelCount: 0, diffPercentage: 0))
+        #expect(report.differentPixelCount == 2_000)
+        #expect(report.totalPixelCount == 12_000)
+        #expect(!report.isIdentical)
+
+        let maskURL = try #require(report.diffMaskURL)
+        // The 20 rows only the taller image has are the change, at the bottom of the mask.
+        #expect(try ImageFixtures.pixel(atX: 50, y: 110, in: maskURL) == [255, 0, 127, 255])
+        let shared = try ImageFixtures.pixel(atX: 50, y: 50, in: maskURL)
+        #expect(shared[0] == shared[1] && shared[1] == shared[2])
+        #expect(shared[3] == 255)
+    }
+
+    @Test("When one image is wider and the other taller, the corner neither covers counts for nothing")
+    func leavesTheUncoveredCornerOut() async throws {
+        let wide = try writeLargeImage(width: 100, height: 50, grey: 0.5)
+        let tall = try writeLargeImage(width: 50, height: 100, grey: 0.5)
+        defer {
+            try? FileManager.default.removeItem(at: wide)
+            try? FileManager.default.removeItem(at: tall)
+        }
+
+        let report = try await makeService().compare(candidateURL: wide, baselineURL: tall)
+        defer { discard(report) }
+
+        #expect(report.overlap?.pixelCount == 2_500)
+        #expect(report.overlap?.differentPixelCount == 0)
+        #expect(report.totalPixelCount == 7_500)
+        #expect(report.differentPixelCount == 5_000)
+        let maskURL = try #require(report.diffMaskURL)
+        #expect(try ImageFixtures.pixel(atX: 90, y: 90, in: maskURL)[3] == 0)
     }
 
     // MARK: - Failures

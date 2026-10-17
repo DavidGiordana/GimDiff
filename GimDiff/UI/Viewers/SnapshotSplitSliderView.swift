@@ -35,7 +35,8 @@ struct SnapshotSplitSliderView: View {
     var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
-            let span = imageSpan(in: proxy.size)
+            let layout = layout
+            let span = layout.rect(layout.imageBounds, fittedIn: proxy.size)
             let splitPosition = CGFloat(state.canvas.splitPosition)
             let splitX = span.minX + span.width * splitPosition
 
@@ -43,12 +44,12 @@ struct SnapshotSplitSliderView: View {
                 // The trailing image is laid down whole and then masked from the right, so
                 // both halves are the same fit into the same box: a curtain that moved the
                 // image even a point as it opened would invent differences of its own.
-                curtainImage(trailingImage, in: proxy.size)
+                curtainImage(trailingImage, at: layout.rect(layout.rightRect, fittedIn: proxy.size), in: proxy.size)
                     .mask(alignment: .trailing) {
                         Rectangle().frame(width: max(0, width - splitX))
                     }
 
-                curtainImage(leadingImage, in: proxy.size)
+                curtainImage(leadingImage, at: layout.rect(layout.leftRect, fittedIn: proxy.size), in: proxy.size)
                     .mask(alignment: .leading) {
                         Rectangle().frame(width: max(0, splitX))
                     }
@@ -94,42 +95,32 @@ struct SnapshotSplitSliderView: View {
 
     // MARK: - Pieces
 
-    /// Where the two images are drawn inside `size`, together: the span the split position
-    /// is a fraction of, as ``ComparisonImageRenderer`` measures it for a copy.
-    private func imageSpan(in size: CGSize) -> CGRect {
-        let sizes = [leadingImage, trailingImage].compactMap { image -> CGSize? in
+    /// How the two images sit over each other, as ``ComparisonImageRenderer`` lays them out
+    /// for a copy, so the split falls where the copy cuts it.
+    ///
+    /// One image alone, while the other is still loading, is laid out on its own.
+    private var layout: ComparisonImageRenderer.Layout {
+        let sizes = [leadingImage, trailingImage].map { image -> CGSize? in
             guard case let .loaded(decoded) = image else { return nil }
             return decoded.pixelSize
         }
-        guard let first = sizes.first else { return CGRect(origin: .zero, size: size) }
-        let layout = ComparisonImageRenderer.layout(left: first, right: sizes.last ?? first)
-        let bounds = layout.imageBounds
-        guard layout.canvasSize.width > 0, layout.canvasSize.height > 0 else {
-            return CGRect(origin: .zero, size: size)
-        }
-        // The layout is in the images' pixels; the view fits that whole frame, aspect kept.
-        let ratio = min(size.width / layout.canvasSize.width, size.height / layout.canvasSize.height)
-        let origin = CGPoint(
-            x: (size.width - layout.canvasSize.width * ratio) / 2,
-            y: (size.height - layout.canvasSize.height * ratio) / 2
-        )
-        return CGRect(
-            x: origin.x + bounds.minX * ratio,
-            y: origin.y + bounds.minY * ratio,
-            width: bounds.width * ratio,
-            height: bounds.height * ratio
-        )
+        let left = sizes[0] ?? sizes[1] ?? .zero
+        let right = sizes[1] ?? sizes[0] ?? .zero
+        return ComparisonImageRenderer.layout(left: left, right: right)
     }
 
+    /// One image at `rect`, inside a frame the whole size of the view so the curtain's mask,
+    /// which is measured against the view, cuts both images at the same place.
     @ViewBuilder
-    private func curtainImage(_ image: CanvasImage?, in size: CGSize) -> some View {
+    private func curtainImage(_ image: CanvasImage?, at rect: CGRect, in size: CGSize) -> some View {
         switch image {
         case let .loaded(decoded):
             Image(decorative: decoded.cgImage, scale: displayScale, orientation: .up)
                 .resizable()
-                .scaledToFit()
                 .background(matte ?? .clear)
-                .frame(width: size.width, height: size.height)
+                .frame(width: rect.width, height: rect.height)
+                .offset(x: rect.minX, y: rect.minY)
+                .frame(width: size.width, height: size.height, alignment: .topLeading)
         case .unavailable, nil:
             Color.clear
                 .frame(width: size.width, height: size.height)

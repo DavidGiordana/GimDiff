@@ -33,7 +33,7 @@ struct ComparisonImageRendererTests {
         #expect(layout.rightRect == layout.leftRect)
     }
 
-    @Test("A smaller image is fitted and centred in the larger one's frame")
+    @Test("A smaller image sits unscaled in the top-left corner of the larger one's frame")
     func mixedSizeLayout() {
         let layout = ComparisonImageRenderer.layout(
             left: CGSize(width: 100, height: 200),
@@ -41,8 +41,32 @@ struct ComparisonImageRendererTests {
         )
 
         #expect(layout.canvasSize == CGSize(width: 100, height: 200))
-        #expect(layout.rightRect == CGRect(x: 0, y: 50, width: 100, height: 100))
+        #expect(layout.rightRect == CGRect(x: 0, y: 0, width: 50, height: 50))
         #expect(layout.imageBounds == CGRect(x: 0, y: 0, width: 100, height: 200))
+    }
+
+    @Test("A wider image and a taller one share a frame as large as both")
+    func crossedSizeLayout() {
+        let layout = ComparisonImageRenderer.layout(
+            left: CGSize(width: 100, height: 50),
+            right: CGSize(width: 50, height: 100)
+        )
+
+        #expect(layout.canvasSize == CGSize(width: 100, height: 100))
+        #expect(layout.leftRect == CGRect(x: 0, y: 0, width: 100, height: 50))
+        #expect(layout.rightRect == CGRect(x: 0, y: 0, width: 50, height: 100))
+    }
+
+    @Test("A part of the canvas lands where the fitted canvas puts it")
+    func fitsARectIntoTheView() {
+        let layout = ComparisonImageRenderer.layout(
+            left: CGSize(width: 100, height: 200),
+            right: CGSize(width: 100, height: 100)
+        )
+
+        // The canvas fits a 400 × 400 view at 2×, centred across.
+        #expect(layout.rect(layout.leftRect, fittedIn: CGSize(width: 400, height: 400)) == CGRect(x: 100, y: 0, width: 200, height: 400))
+        #expect(layout.rect(layout.rightRect, fittedIn: CGSize(width: 400, height: 400)) == CGRect(x: 100, y: 0, width: 200, height: 200))
     }
 
     @Test("The split is a fraction of the images' width, kept inside it")
@@ -113,6 +137,23 @@ struct ComparisonImageRendererTests {
         let blended = try centre(at: 0.5)
         #expect((120...135).contains(blended[0]))
         #expect((120...135).contains(blended[2]))
+    }
+
+    @Test("A shorter image is drawn from the top, over the top of the taller one")
+    func onionSkinAlignsMismatchedSizesTopLeft() throws {
+        let image = try #require(ComparisonImageRenderer.onionSkin(
+            under: try solid(red, width: 200, height: 100),
+            over: try solid(blue, width: 200, height: 50),
+            rightOpacity: 1,
+            backdrop: nil,
+            matte: nil,
+            caption: caption
+        ))
+        let pixels = try Pixels(image)
+
+        #expect(image.width == 200)
+        #expect(pixels.rgb(x: 100, y: 20) == blue)
+        #expect(pixels.rgb(x: 100, y: 80) == red)
     }
 
     @Test("The caption strip sits under the images, dark, and the picture encodes as PNG")

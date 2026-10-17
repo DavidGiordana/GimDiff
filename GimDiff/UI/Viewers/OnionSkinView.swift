@@ -32,9 +32,10 @@ struct OnionSkinView: View {
             // over the same pixel of the other: any offset between them would invent a
             // difference of its own.
             GeometryReader { proxy in
-                ZStack {
-                    layer(baselineImage, matte: matte, in: proxy.size)
-                    layer(candidateImage, matte: nil, in: proxy.size)
+                let layout = layout
+                ZStack(alignment: .topLeading) {
+                    layer(baselineImage, matte: matte, at: layout.rect(layout.leftRect, fittedIn: proxy.size), in: proxy.size)
+                    layer(candidateImage, matte: nil, at: layout.rect(layout.rightRect, fittedIn: proxy.size), in: proxy.size)
                         .opacity(state.canvas.onionOpacity)
                 }
             }
@@ -51,15 +52,30 @@ struct OnionSkinView: View {
 
     // MARK: - Pieces
 
+    /// How the two images sit over each other: at one pixel to one pixel from the top-left
+    /// corner, as the diff mask measures them, so whatever the fade reveals is a real change.
+    ///
+    /// One image alone, while the other is still loading, is laid out on its own.
+    private var layout: ComparisonImageRenderer.Layout {
+        let sizes = [baselineImage, candidateImage].map { image -> CGSize? in
+            guard case let .loaded(decoded) = image else { return nil }
+            return decoded.pixelSize
+        }
+        let below = sizes[0] ?? sizes[1] ?? .zero
+        let above = sizes[1] ?? sizes[0] ?? .zero
+        return ComparisonImageRenderer.layout(left: below, right: above)
+    }
+
     @ViewBuilder
-    private func layer(_ image: CanvasImage?, matte: Color?, in size: CGSize) -> some View {
+    private func layer(_ image: CanvasImage?, matte: Color?, at rect: CGRect, in size: CGSize) -> some View {
         switch image {
         case let .loaded(decoded):
             Image(decorative: decoded.cgImage, scale: displayScale, orientation: .up)
                 .resizable()
-                .scaledToFit()
                 .background(matte ?? .clear)
-                .frame(width: size.width, height: size.height)
+                .frame(width: rect.width, height: rect.height)
+                .offset(x: rect.minX, y: rect.minY)
+                .frame(width: size.width, height: size.height, alignment: .topLeading)
         case .unavailable, nil:
             Color.clear
                 .frame(width: size.width, height: size.height)

@@ -30,9 +30,13 @@ struct ComparisonCaption: Sendable, Equatable {
 /// depend on how large the window is or how far it is zoomed, and the same code is what a
 /// test checks.
 enum ComparisonImageRenderer {
-    /// The images are laid out the way the canvas lays them out: each fitted, centred, into
-    /// a frame as large as the larger of the two, so a pixel of one sits over the same pixel
-    /// of the other when they are the same size.
+    /// The images are laid out the way every comparison mode lays them out: at one pixel to
+    /// one pixel, from the top-left corner of a frame as large as the two together.
+    ///
+    /// Unscaled, so a pixel of one sits over the same pixel of the other whatever their
+    /// sizes, which is the alignment the diff mask measures with. Scaling the smaller image
+    /// up to fit would shift every row of it, and an overlay would then show a change
+    /// everywhere. Rects are measured from the top, as SwiftUI measures them.
     struct Layout: Equatable {
         var canvasSize: CGSize
         var leftRect: CGRect
@@ -40,14 +44,30 @@ enum ComparisonImageRenderer {
 
         /// Where both images are, together: the span a split position is a fraction of.
         var imageBounds: CGRect { leftRect.union(rightRect) }
+
+        /// `rect`, a part of the canvas, where it lands once the canvas is fitted into
+        /// `size` with its aspect kept and centred.
+        func rect(_ rect: CGRect, fittedIn size: CGSize) -> CGRect {
+            guard canvasSize.width > 0, canvasSize.height > 0 else { return .zero }
+            let ratio = min(size.width / canvasSize.width, size.height / canvasSize.height)
+            let origin = CGPoint(
+                x: (size.width - canvasSize.width * ratio) / 2,
+                y: (size.height - canvasSize.height * ratio) / 2
+            )
+            return CGRect(
+                x: origin.x + rect.minX * ratio,
+                y: origin.y + rect.minY * ratio,
+                width: rect.width * ratio,
+                height: rect.height * ratio
+            )
+        }
     }
 
     static func layout(left: CGSize, right: CGSize) -> Layout {
-        let canvas = CGSize(width: max(left.width, right.width), height: max(left.height, right.height))
-        return Layout(
-            canvasSize: canvas,
-            leftRect: fitted(left, in: canvas),
-            rightRect: fitted(right, in: canvas)
+        Layout(
+            canvasSize: CGSize(width: max(left.width, right.width), height: max(left.height, right.height)),
+            leftRect: CGRect(origin: .zero, size: left),
+            rightRect: CGRect(origin: .zero, size: right)
         )
     }
 
@@ -75,12 +95,12 @@ enum ComparisonImageRenderer {
         return render(layout: layout, backdrop: backdrop, caption: caption) { context, size in
             context.saveGState()
             context.clip(to: CGRect(x: divider, y: 0, width: size.width - divider, height: size.height))
-            draw(right, in: layout.rightRect, matte: matte, alpha: 1, context: context)
+            draw(right, in: flipped(layout.rightRect, in: size), matte: matte, alpha: 1, context: context)
             context.restoreGState()
 
             context.saveGState()
             context.clip(to: CGRect(x: 0, y: 0, width: divider, height: size.height))
-            draw(left, in: layout.leftRect, matte: matte, alpha: 1, context: context)
+            draw(left, in: flipped(layout.leftRect, in: size), matte: matte, alpha: 1, context: context)
             context.restoreGState()
 
             // White with a dark edge, so it reads over a light image and a dark one alike.
@@ -102,11 +122,17 @@ enum ComparisonImageRenderer {
         caption: ComparisonCaption
     ) -> CGImage? {
         let layout = layout(left: size(of: left), right: size(of: right))
-        return render(layout: layout, backdrop: backdrop, caption: caption) { context, _ in
+        return render(layout: layout, backdrop: backdrop, caption: caption) { context, size in
             // The matte goes behind the lower image only, as on the canvas: behind the upper
             // one too, it would hide the lower image wherever the upper is transparent.
-            draw(left, in: layout.leftRect, matte: matte, alpha: 1, context: context)
-            draw(right, in: layout.rightRect, matte: nil, alpha: CGFloat(min(max(rightOpacity, 0), 1)), context: context)
+            draw(left, in: flipped(layout.leftRect, in: size), matte: matte, alpha: 1, context: context)
+            draw(
+                right,
+                in: flipped(layout.rightRect, in: size),
+                matte: nil,
+                alpha: CGFloat(min(max(rightOpacity, 0), 1)),
+                context: context
+            )
         }
     }
 
@@ -237,16 +263,9 @@ enum ComparisonImageRenderer {
         CGSize(width: image.width, height: image.height)
     }
 
-    /// `size` scaled to fit inside `canvas`, aspect kept, centred.
-    private static func fitted(_ size: CGSize, in canvas: CGSize) -> CGRect {
-        guard size.width > 0, size.height > 0 else { return .zero }
-        let ratio = min(canvas.width / size.width, canvas.height / size.height)
-        let fitted = CGSize(width: size.width * ratio, height: size.height * ratio)
-        return CGRect(
-            x: (canvas.width - fitted.width) / 2,
-            y: (canvas.height - fitted.height) / 2,
-            width: fitted.width,
-            height: fitted.height
-        )
+    /// A layout rect, measured from the top, in Core Graphics' coordinates, which count up
+    /// from the bottom of the `canvas`.
+    private static func flipped(_ rect: CGRect, in canvas: CGSize) -> CGRect {
+        CGRect(x: rect.minX, y: canvas.height - rect.maxY, width: rect.width, height: rect.height)
     }
 }

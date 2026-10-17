@@ -11,14 +11,26 @@ import Foundation
 
 /// What a pixel comparison of two snapshots found.
 struct ImageDiffReport: Sendable, Equatable {
+    /// How the area two differently sized images both cover compares, laid over each other
+    /// from the top-left corner.
+    struct Overlap: Sendable, Equatable {
+        var pixelCount: Int
+        var differentPixelCount: Int
+        /// Share of the overlap that differs, as a percentage, like ``diffPercentage``.
+        var diffPercentage: Double
+
+        var isIdentical: Bool { differentPixelCount == 0 }
+    }
+
     /// Size of the image under examination, in pixels.
     var candidateSize: CGSize
     /// Size of the image it was measured against, in pixels.
     var baselineSize: CGSize
     /// Whether the two images cover the same pixel grid.
     ///
-    /// When this is `false` the pixel counts below were never compared: differently sized
-    /// images have no pixel-to-pixel correspondence to report on.
+    /// When this is `false` the images are laid over each other from the top-left corner:
+    /// the counts below cover every pixel either image has, a pixel only one of them has
+    /// counting as different, and ``overlap`` says how the shared area compares.
     var hasIdenticalDimensions: Bool
     var differentPixelCount: Int
     var totalPixelCount: Int
@@ -36,6 +48,8 @@ struct ImageDiffReport: Sendable, Equatable {
     /// Measured whatever the tolerance, so it answers the question a tolerance raises: how
     /// loose would the comparison have to be for these two images to match.
     var maximumDeltaE: Double
+    /// The area both images cover, when their sizes differ; `nil` when they are the same.
+    var overlap: Overlap?
 
     init(
         candidateSize: CGSize,
@@ -46,7 +60,8 @@ struct ImageDiffReport: Sendable, Equatable {
         diffPercentage: Double,
         diffMaskURL: URL? = nil,
         toleratedPixelCount: Int = 0,
-        maximumDeltaE: Double = 0
+        maximumDeltaE: Double = 0,
+        overlap: Overlap? = nil
     ) {
         self.candidateSize = candidateSize
         self.baselineSize = baselineSize
@@ -57,6 +72,7 @@ struct ImageDiffReport: Sendable, Equatable {
         self.diffMaskURL = diffMaskURL
         self.toleratedPixelCount = toleratedPixelCount
         self.maximumDeltaE = maximumDeltaE
+        self.overlap = overlap
     }
 
     /// Whether the two images are the same size and match pixel for pixel, within the

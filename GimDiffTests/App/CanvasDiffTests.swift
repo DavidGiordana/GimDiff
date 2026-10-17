@@ -138,6 +138,14 @@ struct CanvasDiffTests {
             diffPercentage: 100
         )
         #expect(DiffReportPill.summary(of: mismatched) == "⚠️ Size Mismatch")
+
+        var grown = mismatched
+        grown.overlap = ImageDiffReport.Overlap(pixelCount: 10_000, differentPixelCount: 0, diffPercentage: 0)
+        #expect(DiffReportPill.summary(of: grown) == "⚠️ Size Mismatch · Overlap Matches")
+
+        var moved = mismatched
+        moved.overlap = ImageDiffReport.Overlap(pixelCount: 10_000, differentPixelCount: 40, diffPercentage: 0.4)
+        #expect(DiffReportPill.summary(of: moved, locale: Locale(identifier: "en_US")) == "⚠️ Size Mismatch · 0.40% of Overlap Differs")
     }
 
     // MARK: - Git status

@@ -99,13 +99,19 @@ struct DiffReportPill: View {
 
     /// The headline number, or the reason there is not one.
     ///
-    /// Differently sized images are called out rather than reported as 100% changed: the
-    /// percentage would be true and useless, and the size is the thing to go and fix.
+    /// Differently sized images are called out first, since the size is the thing to go and
+    /// fix, and then how much of the area they share differs: whether a screen grew a row
+    /// or everything in it moved.
     ///
     /// - Parameter locale: How the numbers are written; the reader's own unless a test
     ///   needs one that does not depend on the machine it runs on.
     static func summary(of report: ImageDiffReport, locale: Locale = .current) -> String {
-        guard report.hasIdenticalDimensions else { return String(localized: "⚠️ Size Mismatch") }
+        guard report.hasIdenticalDimensions else {
+            guard let overlap = report.overlap else { return String(localized: "⚠️ Size Mismatch") }
+            guard !overlap.isIdentical else { return String(localized: "⚠️ Size Mismatch · Overlap Matches") }
+            let share = (overlap.diffPercentage / 100).formatted(.percent.precision(.fractionLength(2)).locale(locale))
+            return String(localized: "⚠️ Size Mismatch · \(share) of Overlap Differs")
+        }
         guard !report.isIdentical else {
             return report.toleratedPixelCount == 0 ? String(localized: "100% Match") : String(localized: "Match within Tolerance")
         }
@@ -122,7 +128,10 @@ struct DiffReportPill: View {
     /// How loose the comparison would have to be for the two images to match.
     static func detail(of report: ImageDiffReport) -> String {
         guard report.hasIdenticalDimensions else {
-            return String(localized: "The images are different sizes, so no pixel lines up with another.")
+            return String(localized: """
+                The images are different sizes, so they are laid over each other from the \
+                top-left corner. Pixels only one of them has are marked as changed.
+                """)
         }
         guard report.maximumDeltaE > 0 else { return String(localized: "Every pixel is byte for byte the same.") }
         let largest = report.maximumDeltaE.formatted(.number.precision(.fractionLength(1)))
