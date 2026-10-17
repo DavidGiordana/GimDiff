@@ -14,8 +14,6 @@ import Foundation
 /// so a snapshot path containing spaces, quotes, or `$` reaches git verbatim and cannot be
 /// reinterpreted.
 struct DefaultGitService: GitService {
-    /// Location of the Git executable.
-    static let executableURL = URL(fileURLWithPath: "/usr/bin/git")
     /// Marker that identifies a working tree root; a file in a worktree, a folder otherwise.
     static let gitDirectoryName = ".git"
 
@@ -34,36 +32,6 @@ struct DefaultGitService: GitService {
     ) {
         self.runner = runner
         self.filesystem = filesystem
-    }
-
-    // MARK: - Commands
-
-    /// Machine-readable status of the working tree.
-    ///
-    /// Porcelain rather than `-s`, which follows the user's configuration: `color.status`
-    /// would put escape codes in every record and `status.branch` add one of its own.
-    /// `-z` ends each record with a NUL and never quotes a path, so a name holding an accent
-    /// or a quote comes back as written. The untracked files are asked for explicitly,
-    /// because `status.showUntrackedFiles=no` would otherwise leave every new snapshot out;
-    /// `normal` reports a new folder as one record, which ``ProviderRegistry`` resolves.
-    static func statusCommand(in repositoryRoot: URL) -> Command {
-        Command(
-            executableURL: executableURL,
-            arguments: [
-                "-c", "core.quotePath=false",
-                "status", "--porcelain=v1", "-z", "--untracked-files=normal",
-            ],
-            workingDirectory: repositoryRoot
-        )
-    }
-
-    /// Writes the contents of `relativePath` at `gitRef` to standard output.
-    static func showCommand(ofFileAt relativePath: String, gitRef: String, in repositoryRoot: URL) -> Command {
-        Command(
-            executableURL: executableURL,
-            arguments: ["show", "\(gitRef):\(normalize(relativePath))"],
-            workingDirectory: repositoryRoot
-        )
     }
 
     // MARK: - GitService
@@ -89,7 +57,7 @@ struct DefaultGitService: GitService {
     }
 
     func status(repositoryRoot: URL) async throws -> [URL: GitFileStatus] {
-        let command = Self.statusCommand(in: repositoryRoot)
+        let command = GitCommand.status(in: repositoryRoot)
         let result = try await runner.run(command)
         guard result.isSuccess else {
             throw GimDiffError.commandFailed(
@@ -143,7 +111,7 @@ struct DefaultGitService: GitService {
         repositoryRoot: URL,
         gitRef: String
     ) async throws -> URL {
-        let normalized = Self.normalize(relativePath)
+        let normalized = GitCommand.normalize(relativePath)
         let destination = filesystem.createTemporaryFile(
             prefix: Self.temporaryFilePrefix(for: normalized, gitRef: gitRef),
             extension: (normalized as NSString).pathExtension
@@ -152,7 +120,7 @@ struct DefaultGitService: GitService {
         // enclosing directory is there before git starts writing.
         try filesystem.writeFile(at: destination, data: Data())
 
-        let arguments = Self.showCommand(
+        let arguments = GitCommand.show(
             ofFileAt: normalized,
             gitRef: gitRef,
             in: repositoryRoot
@@ -234,7 +202,7 @@ struct DefaultGitService: GitService {
     /// ``CommandRunning`` results do; they go from the pipe to the file untouched.
     private static func stream(arguments: [String], in repositoryRoot: URL, to destination: URL) throws {
         let process = Process()
-        process.executableURL = executableURL
+        process.executableURL = GitCommand.executableURL
         process.arguments = arguments
         process.currentDirectoryURL = repositoryRoot
 
@@ -259,14 +227,6 @@ struct DefaultGitService: GitService {
     }
 
     // MARK: - Paths
-
-    /// Strips the leading `./` or `/` that would make a repository-relative path absolute.
-    static func normalize(_ relativePath: String) -> String {
-        var path = relativePath
-        while path.hasPrefix("./") { path.removeFirst(2) }
-        while path.hasPrefix("/") { path.removeFirst() }
-        return path
-    }
 
     /// A file name that identifies the extracted image without leaking path separators.
     private static func temporaryFilePrefix(for relativePath: String, gitRef: String) -> String {

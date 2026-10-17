@@ -10,56 +10,6 @@ import Foundation
 import Testing
 @testable import GimDiff
 
-@Suite("Git command construction")
-struct GitServiceCommandTests {
-    private let repositoryRoot = URL(fileURLWithPath: "/tmp/My Repo")
-
-    @Test("Status asks for porcelain, NUL-separated and unquoted, in the repository root")
-    func statusCommand() {
-        let command = DefaultGitService.statusCommand(in: repositoryRoot)
-
-        #expect(command.executableURL == URL(fileURLWithPath: "/usr/bin/git"))
-        #expect(command.arguments == [
-            "-c", "core.quotePath=false",
-            "status", "--porcelain=v1", "-z", "--untracked-files=normal",
-        ])
-        #expect(command.workingDirectory == repositoryRoot)
-    }
-
-    @Test("Show asks for one path at one ref, as a single argument")
-    func showCommand() {
-        let command = DefaultGitService.showCommand(
-            ofFileAt: "Snapshots/home screen.png",
-            gitRef: "HEAD",
-            in: repositoryRoot
-        )
-
-        #expect(command.arguments == ["show", "HEAD:Snapshots/home screen.png"])
-        #expect(command.workingDirectory == repositoryRoot)
-    }
-
-    @Test("A path containing shell metacharacters is passed through untouched")
-    func pathsAreNotEscaped() {
-        let command = DefaultGitService.showCommand(
-            ofFileAt: "Snapshots/$(whoami); rm -rf *.png",
-            gitRef: "main",
-            in: repositoryRoot
-        )
-
-        #expect(command.arguments == ["show", "main:Snapshots/$(whoami); rm -rf *.png"])
-    }
-
-    @Test("Leading separators are stripped so the path stays repository-relative", arguments: [
-        ("Snapshots/home.png", "Snapshots/home.png"),
-        ("./Snapshots/home.png", "Snapshots/home.png"),
-        ("/Snapshots/home.png", "Snapshots/home.png"),
-        ("././Snapshots/home.png", "Snapshots/home.png"),
-    ])
-    func normalizesRelativePaths(input: String, expected: String) {
-        #expect(DefaultGitService.normalize(input) == expected)
-    }
-}
-
 @Suite("Git status parsing")
 struct GitStatusParsingTests {
     private let repositoryRoot = URL(fileURLWithPath: "/repo")
@@ -211,7 +161,7 @@ struct DefaultGitServiceTests {
             URL(fileURLWithPath: "/repo/Snapshots/new.png"): .untracked,
         ])
         #expect(runner.recorded.map(\.arguments) == [
-            DefaultGitService.statusCommand(in: URL(fileURLWithPath: "/repo")).arguments,
+            GitCommand.status(in: URL(fileURLWithPath: "/repo")).arguments,
         ])
     }
 

@@ -8,18 +8,8 @@
 
 import Foundation
 
-/// Recovers comparisons from pasted failure logs and from `gimdiff://` URLs.
+/// Recovers comparisons from pasted failure logs, and pull requests from pasted links.
 struct DefaultIngestionService: IngestionService {
-    /// The scheme GimDiff is registered to handle.
-    static let scheme = "gimdiff"
-
-    /// Query names read as the candidate image, in order of preference.
-    static let candidateParameterNames = ["candidate", "failure", "actual", "new"]
-    /// Query names read as the baseline image, in order of preference.
-    static let baselineParameterNames = ["baseline", "reference", "recorded", "expected", "old"]
-    private static let candidateTagParameterNames = ["candidatetag", "failuretag"]
-    private static let baselineTagParameterNames = ["baselinetag", "referencetag"]
-
     /// Matches an image path, with or without a `file://` prefix.
     ///
     /// Whitespace and quotes end a path: failure logs surround paths with one or the
@@ -83,34 +73,6 @@ struct DefaultIngestionService: IngestionService {
 
     func parsePullRequest(_ text: String) -> GitHubPRReference? {
         GitHubPRURLParser.reference(in: text)
-    }
-
-    // MARK: - URL scheme
-
-    func parseURLScheme(_ url: URL) -> IngestionPayload? {
-        guard url.scheme?.lowercased() == Self.scheme,
-              let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        else { return nil }
-
-        var parameters: [String: String] = [:]
-        for item in components.queryItems ?? [] {
-            guard let value = item.value, !value.isEmpty else { continue }
-            parameters[item.name.lowercased()] = value
-        }
-
-        guard let candidate = Self.value(for: Self.candidateParameterNames, in: parameters) else {
-            return nil
-        }
-
-        return IngestionPayload(
-            candidateURL: Self.fileURL(from: candidate),
-            baselineURL: Self.value(for: Self.baselineParameterNames, in: parameters)
-                .map(Self.fileURL(from:)),
-            candidateTag: Self.value(for: Self.candidateTagParameterNames, in: parameters),
-            baselineTag: Self.value(for: Self.baselineTagParameterNames, in: parameters),
-            // A URL names each side by its parameter.
-            rolesAreStated: true
-        )
     }
 
     // MARK: - Log scanning
@@ -235,9 +197,5 @@ struct DefaultIngestionService: IngestionService {
         }
 
         return URL(fileURLWithPath: (value as NSString).expandingTildeInPath).standardizedFileURL
-    }
-
-    private static func value(for names: [String], in parameters: [String: String]) -> String? {
-        names.lazy.compactMap { parameters[$0] }.first
     }
 }

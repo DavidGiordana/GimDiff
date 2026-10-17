@@ -22,11 +22,38 @@ struct GitCommandTests {
         #expect(command.workingDirectory == repository)
     }
 
-    @Test("Status asks for machine-readable output including untracked files")
+    @Test("Status asks for porcelain, NUL-separated and unquoted, with untracked files")
     func statusArguments() {
         #expect(GitCommand.status(in: repository).arguments == [
-            "-c", "core.quotePath=false", "status", "--porcelain=v1", "--untracked-files=all",
+            "-c", "core.quotePath=false",
+            "status", "--porcelain=v1", "-z", "--untracked-files=normal",
         ])
+    }
+
+    @Test("Show asks for one path at one ref, as a single argument")
+    func showArguments() {
+        let command = GitCommand.show(ofFileAt: "Snapshots/home screen.png", gitRef: "HEAD", in: repository)
+
+        #expect(command.arguments == ["show", "HEAD:Snapshots/home screen.png"])
+        #expect(command.workingDirectory == repository)
+    }
+
+    @Test("A path containing shell metacharacters is passed through untouched")
+    func showDoesNotEscape() {
+        let command = GitCommand.show(ofFileAt: "Snapshots/$(whoami); rm -rf *.png", gitRef: "main", in: repository)
+
+        #expect(command.arguments == ["show", "main:Snapshots/$(whoami); rm -rf *.png"])
+    }
+
+    @Test("Leading separators are stripped so the path stays repository-relative", arguments: [
+        ("Snapshots/home.png", "Snapshots/home.png"),
+        ("./Snapshots/home.png", "Snapshots/home.png"),
+        ("/Snapshots/home.png", "Snapshots/home.png"),
+        ("././Snapshots/home.png", "Snapshots/home.png"),
+    ])
+    func normalizesRelativePaths(input: String, expected: String) {
+        #expect(GitCommand.normalize(input) == expected)
+        #expect(GitCommand.show(ofFileAt: input, gitRef: "HEAD", in: repository).arguments == ["show", "HEAD:\(expected)"])
     }
 
     @Test("The tracking check fails on an untracked path, and keeps it behind --")
@@ -45,13 +72,6 @@ struct GitCommandTests {
         ])
     }
 
-    @Test("Branch lookup uses the abbreviated ref")
-    func currentBranchArguments() {
-        #expect(GitCommand.currentBranch(in: repository).arguments == [
-            "rev-parse", "--abbrev-ref", "HEAD",
-        ])
-    }
-
     @Test("Paths are passed as separate arguments and need no escaping")
     func pathsArePassedVerbatim() {
         let paths = [
@@ -59,22 +79,15 @@ struct GitCommandTests {
             URL(fileURLWithPath: "/tmp/My Repo/Snapshots/it's-a-name.png"),
         ]
 
-        let command = GitCommand.checkout(paths: paths, in: repository)
-
-        #expect(command.arguments == [
-            "checkout",
+        #expect(GitCommand.restoreFromHEAD(paths: paths, in: repository).arguments.suffix(3) == [
             "--",
             "/tmp/My Repo/Snapshots/home screen.png",
             "/tmp/My Repo/Snapshots/it's-a-name.png",
         ])
     }
 
-    @Test("A double dash separates paths from options so filenames are never read as flags")
-    func pathsAreSeparatedByDoubleDash() {
-        let path = URL(fileURLWithPath: "/tmp/My Repo/--force.png")
-
-        let command = GitCommand.add(paths: [path], in: repository)
-
-        #expect(command.arguments == ["add", "--", "/tmp/My Repo/--force.png"])
+    @Test("The remote is named behind --, so a name cannot be read as an option")
+    func remoteURLArguments() {
+        #expect(GitCommand.remoteURL(named: "origin", in: repository).arguments == ["remote", "get-url", "--", "origin"])
     }
 }

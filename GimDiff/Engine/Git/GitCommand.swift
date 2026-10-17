@@ -16,40 +16,37 @@ enum GitCommand {
     /// Location of the Git executable shipped with the developer tools.
     static let executableURL = URL(fileURLWithPath: "/usr/bin/git")
 
-    /// Prints the absolute path of the working tree containing `directory`.
-    static func revParseToplevel(in directory: URL) -> Command {
-        command(["rev-parse", "--show-toplevel"], in: directory)
-    }
-
-    /// Prints the name of the checked-out branch, or `HEAD` when detached.
-    static func currentBranch(in directory: URL) -> Command {
-        command(["rev-parse", "--abbrev-ref", "HEAD"], in: directory)
-    }
-
     /// Prints the URL the remote called `name` fetches from.
     static func remoteURL(named name: String, in directory: URL) -> Command {
         command(["remote", "get-url", "--", name], in: directory)
     }
 
-    /// Lists modified and untracked paths, one `XY path` record per line.
+    /// Machine-readable status of the working tree.
     ///
-    /// `core.quotePath` is disabled so snapshot names containing non-ASCII characters come
-    /// back verbatim rather than octal-escaped.
+    /// Porcelain rather than `-s`, which follows the user's configuration: `color.status`
+    /// would put escape codes in every record and `status.branch` add one of its own.
+    /// `-z` ends each record with a NUL and never quotes a path, so a name holding an accent
+    /// or a quote comes back as written. The untracked files are asked for explicitly,
+    /// because `status.showUntrackedFiles=no` would otherwise leave every new snapshot out;
+    /// `normal` reports a new folder as one record, which ``ProviderRegistry`` resolves.
     static func status(in directory: URL) -> Command {
         command(
-            ["-c", "core.quotePath=false", "status", "--porcelain=v1", "--untracked-files=all"],
+            ["-c", "core.quotePath=false", "status", "--porcelain=v1", "-z", "--untracked-files=normal"],
             in: directory
         )
+    }
+
+    /// Writes the contents of `relativePath` at `gitRef` to standard output.
+    ///
+    /// One argument, `ref:path`, so a path holding spaces or shell characters reaches git
+    /// as it is spelled.
+    static func show(ofFileAt relativePath: String, gitRef: String, in directory: URL) -> Command {
+        command(["show", "\(gitRef):\(normalize(relativePath))"], in: directory)
     }
 
     /// Succeeds when `path` is a file Git tracks, and fails when it is not.
     static func lsFilesErrorUnmatch(path: URL, in directory: URL) -> Command {
         command(["ls-files", "--error-unmatch", "--", path.path], in: directory)
-    }
-
-    /// Restores `paths` to their committed state.
-    static func checkout(paths: [URL], in directory: URL) -> Command {
-        command(["checkout", "--"] + paths.map(\.path), in: directory)
     }
 
     /// Puts `paths` back to what `HEAD` holds, in the index and the working tree alike.
@@ -60,9 +57,12 @@ enum GitCommand {
         command(["restore", "--source=HEAD", "--staged", "--worktree", "--"] + paths.map(\.path), in: directory)
     }
 
-    /// Stages `paths`.
-    static func add(paths: [URL], in directory: URL) -> Command {
-        command(["add", "--"] + paths.map(\.path), in: directory)
+    /// Strips the leading `./` or `/` that would make a repository-relative path absolute.
+    static func normalize(_ relativePath: String) -> String {
+        var path = relativePath
+        while path.hasPrefix("./") { path.removeFirst(2) }
+        while path.hasPrefix("/") { path.removeFirst() }
+        return path
     }
 
     private static func command(_ arguments: [String], in directory: URL) -> Command {

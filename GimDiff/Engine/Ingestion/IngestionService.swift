@@ -8,19 +8,14 @@
 
 import Foundation
 
-/// Turns text and URLs arriving from elsewhere into a comparison GimDiff can open.
-///
-/// The two entry points are a copied test failure log and the `gimdiff://` URL scheme.
+/// Turns pasted text into something GimDiff can open: a copied test failure log becomes a
+/// comparison, and a link becomes a pull request. A `gimdiff://` URL is read by
+/// ``GimDiffURLCommand`` instead.
 protocol IngestionService: Sendable {
     /// Recovers image paths from pasted text, typically an Xcode or Swift Testing failure log.
     ///
     /// - Returns: `nil` when the text names no image.
     func parseClipboardText(_ text: String) -> IngestionPayload?
-
-    /// Reads a comparison out of a `gimdiff://` URL.
-    ///
-    /// - Returns: `nil` when the URL is not GimDiff's or names no candidate image.
-    func parseURLScheme(_ url: URL) -> IngestionPayload?
 
     /// Finds a GitHub pull request link in pasted text, such as a chat message holding one.
     ///

@@ -84,7 +84,7 @@ That command must print nothing.
 
 When the engine needs a platform capability, declare a protocol in `Engine/` and implement
 it in `Infrastructure/`. `CommandRunning` and `SystemCommandRunner` are the worked example:
-`GitRepository` talks to the protocol, so tests substitute a double instead of spawning git.
+`DefaultGitService` talks to the protocol, so tests substitute a double instead of spawning git.
 
 ### Single-window mandate
 
