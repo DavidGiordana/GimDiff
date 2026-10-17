@@ -50,34 +50,26 @@ struct ImageDiffServiceTests {
 
     // MARK: - Threading
 
-    @Test("A comparison started on the main actor leaves it free while it runs")
+    // Asks where the work ran rather than counting the main actor's turns while it runs:
+    // the turns depend on what else holds the main actor, and on a busy machine the test
+    // host's own launch can hold it for the whole comparison.
+    @Test("A comparison started on the main actor runs off it")
     @MainActor
     func leavesTheMainActorFree() async throws {
-        let candidate = try writeLargeImage(width: 2_500, height: 3_500, grey: 0.2)
-        let baseline = try writeLargeImage(width: 2_500, height: 3_500, grey: 0.8)
+        let candidate = try writeLargeImage(width: 64, height: 64, grey: 0.2)
+        let baseline = try writeLargeImage(width: 64, height: 64, grey: 0.8)
         defer {
             try? FileManager.default.removeItem(at: candidate)
             try? FileManager.default.removeItem(at: baseline)
         }
 
-        // Counts the turns the main actor gets while the comparison is in flight. Held on
-        // the main actor for the whole of it, it would get none.
-        var turns = 0
-        var isDone = false
-        let heartbeat = Task { @MainActor in
-            while !isDone {
-                turns += 1
-                try? await Task.sleep(for: .milliseconds(5))
-            }
-        }
-
-        let report = try await makeService().compare(candidateURL: candidate, baselineURL: baseline)
-        isDone = true
-        await heartbeat.value
+        let recorder = ThreadRecordingFilesystem()
+        let report = try await DefaultImageDiffService(filesystem: recorder)
+            .compare(candidateURL: candidate, baselineURL: baseline)
         defer { discard(report) }
 
-        #expect(report.differentPixelCount == 2_500 * 3_500)
-        #expect(turns > 1)
+        #expect(report.differentPixelCount == 64 * 64)
+        #expect(recorder.wroteOnMainThread == false)
     }
 
     @Test("A cancelled comparison stops instead of finishing")
@@ -487,4 +479,44 @@ private struct SolidImages {
         CGImageDestinationAddImage(destination, image, nil)
         #expect(CGImageDestinationFinalize(destination))
     }
+}
+
+/// The real filesystem, noting whether the mask was written on the main thread.
+///
+/// Writing the mask is the last step of a comparison and runs on whatever thread the rest
+/// of it did, so it is where a test can see the work from outside.
+private final class ThreadRecordingFilesystem: FilesystemService, @unchecked Sendable {
+    private let base = DefaultFilesystemService()
+    private let lock = NSLock()
+    private var storedWroteOnMainThread: Bool?
+
+    /// Whether the last write ran on the main thread, or `nil` before any write.
+    var wroteOnMainThread: Bool? {
+        lock.withLock { storedWroteOnMainThread }
+    }
+
+    func writeFile(at url: URL, data: Data) throws {
+        let isMainThread = Thread.isMainThread
+        lock.withLock { storedWroteOnMainThread = isMainThread }
+        try base.writeFile(at: url, data: data)
+    }
+
+    func fileExists(at url: URL) -> Bool { base.fileExists(at: url) }
+    func isDirectory(at url: URL) -> Bool { base.isDirectory(at: url) }
+    func isPackage(at url: URL) -> Bool { base.isPackage(at: url) }
+    func contentsOfDirectory(at url: URL, includingPropertiesForKeys keys: [URLResourceKey]?) throws -> [URL] {
+        try base.contentsOfDirectory(at: url, includingPropertiesForKeys: keys)
+    }
+    func fileSize(at url: URL) -> Int? { base.fileSize(at: url) }
+    func modificationDate(at url: URL) -> Date? { base.modificationDate(at: url) }
+    func readFile(at url: URL) throws -> Data { try base.readFile(at: url) }
+    func copyFile(from source: URL, to destination: URL) throws { try base.copyFile(from: source, to: destination) }
+    func replaceFile(at destination: URL, with source: URL) throws { try base.replaceFile(at: destination, with: source) }
+    func trashFile(at url: URL) throws -> URL? { try base.trashFile(at: url) }
+    func moveItem(at source: URL, to destination: URL) throws { try base.moveItem(at: source, to: destination) }
+    func removeItem(at url: URL) throws { try base.removeItem(at: url) }
+    func createTemporaryFile(prefix: String, extension fileExtension: String) -> URL {
+        base.createTemporaryFile(prefix: prefix, extension: fileExtension)
+    }
+    func imageFiles(under folder: URL) -> [URL] { base.imageFiles(under: folder) }
 }
