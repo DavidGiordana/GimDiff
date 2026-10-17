@@ -126,19 +126,25 @@ struct DefaultGitService: GitService {
             in: repositoryRoot
         ).arguments
 
-        return try await withCheckedThrowingContinuation { [filesystem] continuation in
-            Self.queue.async {
-                continuation.resume(with: Result {
-                    do {
-                        try Self.stream(arguments: arguments, in: repositoryRoot, to: destination)
-                    } catch {
-                        // Whatever git managed to write is not the committed file.
-                        try? filesystem.removeItem(at: destination)
-                        throw error
-                    }
-                    return destination
-                })
+        // Cancelled when the canvas moves on before git has finished writing.
+        let running = CancellableProcess()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { [filesystem] continuation in
+                Self.queue.async {
+                    continuation.resume(with: Result {
+                        do {
+                            try Self.stream(arguments: arguments, in: repositoryRoot, to: destination, as: running)
+                        } catch {
+                            // Whatever git managed to write is not the committed file.
+                            try? filesystem.removeItem(at: destination)
+                            throw error
+                        }
+                        return destination
+                    })
+                }
             }
+        } onCancel: {
+            running.cancel()
         }
     }
 
@@ -200,7 +206,12 @@ struct DefaultGitService: GitService {
     ///
     /// Snapshots are binary, so the bytes never pass through a `String` the way
     /// ``CommandRunning`` results do; they go from the pipe to the file untouched.
-    private static func stream(arguments: [String], in repositoryRoot: URL, to destination: URL) throws {
+    private static func stream(
+        arguments: [String],
+        in repositoryRoot: URL,
+        to destination: URL,
+        as running: CancellableProcess
+    ) throws {
         let process = Process()
         process.executableURL = GitCommand.executableURL
         process.arguments = arguments
@@ -212,10 +223,11 @@ struct DefaultGitService: GitService {
         process.standardOutput = output
         process.standardError = errorPipe
 
-        try process.run()
+        try running.start(process)
         let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
 
+        if running.isCancelled { throw CancellationError() }
         guard process.terminationStatus == 0 else {
             throw GimDiffError.commandFailed(
                 command: "git show",

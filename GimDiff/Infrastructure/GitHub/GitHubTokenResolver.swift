@@ -72,6 +72,9 @@ struct GitHubTokenResolver: GitHubTokenProviding {
         let result: CommandResult
         do {
             result = try await runner.run(command)
+        } catch is CancellationError {
+            // Nobody is waiting for the answer any more, which says nothing about `gh`.
+            throw CancellationError()
         } catch {
             throw GitHubCLIAuthError.notInstalled
         }

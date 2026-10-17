@@ -63,6 +63,46 @@ struct SystemCommandRunnerTests {
         #expect(URL(fileURLWithPath: result.trimmedOutput).standardizedFileURL == directory)
     }
 
+    @Test("Cancelling the task terminates the process instead of waiting it out",
+          .timeLimit(.minutes(1)))
+    func cancellationTerminatesTheProcess() async throws {
+        let clock = ContinuousClock()
+        let start = clock.now
+        let run = Task {
+            try await runner.run(Command(executableURL: URL(fileURLWithPath: "/bin/sleep"), arguments: ["30"]))
+        }
+        try await Task.sleep(for: .milliseconds(300))
+
+        run.cancel()
+
+        await #expect(throws: CancellationError.self) {
+            _ = try await run.value
+        }
+        #expect(clock.now - start < .seconds(10))
+    }
+
+    @Test("A task cancelled before its command starts never starts it")
+    func cancellationBeforeLaunchStartsNothing() async throws {
+        // A marker the process would create if it ran at all.
+        let marker = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("gimdiff-never-\(UUID().uuidString)")
+        let run = Task {
+            try await runner.run(Command(executableURL: URL(fileURLWithPath: "/usr/bin/touch"), arguments: [marker.path]))
+        }
+        run.cancel()
+
+        await #expect(throws: CancellationError.self) {
+            _ = try await run.value
+        }
+        #expect(!FileManager.default.fileExists(atPath: marker.path))
+    }
+
+    @Test("A command that cannot be launched fails instead of hanging", .timeLimit(.minutes(1)))
+    func failedLaunchThrows() async {
+        await #expect(throws: (any Error).self) {
+            _ = try await runner.run(Command(executableURL: URL(fileURLWithPath: "/nonexistent/tool")))
+        }
+    }
+
     @Test("Output larger than a pipe buffer is read in full without deadlocking",
           .timeLimit(.minutes(1)))
     func readsOutputLargerThanThePipeBuffer() async throws {
