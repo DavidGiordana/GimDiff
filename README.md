@@ -1,4 +1,8 @@
-# GimDiff
+<p align="center">
+  <img src="docs/icon.png" width="128" height="128" alt="GimDiff app icon">
+</p>
+
+<h1 align="center">GimDiff</h1>
 
 A native macOS app for reviewing snapshot tests: find every reference image in a project,
 compare it with what the last test run rendered, and accept or reject the change without
@@ -6,6 +10,8 @@ leaving the window.
 
 GimDiff reads the folders snapshot libraries already write. It needs no plugin and no
 change to your tests.
+
+![GimDiff comparing a snapshot Git reports as modified with the version committed at HEAD](docs/screenshot-git.png)
 
 ## Features
 
@@ -26,6 +32,8 @@ change to your tests.
   images shows up without a refresh.
 - **Comes with a command-line tool.** `gimdiff` scans, diffs, and exports test-run failures
   on a build machine, and hands paths to the running app from a terminal.
+
+![GimDiff showing a failing test run: the failed snapshots in the sidebar, and a recorded snapshot beside the image the test rendered](docs/screenshot.png)
 
 ## Requirements
 
