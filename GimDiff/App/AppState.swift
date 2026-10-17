@@ -211,6 +211,12 @@ final class AppState {
             case let .open(folder):
                 openProject(at: folder)
             case let .compare(reference, failure):
+                // A link can come from any web page, and the pair it opens offers to write one
+                // file over the other: anything but two images on disk is refused here.
+                if let unusable = [reference, failure].first(where: { !isOpenableImage($0) }) {
+                    report(String(localized: "“\(unusable.path)” is not an image file GimDiff can compare, so the link was not opened."))
+                    return
+                }
                 canvas.showComparison(reference: reference, failure: failure, certainty: .stated)
             case let .openPullRequest(input):
                 openPullRequest(input)
@@ -218,6 +224,17 @@ final class AppState {
         } catch {
             report(error)
         }
+    }
+
+    /// Whether `url` names an image file on disk: one GimDiff can show, and the only kind
+    /// Accept, Reject, and the Keep choices may write over.
+    func isOpenableImage(_ url: URL) -> Bool {
+        filesystem.fileExists(at: url) && !filesystem.isDirectory(at: url) && Self.hasImageExtension(url)
+    }
+
+    /// Whether the name of `url` is that of an image GimDiff reads.
+    static func hasImageExtension(_ url: URL) -> Bool {
+        url.isImageFile || ImageFormat(url: url).isRecognized
     }
 
     /// Opens whatever a path turns out to be: a project folder, or a single image.

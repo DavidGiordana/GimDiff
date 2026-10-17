@@ -274,18 +274,63 @@ struct ProjectOpeningTests {
 
     // MARK: - URL scheme
 
+    /// A folder holding empty files of these names, removed when the test lets go of it.
+    private func scratchFiles(_ names: [String]) throws -> URL {
+        let folder = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("GimDiffLink-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        for name in names {
+            try Data().write(to: folder.appendingPathComponent(name))
+        }
+        return folder
+    }
+
+    private func compareURL(reference: URL, failure: URL) throws -> URL {
+        var components = URLComponents()
+        components.scheme = "gimdiff"
+        components.host = "compare"
+        components.queryItems = [
+            URLQueryItem(name: "reference", value: reference.path),
+            URLQueryItem(name: "failure", value: failure.path),
+        ]
+        return try #require(components.url)
+    }
+
     @Test("A gimdiff://compare URL opens the comparison it names")
     func handlesACompareURL() throws {
         let defaults = TemporaryDefaults()
         let state = state(defaults: defaults)
-        let url = try #require(
-            URL(string: "gimdiff://compare?reference=/tmp/a.png&failure=/tmp/b.png")
-        )
+        let folder = try scratchFiles(["a.png", "b.png"])
+        defer { try? FileManager.default.removeItem(at: folder) }
 
-        state.handle(url)
+        state.handle(try compareURL(
+            reference: folder.appendingPathComponent("a.png"),
+            failure: folder.appendingPathComponent("b.png")
+        ))
 
         #expect(state.canvas.preview?.isComparison == true)
         #expect(state.canvas.preview?.title == "b")
+    }
+
+    @Test("A compare link naming a file that is not an image, or not there, opens nothing", arguments: [
+        ("notes.txt", "b.png"),
+        ("a.png", "missing.png"),
+        ("folder.png", "b.png"),
+    ])
+    func refusesALinkToAnythingButImages(reference: String, failure: String) throws {
+        let defaults = TemporaryDefaults()
+        let state = state(defaults: defaults)
+        let folder = try scratchFiles(["notes.txt", "a.png", "b.png"])
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("folder.png"), withIntermediateDirectories: true)
+
+        state.handle(try compareURL(
+            reference: folder.appendingPathComponent(reference),
+            failure: folder.appendingPathComponent(failure)
+        ))
+
+        #expect(state.canvas.preview == nil)
+        #expect(state.lastError != nil)
     }
 
     @Test("A gimdiff:// URL GimDiff cannot read is reported rather than ignored")

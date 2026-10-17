@@ -268,8 +268,16 @@ extension AppState {
     /// what makes the write atomic, and a snapshot half overwritten is worse than either
     /// version of it.
     ///
+    /// Refused unless both files are named as images: a pair can arrive from a link or a
+    /// pasted log naming any path at all, and an Accept on it must never put an image over
+    /// a document, or a document over a snapshot.
+    ///
     /// - Returns: Whether the write went through; a failure is already on the error banner.
     func copy(contentsOf source: URL, over destination: URL) -> Bool {
+        if let other = [source, destination].first(where: { !Self.hasImageExtension($0) }) {
+            report(String(localized: "“\(other.lastPathComponent)” is not an image, so GimDiff will not write it over another file, or another file over it."))
+            return false
+        }
         do {
             let staged = filesystem.createTemporaryFile(
                 prefix: destination.deletingPathExtension().lastPathComponent,
