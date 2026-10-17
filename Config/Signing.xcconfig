@@ -1,0 +1,12 @@
+//
+//  Created by David Giordana.
+//  Copyright © 2026 David Giordana. All rights reserved.
+//
+
+// A fresh clone signs to run locally, which needs no Apple Developer account.
+// To sign with your own team, copy Local.xcconfig.template to Local.xcconfig;
+// that file is git-ignored, so the team never lands in a commit.
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"

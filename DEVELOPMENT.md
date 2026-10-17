@@ -33,6 +33,15 @@ xcodebuild -scheme gimdiff -destination 'platform=macOS' build
 All three commands must finish clean — no errors and no new warnings — before a change is
 considered done.
 
+### Signing
+
+`Config/Signing.xcconfig` is the project-level base configuration. It signs to run locally
+(`CODE_SIGN_IDENTITY = -`) with no team, so a fresh clone builds without an Apple Developer
+account, and then includes the optional, git-ignored `Config/Local.xcconfig`, where a
+developer sets their own `DEVELOPMENT_TEAM` (start from `Config/Local.xcconfig.template`).
+Never set `DEVELOPMENT_TEAM` in `project.pbxproj`: a target-level value overrides the
+xcconfig and puts one person's team in everyone's build.
+
 ### If a test run leaves the app wedged
 
 A cancelled test run can orphan `debugserver` with the host app stopped under it (`ps`

@@ -31,3 +31,6 @@ playground.xcworkspace
 
 # Local CodeGraph index
 .codegraph/
+
+# Personal signing settings (see Config/Local.xcconfig.template)
+Config/Local.xcconfig
