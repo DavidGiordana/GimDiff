@@ -57,9 +57,17 @@ struct PRReviewSession: Identifiable, Sendable, Equatable {
     let suites: [SnapshotSuite]
     /// Each changed snapshot keyed by its ``SnapshotItem/id``, which is its repository path.
     let changes: [String: PRSnapshotChange]
-    /// How many files the pull request changes in all, snapshot or not.
+    /// How many files GitHub listed as changed, snapshot or not.
     let changedFileCount: Int
     let tempDirectoryURL: URL
+    /// How many files GitHub says the pull request changes, which can be more than it lists:
+    /// the list stops at ``DefaultGitHubPRService/maximumListedFiles``.
+    var reportedChangedFileCount: Int?
+
+    /// Changed files GitHub did not list, and whose snapshots the review therefore lacks.
+    var unlistedFileCount: Int {
+        max(0, (reportedChangedFileCount ?? changedFileCount) - changedFileCount)
+    }
 }
 
 /// Fetches a pull request's snapshot changes from GitHub.
@@ -117,6 +125,7 @@ struct DefaultGitHubPRService: GitHubPRService {
     static let pageSize = 100
     /// GitHub stops listing a pull request's files at 3,000, which is 30 pages.
     static let maximumPages = 30
+    static let maximumListedFiles = maximumPages * pageSize
     /// Enough to hide latency without inviting GitHub's secondary rate limit.
     static let maximumConcurrentDownloads = 6
     /// Folder names that mark a Swift snapshot. Paparazzi's folder is recognised by its
@@ -191,7 +200,8 @@ struct DefaultGitHubPRService: GitHubPRService {
                 suites: suites,
                 changes: Dictionary(changes.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first }),
                 changedFileCount: files.count,
-                tempDirectoryURL: directory
+                tempDirectoryURL: directory,
+                reportedChangedFileCount: pull.changedFiles
             )
         } catch {
             // A half-downloaded session is of no use to anyone, and nothing else knows the
@@ -608,6 +618,9 @@ private extension DefaultGitHubPRService {
         let user: User
         let base: Branch
         let head: Branch
+        /// The true count, which the file list stops short of past 3,000. Optional so a
+        /// response without it still reads as one.
+        let changedFiles: Int?
     }
 
     struct FileResponse: Decodable, Sendable {

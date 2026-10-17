@@ -36,6 +36,30 @@ struct PullRequestReviewTests {
         #expect(fixture.service.requested == [Self.reference])
     }
 
+    @Test("A review missing files GitHub would not list says so, as it opens and in its header")
+    func reportsUnlistedFiles() async throws {
+        let fixture = Fixture()
+        fixture.service.reportedChangedFileCount = 4_812
+
+        await fixture.open("https://github.com/octo/app/pull/7")
+
+        let session = try #require(fixture.state.pullRequestReview.session)
+        #expect(session.unlistedFileCount == 4_812 - session.changedFileCount)
+        let notice = try #require(AppState.unlistedFilesNotice(for: session))
+        #expect(fixture.state.lastError == notice)
+    }
+
+    @Test("A review GitHub listed in full raises no notice")
+    func listedReviewIsQuiet() async throws {
+        let fixture = Fixture()
+
+        await fixture.open("https://github.com/octo/app/pull/7")
+
+        let session = try #require(fixture.state.pullRequestReview.session)
+        #expect(AppState.unlistedFilesNotice(for: session) == nil)
+        #expect(fixture.state.lastError == nil)
+    }
+
     @Test("A fetched pull request selects and shows its first snapshot")
     func selectsFirstSnapshot() async throws {
         let fixture = Fixture()
@@ -403,6 +427,8 @@ private final class StubPRService: GitHubPRService, @unchecked Sendable {
     }
 
     var requested: [GitHubPRReference] { lock.withLock { recorded } }
+    /// What GitHub says the pull request changes in all, when the test wants more than it lists.
+    var reportedChangedFileCount: Int?
 
     func fetchPRSession(reference: GitHubPRReference) async throws -> PRReviewSession {
         lock.withLock { recorded.append(reference) }
@@ -462,7 +488,8 @@ private final class StubPRService: GitHubPRService, @unchecked Sendable {
             ),
             changes: Dictionary(uniqueKeysWithValues: changes.map { ($0.path, $0) }),
             changedFileCount: max(changes.count, 3),
-            tempDirectoryURL: directory
+            tempDirectoryURL: directory,
+            reportedChangedFileCount: reportedChangedFileCount
         )
     }
 }

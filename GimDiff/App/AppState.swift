@@ -1340,6 +1340,20 @@ final class AppState {
         selectRow(withID: visibleRows.first(where: \.isSnapshot)?.id ?? visibleRows.first?.id)
 
         pullRequestReview.finishFetch()
+        // A review that looks complete when it is not is worse than none: said as it opens,
+        // and kept in the review's header for as long as it is up.
+        if let notice = Self.unlistedFilesNotice(for: session) {
+            report(notice)
+        }
+    }
+
+    /// Why a review lacks some of its snapshots, or `nil` when GitHub listed every file.
+    static func unlistedFilesNotice(for session: PRReviewSession) -> String? {
+        guard session.unlistedFileCount > 0, let total = session.reportedChangedFileCount else { return nil }
+        return String(localized: """
+            GitHub lists only the first \(session.changedFileCount) of the \(total) files this pull \
+            request changes, so snapshots among the rest are not shown.
+            """)
     }
 
     // MARK: - Paths

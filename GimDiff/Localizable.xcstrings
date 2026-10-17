@@ -673,6 +673,16 @@
     "Git tracks the baseline and not the candidate" : {
 
     },
+    "GitHub lists only the first %lld of the %lld files this pull request changes, so snapshots among the rest are not shown." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "GitHub lists only the first %1$lld of the %2$lld files this pull request changes, so snapshots among the rest are not shown."
+          }
+        }
+      }
+    },
     "Green" : {
 
     },
@@ -822,6 +832,16 @@
     },
     "Onion Skin" : {
 
+    },
+    "Only %lld of %lld files listed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Only %1$lld of %2$lld files listed"
+          }
+        }
+      }
     },
     "Open Image in Preview" : {
 

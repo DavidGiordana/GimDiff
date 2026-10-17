@@ -274,6 +274,27 @@ struct GitHubPRServiceTests {
         #expect(!fixture.http.requestedPaths.contains("/repos/octo/app/pulls/7/files?per_page=100&page=3"))
     }
 
+    @Test("The count GitHub reports is kept beside the files it listed")
+    func keepsTheReportedCount() async throws {
+        let fixture = Fixture(files: [.modified("Tests/Snapshots/HomeTests/testHome.png")], changedFiles: 4_812)
+
+        let session = try await fixture.service.fetchPRSession(reference: Self.reference)
+
+        #expect(session.changedFileCount == 1)
+        #expect(session.reportedChangedFileCount == 4_812)
+        #expect(session.unlistedFileCount == 4_811)
+    }
+
+    @Test("A response without a count leaves nothing unlisted")
+    func missingCountMeansComplete() async throws {
+        let fixture = Fixture(files: [.modified("Tests/Snapshots/HomeTests/testHome.png")])
+
+        let session = try await fixture.service.fetchPRSession(reference: Self.reference)
+
+        #expect(session.reportedChangedFileCount == nil)
+        #expect(session.unlistedFileCount == 0)
+    }
+
     // MARK: - Failures
 
     @Test("A pull request GitHub does not know is reported as not found")
@@ -361,6 +382,7 @@ private struct Fixture {
         files: [FileEntry],
         secondPage: [FileEntry]? = nil,
         headRepository: String = "octo/app",
+        changedFiles: Int? = nil,
         token: Result<String, any Error> = .success("gho_test")
     ) {
         service = DefaultGitHubPRService(
@@ -370,12 +392,14 @@ private struct Fixture {
             temporaryRoot: URL(fileURLWithPath: "/mock-tmp/PullRequests", isDirectory: true)
         )
 
-        http.stub("/repos/octo/app/pulls/7", json: [
+        var pull: [String: Any] = [
             "title": "Refresh the home screen",
             "user": ["login": "mona"],
             "base": ["ref": "main", "sha": "base000", "repo": ["full_name": "octo/app"]],
             "head": ["ref": "feature/home", "sha": "head111", "repo": ["full_name": headRepository]],
-        ])
+        ]
+        if let changedFiles { pull["changed_files"] = changedFiles }
+        http.stub("/repos/octo/app/pulls/7", json: pull)
         http.stub("/repos/octo/app/pulls/7/files?per_page=100&page=1", json: files.map(\.json))
         if let secondPage {
             http.stub("/repos/octo/app/pulls/7/files?per_page=100&page=2", json: secondPage.map(\.json))

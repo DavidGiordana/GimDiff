@@ -71,6 +71,15 @@ struct PullRequestHeader: View {
             .foregroundStyle(.secondary)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(session.headRef) into \(session.baseRef)")
+
+            if let notice = AppState.unlistedFilesNotice(for: session),
+               let total = session.reportedChangedFileCount {
+                Label("Only \(session.changedFileCount) of \(total) files listed", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .help(notice)
+                    .accessibilityHint(notice)
+            }
         }
     }
 }
