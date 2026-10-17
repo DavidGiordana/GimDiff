@@ -43,6 +43,11 @@ final class GitFixture {
         try run(["add", "--", relativePath])
     }
 
+    /// Sets `key` in this repository's own configuration, which outranks the developer's.
+    func configure(_ key: String, _ value: String) throws {
+        try run(["config", key, value])
+    }
+
     /// Stages everything and commits it without touching the developer's global Git config.
     func commit() throws {
         try run(["add", "--all"])

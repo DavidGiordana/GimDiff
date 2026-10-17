@@ -14,12 +14,15 @@ import Testing
 struct GitServiceCommandTests {
     private let repositoryRoot = URL(fileURLWithPath: "/tmp/My Repo")
 
-    @Test("Status runs git directly, in the repository root")
+    @Test("Status asks for porcelain, NUL-separated and unquoted, in the repository root")
     func statusCommand() {
         let command = DefaultGitService.statusCommand(in: repositoryRoot)
 
         #expect(command.executableURL == URL(fileURLWithPath: "/usr/bin/git"))
-        #expect(command.arguments == ["status", "-s"])
+        #expect(command.arguments == [
+            "-c", "core.quotePath=false",
+            "status", "--porcelain=v1", "-z", "--untracked-files=normal",
+        ])
         #expect(command.workingDirectory == repositoryRoot)
     }
 
@@ -85,12 +88,7 @@ struct GitStatusParsingTests {
 
     @Test("Resolves each record against the repository root")
     func resolvesPathsAgainstRoot() {
-        let output = """
-         M Snapshots/home.png
-        ?? Snapshots/new.png
-         D Snapshots/gone.png
-
-        """
+        let output = " M Snapshots/home.png\0?? Snapshots/new.png\0 D Snapshots/gone.png\0"
 
         let statuses = DefaultGitService.parseStatus(output, repositoryRoot: repositoryRoot)
 
@@ -104,7 +102,7 @@ struct GitStatusParsingTests {
     @Test("Keeps a path that contains spaces intact")
     func keepsSpacesInPaths() {
         let statuses = DefaultGitService.parseStatus(
-            " M Snapshots/home screen.png\n",
+            " M Snapshots/home screen.png\0",
             repositoryRoot: repositoryRoot
         )
 
@@ -114,7 +112,7 @@ struct GitStatusParsingTests {
     @Test("A rename is added at the path on disk and deleted at the path HEAD has")
     func renameUsesDestination() {
         let statuses = DefaultGitService.parseStatus(
-            "R  Snapshots/old.png -> Snapshots/new.png\n",
+            "R  Snapshots/new.png\0Snapshots/old.png\0",
             repositoryRoot: repositoryRoot
         )
 
@@ -124,19 +122,32 @@ struct GitStatusParsingTests {
         ])
     }
 
-    @Test("Quoting applied by git is undone")
-    func unquotesPaths() {
+    @Test("A copy is added at its new path, and its source is left alone")
+    func copyKeepsItsSource() {
         let statuses = DefaultGitService.parseStatus(
-            "?? \"Snapshots/caf\\\"e.png\"\n",
+            "C  Snapshots/copy.png\0Snapshots/original.png\0 M Snapshots/home.png\0",
             repositoryRoot: repositoryRoot
         )
 
-        #expect(statuses == [URL(fileURLWithPath: "/repo/Snapshots/caf\"e.png"): .untracked])
+        #expect(statuses == [
+            URL(fileURLWithPath: "/repo/Snapshots/copy.png"): .added,
+            URL(fileURLWithPath: "/repo/Snapshots/home.png"): .modified,
+        ])
     }
 
-    @Test("Empty and truncated lines are skipped rather than crashing")
+    @Test("Accents, quotes, and a separator lookalike arrive as they are spelled")
+    func keepsPathsVerbatim() {
+        let statuses = DefaultGitService.parseStatus(
+            "?? Snapshots/café \"quoted\" -> ünï.png\0",
+            repositoryRoot: repositoryRoot
+        )
+
+        #expect(statuses == [URL(fileURLWithPath: "/repo/Snapshots/café \"quoted\" -> ünï.png"): .untracked])
+    }
+
+    @Test("Empty and truncated records are skipped rather than crashing")
     func skipsUnusableLines() {
-        #expect(DefaultGitService.parseStatus("\n M\n??\n\n", repositoryRoot: repositoryRoot).isEmpty)
+        #expect(DefaultGitService.parseStatus("\0 M\0??\0\0", repositoryRoot: repositoryRoot).isEmpty)
     }
 
     @Test("A clean tree reports nothing")
@@ -187,7 +198,7 @@ struct DefaultGitServiceTests {
         let runner = RecordingCommandRunner(
             result: CommandResult(
                 exitCode: 0,
-                standardOutput: " M Snapshots/home.png\n?? Snapshots/new.png\n",
+                standardOutput: " M Snapshots/home.png\0?? Snapshots/new.png\0",
                 standardError: ""
             )
         )
@@ -199,7 +210,9 @@ struct DefaultGitServiceTests {
             URL(fileURLWithPath: "/repo/Snapshots/home.png"): .modified,
             URL(fileURLWithPath: "/repo/Snapshots/new.png"): .untracked,
         ])
-        #expect(runner.recorded.map(\.arguments) == [["status", "-s"]])
+        #expect(runner.recorded.map(\.arguments) == [
+            DefaultGitService.statusCommand(in: URL(fileURLWithPath: "/repo")).arguments,
+        ])
     }
 
     @Test("A failing status surfaces git's own message")
@@ -275,6 +288,46 @@ struct GitServiceIntegrationTests {
         let new = repository.url.appendingPathComponent("Snapshots/new.png").standardizedFileURL
         #expect(statuses[home] == .modified)
         #expect(statuses[new] == .untracked)
+    }
+
+    @Test("Status survives a configuration that colours it, adds a branch line, and hides untracked files")
+    func ignoresTheUsersStatusConfiguration() async throws {
+        let repository = try GitFixture()
+        try repository.write("Snapshots/café.png", data: Data([0x01]))
+        try repository.commit()
+        try repository.configure("color.status", "always")
+        try repository.configure("status.branch", "true")
+        try repository.configure("status.showUntrackedFiles", "no")
+        try repository.configure("core.quotePath", "true")
+        try repository.write("Snapshots/café.png", data: Data([0x02]))
+        try repository.write("Snapshots/ünï.png", data: Data([0x03]))
+
+        let statuses = try await service.status(repositoryRoot: repository.url)
+
+        #expect(statuses == [
+            repository.url.appendingPathComponent("Snapshots/café.png").standardizedFileURL: .modified,
+            repository.url.appendingPathComponent("Snapshots/ünï.png").standardizedFileURL: .untracked,
+        ])
+    }
+
+    @Test("A staged rename reports the new path added and the old one deleted")
+    func reportsARealRename() async throws {
+        let repository = try GitFixture()
+        try repository.write("Snapshots/old.png", data: Data(repeating: 0x07, count: 512))
+        try repository.commit()
+        try FileManager.default.moveItem(
+            at: repository.url.appendingPathComponent("Snapshots/old.png"),
+            to: repository.url.appendingPathComponent("Snapshots/nüevo.png")
+        )
+        try repository.stage("Snapshots/old.png")
+        try repository.stage("Snapshots/nüevo.png")
+
+        let statuses = try await service.status(repositoryRoot: repository.url)
+
+        #expect(statuses == [
+            repository.url.appendingPathComponent("Snapshots/nüevo.png").standardizedFileURL: .added,
+            repository.url.appendingPathComponent("Snapshots/old.png").standardizedFileURL: .deleted,
+        ])
     }
 
     @Test("The repository root is found from a nested snapshot folder")

@@ -38,11 +38,21 @@ struct DefaultGitService: GitService {
 
     // MARK: - Commands
 
-    /// Short, machine-readable status of the working tree.
+    /// Machine-readable status of the working tree.
+    ///
+    /// Porcelain rather than `-s`, which follows the user's configuration: `color.status`
+    /// would put escape codes in every record and `status.branch` add one of its own.
+    /// `-z` ends each record with a NUL and never quotes a path, so a name holding an accent
+    /// or a quote comes back as written. The untracked files are asked for explicitly,
+    /// because `status.showUntrackedFiles=no` would otherwise leave every new snapshot out;
+    /// `normal` reports a new folder as one record, which ``ProviderRegistry`` resolves.
     static func statusCommand(in repositoryRoot: URL) -> Command {
         Command(
             executableURL: executableURL,
-            arguments: ["status", "-s"],
+            arguments: [
+                "-c", "core.quotePath=false",
+                "status", "--porcelain=v1", "-z", "--untracked-files=normal",
+            ],
             workingDirectory: repositoryRoot
         )
     }
@@ -160,31 +170,35 @@ struct DefaultGitService: GitService {
 
     // MARK: - Status parsing
 
-    /// Turns `git status -s` output into absolute paths and their status.
+    /// Turns `git status --porcelain=v1 -z` output into absolute paths and their status.
     ///
-    /// Records are `XY <path>`: two status columns, a space, then the path. Ignored files
-    /// and records whose columns are blank are dropped rather than reported as unmodified.
+    /// Each record is `XY <path>` ended by a NUL: two status columns, a space, then the path
+    /// exactly as it is spelled. A rename or a copy is followed by one more field, the path
+    /// it came from. Ignored files and records whose columns are blank are dropped rather
+    /// than reported as unmodified.
     static func parseStatus(_ output: String, repositoryRoot: URL) -> [URL: GitFileStatus] {
         var statuses: [URL: GitFileStatus] = [:]
+        var fields = output.split(separator: "\0").makeIterator()
 
-        for line in output.split(whereSeparator: \.isNewline) {
-            guard line.count > 3 else { continue }
-            guard let status = status(forCode: String(line.prefix(2))) else { continue }
+        func url(_ path: Substring) -> URL {
+            repositoryRoot.appendingPathComponent(String(path)).standardizedFileURL
+        }
 
-            var path = String(line.dropFirst(3))
-            // A rename reads "old -> new"; the new path is the one on disk. The old one is
-            // reported deleted: `HEAD` still has it, and restoring the project brings it back.
-            if let arrow = path.range(of: " -> ") {
-                let source = unquote(String(path[..<arrow.lowerBound]).trimmingCharacters(in: .whitespaces))
-                if !source.isEmpty {
-                    statuses[repositoryRoot.appendingPathComponent(source).standardizedFileURL] = .deleted
+        while let record = fields.next() {
+            guard record.count > 3 else { continue }
+            let code = String(record.prefix(2))
+
+            if code.contains("R") || code.contains("C") {
+                let source = fields.next()
+                // `HEAD` still has a rename's old path, and restoring the project brings it
+                // back. A copy's source is still where it was, so it says nothing.
+                if code.contains("R"), let source {
+                    statuses[url(source)] = .deleted
                 }
-                path = String(path[arrow.upperBound...])
             }
-            path = unquote(path.trimmingCharacters(in: .whitespaces))
-            guard !path.isEmpty else { continue }
 
-            statuses[repositoryRoot.appendingPathComponent(path).standardizedFileURL] = status
+            guard let status = status(forCode: code) else { continue }
+            statuses[url(record.dropFirst(3))] = status
         }
 
         return statuses
@@ -253,13 +267,5 @@ struct DefaultGitService: GitService {
         let name = ((relativePath as NSString).lastPathComponent as NSString).deletingPathExtension
         let ref = gitRef.replacingOccurrences(of: "/", with: "-")
         return "\(name.isEmpty ? "snapshot" : name)-\(ref)"
-    }
-
-    /// Undoes the quoting git applies to paths holding unusual characters.
-    private static func unquote(_ path: String) -> String {
-        guard path.count > 1, path.hasPrefix("\""), path.hasSuffix("\"") else { return path }
-        return String(path.dropFirst().dropLast())
-            .replacingOccurrences(of: "\\\"", with: "\"")
-            .replacingOccurrences(of: "\\\\", with: "\\")
     }
 }
