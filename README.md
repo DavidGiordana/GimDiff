@@ -11,6 +11,11 @@ leaving the window.
 GimDiff reads the folders snapshot libraries already write. It needs no plugin and no
 change to your tests.
 
+> [!NOTE]
+> GimDiff is under active development. Expect rough edges, and expect features and
+> behaviour to change between releases. Builds are published as pre-releases on the
+> [Releases](https://github.com/DavidGiordana/GimDiff/releases) page.
+
 ![GimDiff comparing a snapshot Git reports as modified with the version committed at HEAD](docs/screenshot-git.png)
 
 ## Features
@@ -34,6 +39,12 @@ change to your tests.
   on a build machine, and hands paths to the running app from a terminal.
 
 ![GimDiff showing a failing test run: the failed snapshots in the sidebar, and a recorded snapshot beside the image the test rendered](docs/screenshot.png)
+
+## Download
+
+Download the latest build from the [Releases](https://github.com/DavidGiordana/GimDiff/releases)
+page. Each release is a zip of the app, signed with Developer ID and notarized: unzip it
+and move *GimDiff* to your Applications folder.
 
 ## Requirements
 
@@ -112,6 +123,12 @@ is optional:
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first, and
 [DEVELOPMENT.md](DEVELOPMENT.md) for the architecture and the rules the code follows.
+
+## Acknowledgements
+
+Thanks to [@clancieri](https://github.com/clancieri), [@jonurq](https://github.com/jonurq),
+[@camovb](https://github.com/camovb), and [@ceichin](https://github.com/ceichin) for their
+encouragement, feedback, and ideas.
 
 ## License
 
