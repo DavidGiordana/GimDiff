@@ -51,6 +51,12 @@ struct SnapshotTreeView: View {
                         .padding(.top, 6)
                 }
 
+                if state.sidebarSource == .testRun, state.testRuns.hasNewerRun {
+                    NewerTestRunNotice()
+                        .padding(.horizontal, 10)
+                        .padding(.top, 6)
+                }
+
                 if state.currentProject != nil, !state.isShowingTestRunPlaceholder {
                     SnapshotFilterBar(focus: $focus)
                         .padding(.horizontal, 10)
@@ -344,9 +350,52 @@ private struct TestRunHistoryPicker: View {
     /// whether it is pinned or the newest is followed.
     private var bundle: Binding<URL?> {
         Binding(
-            get: { state.testRuns.selectedBundle?.url },
+            get: { state.testRuns.displayedBundleURL },
             set: { url in url.map(state.showTestRun(from:)) }
         )
+    }
+}
+
+/// Says a newer run has finished while the one on screen still had failures to review, and
+/// offers it, rather than swapping the tree out from under the review.
+///
+/// Drawn in the accent colour rather than as another grey control: it is the one thing in
+/// the sidebar saying that what is listed is no longer the latest word.
+private struct NewerTestRunNotice: View {
+    @Environment(AppState.self) private var state
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.title3)
+                .foregroundStyle(.tint)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("A newer test run finished")
+                    .font(.callout.weight(.semibold))
+                if let latest = state.testRuns.bundles.first {
+                    Text(TestRunBundleLabel.title(of: latest, among: state.testRuns.bundles))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button("Show Latest") {
+                state.showLatestTestRun()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .help("Replace this run with the newest one")
+            .accessibilityIdentifier("ShowLatestTestRun")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.accentColor.opacity(0.45)))
+        .accessibilityElement(children: .combine)
     }
 }
 

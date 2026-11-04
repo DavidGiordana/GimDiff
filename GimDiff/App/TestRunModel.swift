@@ -32,6 +32,11 @@ final class TestRunModel {
     private(set) var pinnedBundleURL: URL?
     /// What the run read failed on; `nil` until it is read.
     private(set) var results: TestRunResults?
+    /// The bundle `results` were read from, as it was located then; `nil` with no results.
+    ///
+    /// Kept whole rather than by its URL: Paparazzi's run is always the project's root, and
+    /// only its date says a verify task has written it again.
+    private(set) var shownBundle: TestRunBundle?
     /// Whether a read is in flight, so the sidebar can say so rather than look empty.
     private(set) var isReading = false
     /// Why the last read gave nothing, shown in place of the rows.
@@ -72,6 +77,28 @@ final class TestRunModel {
         return bundles.first
     }
 
+    /// The run the pickers mark as chosen: the one on screen while a newer one is held back,
+    /// ``selectedBundle`` otherwise.
+    var displayedBundleURL: URL? {
+        hasNewerRun ? shownBundle?.url : selectedBundle?.url
+    }
+
+    /// Whether a run newer than the one on screen has arrived and is being held back.
+    ///
+    /// A run that arrives while the newest is on screen does not replace it: somebody may be
+    /// halfway through its failures. It waits for ``AppState/showLatestTestRun()``. A run
+    /// picked from the history is left out — it was older on purpose, and the picker says so.
+    var hasNewerRun: Bool {
+        guard pinnedBundleURL == nil, let shownBundle, let latest = bundles.first else { return false }
+        return latest != shownBundle
+    }
+
+    /// Whether a new run should wait to be asked for rather than replace the one on screen:
+    /// the newest was followed, and it still has failures nobody has settled.
+    var holdsResultsOnScreen: Bool {
+        pinnedBundleURL == nil && results?.isEmpty == false
+    }
+
     /// Picks the run in `bundle`. Picking the newest is not pinning it: the view then
     /// follows the newest again, so the next run Xcode writes replaces it as it always did.
     func pick(_ bundle: URL) {
@@ -83,7 +110,10 @@ final class TestRunModel {
     ///
     /// Cheap enough to do on every load — one property list per workspace Xcode has built,
     /// and one per run — and all the switch and the run picker need to know.
-    func locate(project: ProjectBundle?) {
+    ///
+    /// - Parameter settling: Whether to wait for the result folder to go quiet first, so a
+    ///   run still being written is not offered before it can be read.
+    func locate(project: ProjectBundle?, settling: Bool = false) {
         locateTask?.cancel()
         guard let project else {
             bundles = []
@@ -91,6 +121,13 @@ final class TestRunModel {
         }
 
         locateTask = Task { [locator] in
+            if settling {
+                do {
+                    try await Task.sleep(for: Self.settleDelay)
+                } catch {
+                    return
+                }
+            }
             let bundles = await Self.bundles(of: project, locator: locator)
             guard !Task.isCancelled else { return }
             self.bundles = bundles
@@ -182,7 +219,11 @@ final class TestRunModel {
                 return
             }
             isReading = false
-            if !deliver(read) { removeScratch(of: read) }
+            if deliver(read) {
+                shownBundle = bundle
+            } else {
+                removeScratch(of: read)
+            }
         }
     }
 
@@ -248,6 +289,7 @@ final class TestRunModel {
         error = nil
         guard let results else { return false }
         self.results = nil
+        shownBundle = nil
         removeScratch(of: results)
         return true
     }

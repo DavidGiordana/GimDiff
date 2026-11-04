@@ -27,6 +27,9 @@ struct DerivedDataLocator: TestResultLocating {
     static let resultBundleExtension = "xcresult"
     static let resultInfoFileName = "Info.plist"
     static let resultCreationDateKey = "dateCreated"
+    /// The index Xcode keeps beside the bundles of `Logs/Test`, which lists a bundle only
+    /// once its run has finished.
+    static let logManifestFileName = "LogStoreManifest.plist"
     /// Workspaces that are documents inside the folder they build, as opposed to a Swift
     /// package, where the folder itself is what Xcode opens.
     static let workspaceDocumentExtensions: Set<String> = ["xcodeproj", "xcworkspace"]
@@ -124,8 +127,10 @@ struct DerivedDataLocator: TestResultLocating {
             options: [.skipsHiddenFiles]
         )) ?? []
 
+        let finished = finishedBundleNames(in: logs)
         return entries
             .filter { $0.pathExtension.lowercased() == Self.resultBundleExtension }
+            .filter { finished?.contains($0.lastPathComponent) ?? true }
             .map { bundle in
                 TestRunBundle(
                     url: bundle,
@@ -133,6 +138,20 @@ struct DerivedDataLocator: TestResultLocating {
                     workspaceName: workspace.lastPathComponent
                 )
             }
+    }
+
+    /// The file names of the bundles whose runs have finished, or `nil` when the folder has
+    /// no manifest to say, in which case every bundle is taken as finished.
+    ///
+    /// Xcode creates a bundle when its run starts and writes into it for as long as the run
+    /// lasts, with quiet stretches no wait could tell from the end. The manifest is the
+    /// one thing written at the end: the bundle is added to it once the run is over. A run
+    /// that is still going is therefore not offered at all — read halfway, it says too
+    /// little, and announced, it offers a run nobody can look at yet.
+    private func finishedBundleNames(in logs: URL) -> Set<String>? {
+        let manifest = logs.appendingPathComponent(Self.logManifestFileName)
+        guard let logs = Self.propertyList(at: manifest)?["logs"] as? [String: Any] else { return nil }
+        return Set(logs.values.compactMap { ($0 as? [String: Any])?["fileName"] as? String })
     }
 
     /// When the run started, as the bundle records it.

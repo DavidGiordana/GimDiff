@@ -42,6 +42,18 @@ struct DerivedDataLocatorTests {
             return bundle
         }
 
+        /// Writes the manifest Xcode keeps beside the bundles, listing `finished` alone.
+        func writeManifest(in folder: URL, finished: [URL]) throws {
+            var logs: [String: Any] = [:]
+            for (index, bundle) in finished.enumerated() {
+                logs["LOG-\(index)"] = ["fileName": bundle.lastPathComponent]
+            }
+            try write(
+                ["logFormatVersion": 12, "logs": logs],
+                to: folder.appendingPathComponent("Logs/Test/LogStoreManifest.plist")
+            )
+        }
+
         private func write(_ propertyList: [String: Any], to url: URL) throws {
             try FileManager.default.createDirectory(
                 at: url.deletingLastPathComponent(),
@@ -78,6 +90,24 @@ struct DerivedDataLocatorTests {
         let found = fixture.locator.latestResultBundle(forProjectAt: app, gitRootURL: nil)
 
         #expect(Self.isSamePlace(found, bundle))
+    }
+
+    @Test("A run still being written is not offered until the manifest lists it")
+    func skipsRunStillGoing() throws {
+        let fixture = try Fixture()
+        let app = fixture.projects.appendingPathComponent("App")
+        let folder = try fixture.addWorkspace("App-abc", at: app.appendingPathComponent("App.xcodeproj").path)
+        let finished = try fixture.addRun("Test-1", in: folder, created: Self.earlier)
+        let running = try fixture.addRun("Test-2", in: folder, created: Self.later)
+        try fixture.writeManifest(in: folder, finished: [finished])
+
+        let before = fixture.locator.resultBundles(forProjectAt: app, gitRootURL: nil)
+        #expect(before.count == 1)
+        #expect(Self.isSamePlace(before.first?.url, finished))
+
+        try fixture.writeManifest(in: folder, finished: [finished, running])
+        let after = fixture.locator.resultBundles(forProjectAt: app, gitRootURL: nil)
+        #expect(Self.isSamePlace(after.first?.url, running))
     }
 
     @Test("The newest run wins, by the date the bundle records")

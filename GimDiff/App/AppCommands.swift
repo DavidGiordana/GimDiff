@@ -128,6 +128,11 @@ struct AppCommands: Commands {
             }
             .disabled(!state.canShowTestRun)
 
+            Button("Show Latest Test Run") {
+                state.showLatestTestRun()
+            }
+            .disabled(state.sidebarSource != .testRun || !state.testRuns.hasNewerRun)
+
             Divider()
 
             Toggle("Show Only Modified Snapshots", isOn: binding(\.showGitModifiedOnly))
@@ -440,7 +445,7 @@ struct AppCommands: Commands {
     /// to it when it was showing the project.
     private var testRunBundle: Binding<URL?> {
         Binding(
-            get: { state.testRuns.selectedBundle?.url },
+            get: { state.testRuns.displayedBundleURL },
             set: { url in url.map(state.showTestRun(from:)) }
         )
     }

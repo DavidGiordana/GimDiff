@@ -24,8 +24,9 @@ enum SidebarSource: Hashable, Sendable {
 /// that compare a failing snapshot with what its test rendered.
 ///
 /// Every run Xcode still keeps is offered, newest first, and the newest is the one shown
-/// until somebody picks another. A picked run stays on screen when a newer one arrives;
-/// following the newest again is a matter of picking it.
+/// until somebody picks another. A run on screen with failures left stays there when a newer
+/// one arrives, picked or not: the newer one is announced and shown when asked for, so a
+/// review is never swapped out from under the person doing it.
 ///
 /// Nothing is read until the user switches to it: a project opens on its own status, and
 /// reading a run exports images through `xcresulttool`, which is not free. Once read, the
@@ -215,10 +216,17 @@ extension AppState {
 
     /// Answers a change where Xcode writes the project's result bundles.
     ///
-    /// On screen, the new run replaces the old one once it is written, unless an older run
-    /// was picked from the history, which stays. Off screen, the old one is only forgotten,
-    /// so the next switch reads the new one without paying for a read nobody may ask for.
+    /// On screen, a run with failures left stays, and the new one is only located, for
+    /// ``TestRunModel/hasNewerRun`` to announce once it is written. A run with nothing left
+    /// to settle, or none read yet, gives way to the new one. Off screen, the old one is
+    /// only forgotten, so the next switch reads the new one without paying for a read
+    /// nobody may ask for.
     func testResultsChanged() {
+        if sidebarSource == .testRun, testRuns.holdsResultsOnScreen {
+            testRuns.locate(project: isProjectOnDisk ? currentProject : nil, settling: true)
+            return
+        }
+
         // A first run, or derived data deleted, is what shows or hides the switch.
         locateTestRun()
         if sidebarSource == .testRun {
@@ -226,6 +234,15 @@ extension AppState {
         } else {
             discardTestRun()
         }
+    }
+
+    /// Replaces the run on screen with the newer one ``testResultsChanged()`` held back.
+    ///
+    /// The selection and the canvas follow as they would for a run read on arrival: a
+    /// snapshot still failing stays selected and shows its new rendering.
+    func showLatestTestRun() {
+        guard isProjectOnDisk, testRuns.hasNewerRun else { return }
+        refreshTestRun()
     }
 
     // MARK: - Rows

@@ -414,6 +414,14 @@ the user sees goes in the extension.
   one through `showTestRun(from:)`. Picking an older run sets `testRuns.pinnedBundleURL`, and
   a pinned run stays on screen when a newer one arrives; picking the newest clears the pin,
   so the view follows new runs again. A pinned run that is deleted gives way to the newest.
+- **A new run never swaps out a review.** While the newest run is on screen with failures
+  left (`testRuns.holdsResultsOnScreen`), a run that arrives is only located, and once it
+  has finished the sidebar says *A newer test run finished* beside **Show
+  Latest** (also View ▸ Show Latest Test Run), which calls `showLatestTestRun()`.
+  `testRuns.shownBundle` is the bundle the results came from, compared whole, because
+  Paparazzi's run keeps its URL and only its date moves; the pickers mark it through
+  `displayedBundleURL` while it is held. A run with nothing left to settle, or none read
+  yet, gives way to the new one at once.
 - **The switch appears only when there is a run.** `load(_:)` looks for the project's
   bundles with `locateTestRun()` — a property list per workspace and per run, no `xcresulttool` —
   and `showsSidebarSourcePicker` stays false until one is found. It stays up while the
@@ -428,7 +436,7 @@ the user sees goes in the extension.
   nothing. Its suites open on arrival and its first failure is selected. The Modified and
   Warnings chips belong to the project view and are cleared on every switch.
 - **The run stays read across switches.** A new bundle arriving while the run's view is up
-  is read once the folder settles; one arriving while the project view is up only discards
+  is held back as above, or read once the folder settles when nothing is left to review; one arriving while the project view is up only discards
   the old results, so the next switch reads the new run.
 
 Nothing about reading a run assumes a snapshot library: every decision is made from Xcode's
@@ -436,7 +444,10 @@ own structure or from bytes.
 
 - **Finding the run.** `DerivedDataLocator` matches each DerivedData folder's `info.plist`
   (`WorkspacePath`) against the project root and its working tree, and takes the newest
-  `Logs/Test/*.xcresult` by the `dateCreated` the bundle records. It honours Xcode's
+  `Logs/Test/*.xcresult` by the `dateCreated` the bundle records. A bundle exists from the
+  moment its run starts, so one is offered only once `Logs/Test/LogStoreManifest.plist`
+  lists it, which Xcode does when the run ends; a folder without a manifest is taken as
+  finished. Waiting for the folder to go quiet is not enough: a run has quiet stretches. It honours Xcode's
   `IDECustomDerivedDataLocation` when that is absolute.
 - **Reading it.** `XcresultReader` goes through `xcrun xcresulttool` only — the bundle
   format is private. Failed test cases come from `get test-results tests`; images are

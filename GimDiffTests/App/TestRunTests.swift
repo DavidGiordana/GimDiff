@@ -659,27 +659,94 @@ struct TestRunTests {
         #expect(fixture.filesystem.removedPaths == [Self.scratch.path])
     }
 
-    @Test("A new run written to derived data replaces the results")
-    func newRunReplacesResults() async throws {
-        let directory = URL(fileURLWithPath: "/DerivedData/Demo-hash/Logs/Test", isDirectory: true)
-        let fixture = await openWithFailures(resultDirectories: [directory])
-        #expect(fixture.watcher.watchedRoots.last?.contains(directory) == true)
+    private static let resultsDirectory = URL(fileURLWithPath: "/DerivedData/Demo-hash/Logs/Test", isDirectory: true)
+    private static let newerBundle = resultsDirectory.appendingPathComponent("Newer.xcresult")
+    private static let newerScratch = URL(fileURLWithPath: "/scratch/newer", isDirectory: true)
 
-        let secondScratch = URL(fileURLWithPath: "/scratch/second", isDirectory: true)
-        fixture.testResults.report = TestRunReport(
-            bundleURL: StubTestResults.bundleURL,
-            scratchDirectory: secondScratch,
-            failures: []
+    /// Puts a run newer than the one `openWithFailures` sets up in front of it, failing on
+    /// `menu` alone, and tells the app the result folder changed.
+    private func arriveNewerRun(in fixture: AppStateFixture) async {
+        let newer = failure(
+            "BetaTests/testMenu()",
+            images: [("R2", "menu recorded"), ("Z", "menu rendered again")],
+            scratch: Self.newerScratch
         )
-        fixture.watcher.send([ProjectFileEvent(url: directory.appendingPathComponent("Run2.xcresult/Info.plist"))])
-
-        for _ in 0 ..< 400 where fixture.state.testRuns.results?.isEmpty != true {
-            try await Task.sleep(for: .milliseconds(10))
+        for image in newer.groups.flatMap(\.images) {
+            fixture.filesystem.stub(image.fileURL, contents: image.id == "R2" ? "menu recorded" : "menu rendered again")
         }
+        fixture.filesystem.createDirectory(at: Self.newerScratch)
+        fixture.testResults.reports.insert(TestRunReport(
+            bundleURL: Self.newerBundle,
+            scratchDirectory: Self.newerScratch,
+            startedAt: Date(),
+            failures: [newer]
+        ), at: 0)
+
+        await fixture.state.projectFilesChanged([
+            ProjectFileEvent(url: Self.newerBundle.appendingPathComponent("Info.plist")),
+        ])
+        await fixture.state.testRuns.currentLocate?.value
+        await fixture.state.testRuns.currentRead?.value
+    }
+
+    @Test("A new run arriving while failures are on screen is announced, not shown")
+    func newRunIsHeldBack() async throws {
+        let fixture = await openWithFailures(resultDirectories: [Self.resultsDirectory])
+        #expect(fixture.watcher.watchedRoots.last?.contains(Self.resultsDirectory) == true)
+        fixture.state.selectRow(withID: fixture.rowID("AlphaTests/header"))
+        let selected = fixture.selectedRowDescription
+
+        await arriveNewerRun(in: fixture)
+
+        #expect(fixture.testResults.readCount == 1)
+        #expect(fixture.state.testRuns.results?.bundleURL == StubTestResults.bundleURL)
+        #expect(fixture.state.testRuns.hasNewerRun)
+        #expect(fixture.state.testRuns.displayedBundleURL == StubTestResults.bundleURL)
+        #expect(fixture.state.testRuns.bundles.first?.url == Self.newerBundle)
+        #expect(fixture.selectedRowDescription == selected)
+        #expect(!fixture.filesystem.removedPaths.contains(Self.scratch.path))
+    }
+
+    @Test("Showing the latest run replaces the one held on screen")
+    func showsLatestOnRequest() async throws {
+        let fixture = await openWithFailures(resultDirectories: [Self.resultsDirectory])
+        await arriveNewerRun(in: fixture)
+
+        fixture.state.showLatestTestRun()
         await fixture.state.testRuns.currentRead?.value
 
-        #expect(fixture.state.testRuns.results?.isEmpty == true)
+        #expect(fixture.state.testRuns.results?.bundleURL == Self.newerBundle)
+        #expect(!fixture.state.testRuns.hasNewerRun)
+        #expect(fixture.state.testRuns.displayedBundleURL == Self.newerBundle)
+        #expect(fixture.rowDescriptions == ["BetaTests", "BetaTests/menu"])
         #expect(fixture.filesystem.removedPaths.contains(Self.scratch.path))
+    }
+
+    @Test("A new run replaces one that has nothing left to settle")
+    func newRunReplacesSettledRun() async throws {
+        let fixture = await openWithFailures(resultDirectories: [Self.resultsDirectory], attachingUnmatched: false)
+        let header = try snapshot("header", in: fixture)
+        let menu = try snapshot("menu", in: fixture)
+        fixture.state.resolveTestRunFailures(snapshotIDs: [header.id, menu.id])
+        #expect(fixture.state.testRuns.results?.isEmpty == true)
+
+        await arriveNewerRun(in: fixture)
+
+        #expect(fixture.state.testRuns.results?.bundleURL == Self.newerBundle)
+        #expect(!fixture.state.testRuns.hasNewerRun)
+    }
+
+    @Test("A run picked from the history stays without announcing the newer one")
+    func pinnedRunIsNotAnnounced() async throws {
+        let fixture = await openWithFailures(resultDirectories: [Self.resultsDirectory])
+        await addOlderRun(to: fixture)
+        fixture.state.showTestRun(from: Self.olderBundle)
+        await fixture.state.testRuns.currentRead?.value
+
+        await arriveNewerRun(in: fixture)
+
+        #expect(fixture.state.testRuns.results?.bundleURL == Self.olderBundle)
+        #expect(!fixture.state.testRuns.hasNewerRun)
     }
 
     @Test("A new run written while the project is shown is only noted, not read")

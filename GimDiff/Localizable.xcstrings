@@ -260,6 +260,9 @@
     "A link, owner/repo#123, or a number from the open project's repository." : {
 
     },
+    "A newer test run finished" : {
+
+    },
     "A pair pasted from a failure log, dropped in, or opened by URL offers **Keep Baseline** and **Keep Candidate** instead. Keeping the baseline writes nothing; keeping the candidate copies it over the baseline. Either way the baseline is left on screen on its own." : {
 
     },
@@ -1017,6 +1020,9 @@
     "Rendered" : {
 
     },
+    "Replace this run with the newest one" : {
+
+    },
     "Rescan the project" : {
 
     },
@@ -1066,6 +1072,12 @@
 
     },
     "Selecting a snapshot compares it with its committed version when git has one. **Snapshot ▸ Show Snapshot without Git Diff** shows the file on its own." : {
+
+    },
+    "Show Latest" : {
+
+    },
+    "Show Latest Test Run" : {
 
     },
     "Show Only Modified Snapshots" : {
