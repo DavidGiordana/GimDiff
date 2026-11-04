@@ -342,7 +342,29 @@ struct SnapshotImageViewer<Accessory: View>: View {
 
     // MARK: - Footer
 
+    /// The pane's controls, giving up what matters least as the pane narrows: the image
+    /// size first, then the width of the mode picker.
+    ///
+    /// Two panes side by side share whatever the sidebar leaves, and a row that cannot
+    /// shrink does not stay inside its pane — it widens the whole split view past the
+    /// window, which then cuts off the sidebar's leading edge and the decision bar's
+    /// trailing one. Whatever still does not fit is clipped here, at the pane's own edge.
     private var footer: some View {
+        ViewThatFits(in: .horizontal) {
+            footerRow(showsImageSize: true, pickerWidth: Self.displayModePickerWidth)
+            footerRow(showsImageSize: false, pickerWidth: Self.displayModePickerWidth)
+            footerRow(showsImageSize: false, pickerWidth: Self.compactDisplayModePickerWidth)
+        }
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+        .clipped()
+        .padding(.vertical, 6)
+        .background(.bar)
+    }
+
+    private static var displayModePickerWidth: CGFloat { 148 }
+    private static var compactDisplayModePickerWidth: CGFloat { 92 }
+
+    private func footerRow(showsImageSize: Bool, pickerWidth: CGFloat) -> some View {
         HStack(spacing: 10) {
             Picker("Display Mode", selection: $displayMode) {
                 ForEach(CanvasDisplayMode.allCases) { mode in
@@ -351,14 +373,14 @@ struct SnapshotImageViewer<Accessory: View>: View {
             }
             .pickerStyle(.menu)
             .labelsHidden()
-            .frame(width: 148)
+            .frame(width: pickerWidth)
             .help("How the image is fitted into the pane")
 
             if displayMode == .free {
                 zoomControls
             }
 
-            if case let .loaded(decoded) = image {
+            if showsImageSize, case let .loaded(decoded) = image {
                 imageSizeLabel(decoded)
             }
 
@@ -367,8 +389,6 @@ struct SnapshotImageViewer<Accessory: View>: View {
             accessory()
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(.bar)
     }
 
     /// The stored size in pixels, with the density it was recorded at when that is not 1x,

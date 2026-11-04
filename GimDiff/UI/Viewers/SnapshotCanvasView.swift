@@ -177,7 +177,10 @@ struct SnapshotCanvasView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Never wider than the share it is offered: a pane that insists on more widens the
+        // split view past the window instead, and both ends of the window are cut off.
+        .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .clipped()
         .background(paneBackdrop)
     }
 
