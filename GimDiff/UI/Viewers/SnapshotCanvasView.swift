@@ -386,7 +386,7 @@ struct SnapshotPaneHeader: View {
                 Image(systemName: "ellipsis.curlybraces")
             }
             .buttonStyle(.borderless)
-            .disabled(state.previewSuite == nil)
+            .disabled(state.previewSuite?.isMissingSourceCode ?? true)
             .help("Open Test Source")
         }
     }

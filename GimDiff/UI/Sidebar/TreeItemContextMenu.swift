@@ -49,6 +49,7 @@ struct TreeItemContextMenu: View {
             } label: {
                 Label("Open Test File", systemImage: "ellipsis.curlybraces")
             }
+            .disabled(suite.isMissingSourceCode)
         }
 
         if !state.isReviewingPullRequest, !isTestRunAttachment {
@@ -127,6 +128,7 @@ struct TreeItemContextMenu: View {
                 } label: {
                     Label("Open Test File", systemImage: "ellipsis.curlybraces")
                 }
+                .disabled(suite.isMissingSourceCode)
             }
 
             if !isTestRunAttachment {
