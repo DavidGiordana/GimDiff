@@ -238,11 +238,12 @@ struct KeyboardNavigationTests {
     // MARK: - Stepping through changes
 
     @Test("Next Change opens a closed suite and lands on its changed snapshot")
-    func nextChangeOpensTheSuite() {
+    func nextChangeOpensTheSuite() async {
         let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
         #expect(fixture.selectedRowDescription == "AlphaTests")
 
         fixture.state.selectNextChange()
+        await fixture.state.canvas.currentGitDiff?.value
 
         #expect(fixture.selectedRowDescription == "AlphaTests/header")
         #expect(fixture.state.isExpanded(suiteWithID: fixture.suiteID("AlphaTests")))

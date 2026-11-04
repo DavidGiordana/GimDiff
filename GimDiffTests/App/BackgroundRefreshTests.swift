@@ -96,10 +96,11 @@ struct ProjectMergeTests {
     }
 
     @Test("A preview of a snapshot that is still there survives the merge")
-    func keptPreview() {
+    func keptPreview() async {
         let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
         fixture.expand("AlphaTests")
         fixture.state.selectRow(withID: fixture.rowID("AlphaTests/header"))
+        await fixture.state.canvas.currentGitDiff?.value
 
         fixture.state.merge(pruned(AppStateFixture.twoSuites()) { $0 == "BetaTests" })
 

@@ -149,6 +149,7 @@ struct TestRunTests {
         let fixture = await openWithFailures()
 
         fixture.state.showProjectStatus()
+        await fixture.state.canvas.currentGitDiff?.value
 
         #expect(fixture.state.sidebarSource == .project)
         #expect(fixture.rowDescriptions.contains("AlphaTests/footer"))
@@ -283,6 +284,7 @@ struct TestRunTests {
         fixture.state.showProjectStatus()
 
         fixture.state.showSnapshot(header, withGitDiff: true)
+        await fixture.state.canvas.currentGitDiff?.value
 
         #expect(fixture.state.canvas.preview?.candidate?.origin == .workingTree)
     }

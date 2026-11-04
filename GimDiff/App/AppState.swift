@@ -599,7 +599,7 @@ final class AppState {
     /// single image while git extracts it again.
     private func previewSelectedSnapshot() {
         guard case let .snapshot(snapshot, _) = selectedRow,
-              canvas.preview?.snapshotID != snapshot.id
+              !canvas.isShowingOrLoading(snapshotID: snapshot.id)
         else { return }
         showSnapshot(snapshot, withGitDiff: true)
     }
@@ -701,8 +701,8 @@ final class AppState {
     func togglePreview() {
         switch selectedRow {
         case let .snapshot(snapshot, _):
-            if canvas.preview?.snapshotID == snapshot.id {
-                canvas.show(nil)
+            if canvas.isShowingOrLoading(snapshotID: snapshot.id) {
+                canvas.close()
             } else {
                 showSnapshot(snapshot, withGitDiff: true)
             }
@@ -1032,7 +1032,7 @@ final class AppState {
     /// Whether the canvas already shows the selected snapshot, so Space would close it.
     var isShowingSelectedSnapshot: Bool {
         guard let snapshot = selectedSnapshot else { return false }
-        return canvas.preview?.snapshotID == snapshot.id
+        return canvas.isShowingOrLoading(snapshotID: snapshot.id)
     }
 
     /// What Copy Name puts on the clipboard: the suite's name or the snapshot's, as the row reads.

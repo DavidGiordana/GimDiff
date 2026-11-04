@@ -118,11 +118,12 @@ struct SubtreePruningTests {
     }
 
     @Test("A preview of another snapshot survives the deletion")
-    func keepsAnUnrelatedPreview() {
+    func keepsAnUnrelatedPreview() async {
         let fixture = AppStateFixture(bundle: AppStateFixture.twoSuites())
         fixture.expand("AlphaTests")
         fixture.select("AlphaTests/header")
         fixture.state.togglePreview()
+        await fixture.state.canvas.currentGitDiff?.value
 
         fixture.select("AlphaTests/footer")
         fixture.state.deleteSelection()

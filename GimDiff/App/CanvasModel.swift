@@ -91,6 +91,14 @@ final class CanvasModel {
     /// Held so a second diff request supersedes the first rather than racing it.
     @ObservationIgnored private var diffTask: Task<Void, Never>?
     @ObservationIgnored private var committedVersionTask: Task<Void, Never>?
+    /// Puts a snapshot up on its own when git takes longer than ``committedVersionGrace``.
+    @ObservationIgnored private var committedVersionFallback: Task<Void, Never>?
+    /// The snapshot waiting for its committed version, while the previous preview stays up.
+    @ObservationIgnored private var pendingSnapshotID: String?
+    /// How long the canvas keeps the previous preview while git extracts a committed
+    /// version. `git show` of a snapshot usually takes a few milliseconds; this only bounds
+    /// a slow one.
+    @ObservationIgnored var committedVersionGrace: Duration = .milliseconds(250)
     @ObservationIgnored private var looseRoleTask: Task<Void, Never>?
 
     init(
@@ -117,6 +125,8 @@ final class CanvasModel {
     /// pair would otherwise keep describing it under the new one's images.
     func show(_ newValue: SnapshotPreview?) {
         diffTask?.cancel()
+        // Whatever is shown now supersedes a snapshot still waiting for its committed version.
+        pendingSnapshotID = nil
         // Whatever the canvas shows next, a pair still being decided is no longer wanted.
         looseRoleTask?.cancel()
         looseRoleCertainty = nil
@@ -134,7 +144,7 @@ final class CanvasModel {
 
     /// Clears the canvas, abandoning a committed version still being extracted.
     func close() {
-        committedVersionTask?.cancel()
+        cancelCommittedVersion()
         show(nil)
     }
 
@@ -142,37 +152,57 @@ final class CanvasModel {
     /// something else.
     func cancelCommittedVersion() {
         committedVersionTask?.cancel()
+        committedVersionFallback?.cancel()
+        pendingSnapshotID = nil
     }
 
-    /// Shows `snapshot`, upgraded to a comparison with its committed version once git has
-    /// written that out.
+    /// Shows `snapshot`, as a comparison with its committed version when it has one.
     ///
-    /// The image is put on screen immediately: extracting the committed file spawns a
-    /// process, and waiting for that before drawing anything would make every selection
-    /// feel slow.
+    /// A snapshot with a committed version is not drawn on its own first: the canvas would
+    /// lay out one pane and then two a moment later, which reads as a flicker on every step
+    /// through a folder of changes. What is on screen stays there while git writes the file,
+    /// for up to ``committedVersionGrace``; only an extraction slower than that puts the
+    /// image up alone in the meantime, so a selection never waits on git for long.
     ///
     /// - Parameter gitRoot: The repository the snapshot is in; `nil` shows it on its own.
     func showWithCommittedVersion(_ snapshot: SnapshotItem, gitRoot: URL?) {
-        committedVersionTask?.cancel()
-        show(.single(snapshot))
+        cancelCommittedVersion()
 
         guard snapshot.gitStatus == .modified,
               let gitRoot,
               let relativePath = AppState.relativePath(of: snapshot.fileURL, under: gitRoot)
-        else { return }
+        else {
+            show(.single(snapshot))
+            return
+        }
+
+        pendingSnapshotID = snapshot.id
+        let grace = committedVersionGrace
+        committedVersionFallback = Task {
+            try? await Task.sleep(for: grace)
+            guard !Task.isCancelled, pendingSnapshotID == snapshot.id else { return }
+            show(.single(snapshot))
+        }
 
         committedVersionTask = Task { [gitService, filesystem] in
             // An untracked or newly added snapshot has nothing at HEAD to compare with, so
-            // a failure here is ordinary: the image stays on screen on its own.
-            guard let committed = try? await gitService.extractCommittedVersion(
+            // a failure here is ordinary: the image is shown on its own.
+            let committed = try? await gitService.extractCommittedVersion(
                 ofFileAt: relativePath,
                 repositoryRoot: gitRoot,
                 gitRef: Self.comparisonGitRef
-            ) else { return }
+            )
 
-            guard !Task.isCancelled, preview?.snapshotID == snapshot.id else {
+            let stillWanted = !Task.isCancelled
+                && (pendingSnapshotID == snapshot.id || preview?.snapshotID == snapshot.id)
+            guard stillWanted else {
                 // Superseded while git was writing it; nothing will ever show it.
-                try? filesystem.removeItem(at: committed)
+                if let committed { try? filesystem.removeItem(at: committed) }
+                return
+            }
+            committedVersionFallback?.cancel()
+            guard let committed else {
+                show(.single(snapshot))
                 return
             }
             show(.comparison(
@@ -184,6 +214,14 @@ final class CanvasModel {
         }
     }
 
+    /// The snapshot the canvas is about to show, while its committed version is extracted.
+    ///
+    /// The selection has already moved to it even though ``preview`` has not, so a caller
+    /// deciding whether the canvas stands on a snapshot asks here.
+    func isShowingOrLoading(snapshotID: String) -> Bool {
+        (pendingSnapshotID ?? preview?.snapshotID) == snapshotID
+    }
+
     /// The committed-version extraction in flight, if any, so a caller can wait for it.
     var currentGitDiff: Task<Void, Never>? { committedVersionTask }
 
@@ -192,7 +230,7 @@ final class CanvasModel {
     /// - Parameter certainty: How the sides were chosen. A caller that named them — a
     ///   `gimdiff://compare` URL — leaves the default.
     func showComparison(reference: URL, failure: URL, certainty: LooseRoleCertainty = .stated) {
-        committedVersionTask?.cancel()
+        cancelCommittedVersion()
         show(.comparison(
             SnapshotPair(reference: reference, failure: failure),
             snapshotID: nil,
