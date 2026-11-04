@@ -1380,10 +1380,8 @@ final class AppState {
 enum CanvasViewCommand: Equatable, Sendable {
     case fit
     case actualSize
-    case free
     case zoomIn
     case zoomOut
-    case resetZoom
     /// Sets the onion skin's fade: 0 is the baseline alone, 1 the candidate alone.
     case fadeOnionSkin(to: Double)
 }

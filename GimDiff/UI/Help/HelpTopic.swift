@@ -282,12 +282,13 @@ private extension HelpTopic {
         ]),
         HelpSection(title: String(localized: "Zoom and backgrounds"), blocks: [
             .text(String(localized: """
-                Each pane has its own display mode: **Fit**, **Actual Size (1:1)**, or \
-                **Free**. In Free, scroll or pinch over the image to zoom around the pointer, \
-                drag to move it, or use the **−** and **+** buttons and type a factor between \
-                them; the target button centres the image at 1.0 again. **View ▸ Image Size**, \
-                **Zoom In** (⌘=), **Zoom Out** (⌘-), and **Centre and Reset Zoom** do the same \
-                for every pane at once.
+                Each pane opens fitted. Scroll or drag to move around the image, and pinch or \
+                hold ⌘ while scrolling to zoom around the pointer. **Fit** and **1:1** in the \
+                pane's footer put the whole image in the pane or show it at the size it was \
+                recorded at, and double-clicking the image switches between the two. Use the \
+                **−** and **+** buttons, or type a percentage between them, to zoom in steps. \
+                **View ▸ Zoom to Fit**, **Actual Size**, **Zoom In** (⌘=), and **Zoom Out** \
+                (⌘-) do the same for every pane at once.
                 """)),
             .text(String(localized: """
                 Side by side, each pane zooms on its own. Click the link button in either \

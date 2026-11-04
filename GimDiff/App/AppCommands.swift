@@ -165,21 +165,16 @@ struct AppCommands: Commands {
             Divider()
 
             // The footer controls of each pane, applied to every pane on screen at once.
-            // ⌘0 is Collapse Sidebar's, so resetting the zoom goes without a shortcut.
-            Menu("Image Size") {
-                Button("Fit") { state.canvas.requestView(.fit) }
-                Button("Actual Size (1:1)") { state.canvas.requestView(.actualSize) }
-                Button("Free") { state.canvas.requestView(.free) }
-            }
-            .disabled(!state.canvas.hasZoomableImages)
-
+            // ⌘0 and ⌘1 are the sidebar's, so Fit and Actual Size go without a shortcut.
+            Button("Zoom to Fit") { state.canvas.requestView(.fit) }
+                .disabled(!state.canvas.hasZoomableImages)
+            Button("Actual Size") { state.canvas.requestView(.actualSize) }
+                .disabled(!state.canvas.hasZoomableImages)
             Button("Zoom In") { state.canvas.requestView(.zoomIn) }
                 .keyboardShortcut("=", modifiers: .command)
                 .disabled(!state.canvas.hasZoomableImages)
             Button("Zoom Out") { state.canvas.requestView(.zoomOut) }
                 .keyboardShortcut("-", modifiers: .command)
-                .disabled(!state.canvas.hasZoomableImages)
-            Button("Centre and Reset Zoom") { state.canvas.requestView(.resetZoom) }
                 .disabled(!state.canvas.hasZoomableImages)
 
             // The link button in each side-by-side pane's footer.

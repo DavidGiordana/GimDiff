@@ -21,9 +21,9 @@ struct SnapshotCanvasView: View {
     /// Colour painted behind the images themselves, for reading transparent snapshots.
     let imageMatte: Color?
 
-    /// The view both side-by-side panes follow while Link Panes is on. Dropped whenever the
+    /// The zoom both side-by-side panes follow while Link Panes is on. Dropped whenever the
     /// link is broken or the pair changes, so the next link starts from the baseline pane.
-    @State private var linkedTransform: LinkedPaneTransform?
+    @State private var linkedTransform: PaneViewport?
 
     var body: some View {
         VStack(spacing: 0) {

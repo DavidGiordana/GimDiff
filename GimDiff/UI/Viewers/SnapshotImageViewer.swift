@@ -8,58 +8,14 @@
 
 import SwiftUI
 
-/// How one image is fitted into the room the canvas has for it.
-enum CanvasDisplayMode: String, CaseIterable, Identifiable, Sendable {
-    /// Whatever the pinch and the drag have made of it.
-    case free
-    /// Scaled down until the whole image is on screen.
-    case fit
-    /// Drawn at the point size it was recorded at, scrollable in both directions.
-    case actualSize
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .free: String(localized: "Free")
-        case .fit: String(localized: "Fit")
-        case .actualSize: String(localized: "Actual Size (1:1)")
-        }
-    }
-}
-
-/// What two linked panes share: how the image is fitted, and where a free zoom stands.
+/// One image on the canvas, with the zoom controls under it.
 ///
-/// The pan is a fraction of the fitted image's size rather than a distance in points, so a
-/// pane showing a taller image puts the same part of it under the same point of the pane.
-struct LinkedPaneTransform: Equatable {
-    var displayMode: CanvasDisplayMode
-    var scale: CGFloat
-    var offset: CGSize
-
-    /// Equal but for rounding, which a round trip through two panes' sizes introduces and
-    /// which, taken as a change, would bounce between the two panes for ever.
-    func isClose(to other: LinkedPaneTransform) -> Bool {
-        let tolerance: CGFloat = 0.000_1
-        return displayMode == other.displayMode
-            && abs(scale - other.scale) < tolerance
-            && abs(offset.width - other.offset.width) < tolerance
-            && abs(offset.height - other.offset.height) < tolerance
-    }
-}
-
-/// One image on the canvas, with the controls that decide how it is drawn.
-///
-/// The viewer owns its display mode and its transform, so the two panes of a comparison can
-/// be inspected independently — one held at 1:1 on a detail while the other stays fitted.
-/// Given a ``link``, it mirrors them into it and follows it, so two panes move as one.
+/// There is one zoom, not a choice of modes: Fit and 1:1 are places the zoom can be put, and
+/// scrolling pans, pinching or ⌘-scrolling zooms, whichever of them was last asked for. Each
+/// viewer owns its zoom, so the two panes of a comparison can be inspected independently —
+/// one held at 1:1 on a detail while the other stays fitted. Given a ``link``, it mirrors its
+/// zoom into it and follows it, so two panes move as one.
 struct SnapshotImageViewer<Accessory: View>: View {
-    /// How far in and out a free-mode zoom may go.
-    static var scaleRange: ClosedRange<CGFloat> { 0.1...10.0 }
-    /// How much one press of `+` or `−` moves the scale.
-    static var zoomStep: CGFloat { 0.25 }
-
-    @Environment(\.displayScale) private var displayScale
     @Environment(AppState.self) private var state
 
     let fileURL: URL
@@ -68,35 +24,26 @@ struct SnapshotImageViewer<Accessory: View>: View {
     /// Painted directly behind the image, so a transparent snapshot can be read.
     let matte: Color?
     /// Shared with the other pane while Link Panes is on, `nil` otherwise.
-    var link: Binding<LinkedPaneTransform?>?
-    /// Whether this pane's view becomes the shared one when linking starts. One pane must
+    var link: Binding<PaneViewport?>?
+    /// Whether this pane's zoom becomes the shared one when linking starts. One pane must
     /// win, or turning the link on would leave the two fighting over whose zoom it is.
     var seedsLink = false
     @ViewBuilder let accessory: () -> Accessory
 
     @State private var image: CanvasImage?
-    /// The image area's size, which turns a shared fraction back into points.
-    @State private var areaSize: CGSize = .zero
-    @State private var displayMode: CanvasDisplayMode = .free
-    @State private var scale: CGFloat = 1.0
-    @State private var offset: CGSize = .zero
-    /// Where the transform stood when the current gesture began.
-    @State private var anchoredScale: CGFloat = 1.0
-    @State private var anchoredOffset: CGSize = .zero
-    @State private var scaleText = "1.00"
+    /// Where the zoom last stood, as the scroll view reported it.
+    @State private var viewport = PaneViewport.fitted
+    @State private var zoomRequest: ZoomRequest?
+    /// What this pane last wrote into the link. Seen coming back, it is this pane's own
+    /// zoom, perhaps a frame behind; following it would pull an animating zoom back.
+    @State private var publishedViewport: PaneViewport?
+    @State private var zoomText = CanvasZoom.percentText(1)
 
     var body: some View {
         VStack(spacing: 0) {
             imageArea
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
-                .background {
-                    GeometryReader { proxy in
-                        Color.clear
-                            .onAppear { areaSize = proxy.size }
-                            .onChange(of: proxy.size) { areaSize = proxy.size }
-                    }
-                }
 
             Divider()
 
@@ -107,119 +54,65 @@ struct SnapshotImageViewer<Accessory: View>: View {
         .task(id: ReloadKey(path: fileURL.path, token: reloadToken)) {
             await loadImage()
         }
-        // A new file at the old transform would open somewhere off screen, so the pan and
-        // the zoom belong to the image that was being looked at, not to the pane. The old
-        // bitmap goes with them: held until the new one decodes, it would spend a frame
-        // claiming to be a file it is not.
+        // The zoom belongs to the image that was being looked at, not to the pane, so a new
+        // file opens fitted. The old bitmap goes with it: held until the new one decodes, it
+        // would spend a frame claiming to be a file it is not. Dropping it also replaces the
+        // scroll view, and the request is dropped so the new one does not replay it.
         .onChange(of: fileURL) {
             image = nil
-            resetTransform(animated: false)
-        }
-        .onChange(of: displayMode) { _, mode in
-            // Switched to follow the other pane: take its zoom rather than resetting it.
-            if let shared = link?.wrappedValue, shared.displayMode == mode {
-                adopt(shared)
-            } else {
-                resetTransform(animated: false)
-                publishToLink()
-            }
+            zoomRequest = nil
+            viewport = .fitted
+            zoomText = CanvasZoom.percentText(viewport.magnification)
+            followLink()
         }
         .onChange(of: state.canvas.viewRequest) { _, request in
             if let request { perform(request.command) }
         }
-        .onChange(of: scale) { publishToLink() }
-        .onChange(of: offset) { publishToLink() }
         .onChange(of: link != nil) { followLink() }
         .onChange(of: link?.wrappedValue, initial: true) { followLink() }
     }
 
-    // MARK: - Linking
+    // MARK: - Zoom
 
-    /// Takes the shared view, or offers this pane's when there is none yet and it seeds.
-    private func followLink() {
-        guard let link else { return }
-        if let shared = link.wrappedValue {
-            adopt(shared)
-        } else if seedsLink {
-            publishToLink()
-        }
-    }
-
-    /// Writes this pane's view into the link, unless it already says the same.
-    private func publishToLink() {
-        guard let link else { return }
-        let fitted = fittedSize
-        let current = LinkedPaneTransform(
-            displayMode: displayMode,
-            scale: scale,
-            offset: CGSize(
-                width: fitted.width > 0 ? offset.width / fitted.width : 0,
-                height: fitted.height > 0 ? offset.height / fitted.height : 0
-            )
-        )
-        if let shared = link.wrappedValue, shared.isClose(to: current) { return }
-        link.wrappedValue = current
-    }
-
-    /// Moves this pane to the shared view. A display mode that differs is set first; its
-    /// change handler comes back here for the zoom.
-    private func adopt(_ shared: LinkedPaneTransform) {
-        guard shared.displayMode == displayMode else {
-            displayMode = shared.displayMode
-            return
-        }
-        let fitted = fittedSize
-        let target = CGSize(
-            width: shared.offset.width * fitted.width,
-            height: shared.offset.height * fitted.height
-        )
-        guard abs(scale - shared.scale) > 0.000_1
-            || abs(offset.width - target.width) > 0.01
-            || abs(offset.height - target.height) > 0.01
-        else { return }
-
-        scale = shared.scale
-        offset = target
-        anchoredScale = scale
-        anchoredOffset = offset
-        syncScaleText()
-    }
-
-    /// The size the image is drawn at before any zoom: fitted to the area, aspect kept.
-    private var fittedSize: CGSize {
-        guard case let .loaded(decoded) = image,
-              decoded.pixelSize.width > 0,
-              decoded.pixelSize.height > 0
-        else { return areaSize }
-        let ratio = min(
-            areaSize.width / decoded.pixelSize.width,
-            areaSize.height / decoded.pixelSize.height
-        )
-        return CGSize(width: decoded.pixelSize.width * ratio, height: decoded.pixelSize.height * ratio)
+    private func request(_ action: ZoomAction) {
+        zoomRequest = ZoomRequest(serial: (zoomRequest?.serial ?? 0) + 1, action: action)
     }
 
     /// Carries out a View menu command, which reaches every pane on screen at once.
     ///
-    /// Zooming a pane that is not in free mode switches it to free first: the scale only
-    /// means something there, and the switch itself starts it at 1.0.
+    /// Two linked panes would each carry it out and then follow each other halfway through,
+    /// so only the pane that seeds the link does; the other follows it.
     private func perform(_ command: CanvasViewCommand) {
+        if link != nil, !seedsLink { return }
         switch command {
-        case .fit:
-            displayMode = .fit
-        case .actualSize:
-            displayMode = .actualSize
-        case .free:
-            displayMode = .free
-        case .zoomIn, .zoomOut:
-            guard displayMode == .free else {
-                displayMode = .free
-                return
-            }
-            step(by: command == .zoomIn ? Self.zoomStep : -Self.zoomStep)
-        case .resetZoom:
-            resetTransform(animated: true)
-        case .fadeOnionSkin:
-            break
+        case .fit: request(.fit)
+        case .actualSize: request(.actualSize)
+        case .zoomIn: request(.zoomIn)
+        case .zoomOut: request(.zoomOut)
+        case .fadeOnionSkin: break
+        }
+    }
+
+    private func viewportChanged(_ new: PaneViewport, isUserInitiated: Bool) {
+        viewport = new
+        zoomText = CanvasZoom.percentText(new.magnification)
+        guard isUserInitiated, let link else { return }
+        if let shared = link.wrappedValue, shared.isClose(to: new) { return }
+        publishedViewport = new
+        link.wrappedValue = new
+    }
+
+    // MARK: - Linking
+
+    /// Takes the shared zoom, or offers this pane's when there is none yet and it seeds.
+    private func followLink() {
+        guard let link else { return }
+        if let shared = link.wrappedValue {
+            guard shared != publishedViewport else { return }
+            if !shared.isClose(to: viewport) { request(.adopt(shared)) }
+        } else if seedsLink {
+            publishedViewport = viewport
+            link.wrappedValue = viewport
         }
     }
 
@@ -229,59 +122,18 @@ struct SnapshotImageViewer<Accessory: View>: View {
     private var imageArea: some View {
         switch image {
         case let .loaded(decoded):
-            decodedContent(decoded)
+            ZoomableImageView(
+                image: decoded,
+                matte: matte,
+                request: zoomRequest,
+                onChange: viewportChanged(_:isUserInitiated:)
+            )
         case .unavailable:
             MissingImageView(fileURL: fileURL)
         case nil:
             ProgressView()
                 .controlSize(.small)
         }
-    }
-
-    @ViewBuilder
-    private func decodedContent(_ decoded: DecodedSnapshotImage) -> some View {
-        switch displayMode {
-        case .fit:
-            fittedImage(decoded)
-                .padding(12)
-
-        case .actualSize:
-            // Scaled by the density the snapshot was recorded at, not the display's: no Mac is
-            // @3x, so pixel-for-pixel would draw an iPhone snapshot up to three times the size
-            // the simulator showed it.
-            ScrollView([.horizontal, .vertical]) {
-                matted(
-                    Image(decorative: decoded.cgImage, scale: decoded.recordedScale, orientation: .up)
-                )
-                .padding(12)
-            }
-
-        case .free:
-            fittedImage(decoded)
-                .scaleEffect(scale)
-                .offset(offset)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .gesture(SimultaneousGesture(magnifyGesture, panGesture))
-                .background(ScrollWheelReader(onScroll: zoom(with:)))
-        }
-    }
-
-    private func fittedImage(_ decoded: DecodedSnapshotImage) -> some View {
-        matted(
-            Image(decorative: decoded.cgImage, scale: displayScale, orientation: .up)
-                .resizable()
-                .scaledToFit()
-        )
-    }
-
-    /// Puts the matte colour behind the image itself rather than behind the pane.
-    ///
-    /// That is the whole point of the control: a dark-mode icon on a dark panel is invisible
-    /// until something opaque sits in the transparent parts of the *image*, exactly where
-    /// the image is and nowhere else.
-    private func matted(_ image: some View) -> some View {
-        image.background(matte ?? .clear)
     }
 
     private func loadImage() async {
@@ -294,56 +146,10 @@ struct SnapshotImageViewer<Accessory: View>: View {
         image = decoded
     }
 
-    // MARK: - Gestures
-
-    private var magnifyGesture: some Gesture {
-        MagnifyGesture()
-            .onChanged { value in
-                scale = Self.clamped(anchoredScale * value.magnification)
-                syncScaleText()
-            }
-            .onEnded { _ in anchoredScale = scale }
-    }
-
-    private var panGesture: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                offset = CGSize(
-                    width: anchoredOffset.width + value.translation.width,
-                    height: anchoredOffset.height + value.translation.height
-                )
-            }
-            .onEnded { _ in anchoredOffset = offset }
-    }
-
-    /// Zooms around the pointer, so whatever is under it stays under it.
-    ///
-    /// The step is exponential in the distance scrolled, which makes a wheel notch in and a
-    /// notch out land back where they started, at any scale.
-    private func zoom(with tick: ScrollWheelTick) {
-        let sensitivity: CGFloat = tick.isPrecise ? 0.01 : 0.1
-        let newScale = Self.clamped(scale * exp(tick.delta * sensitivity))
-        guard newScale != scale else { return }
-
-        // The image is scaled about the pane's centre and then offset, so a pointer at `p`
-        // is over the image point `(p - offset) / scale`. Keeping that point under the
-        // pointer at the new scale fixes the offset.
-        let ratio = newScale / scale
-        let pointer = tick.locationFromCenter
-        offset = CGSize(
-            width: pointer.x - (pointer.x - offset.width) * ratio,
-            height: pointer.y - (pointer.y - offset.height) * ratio
-        )
-        scale = newScale
-        anchoredScale = scale
-        anchoredOffset = offset
-        syncScaleText()
-    }
-
     // MARK: - Footer
 
     /// The pane's controls, giving up what matters least as the pane narrows: the image
-    /// size first, then the width of the mode picker.
+    /// size first, then the zoom's step buttons.
     ///
     /// Two panes side by side share whatever the sidebar leaves, and a row that cannot
     /// shrink does not stay inside its pane — it widens the whole split view past the
@@ -351,9 +157,9 @@ struct SnapshotImageViewer<Accessory: View>: View {
     /// trailing one. Whatever still does not fit is clipped here, at the pane's own edge.
     private var footer: some View {
         ViewThatFits(in: .horizontal) {
-            footerRow(showsImageSize: true, pickerWidth: Self.displayModePickerWidth)
-            footerRow(showsImageSize: false, pickerWidth: Self.displayModePickerWidth)
-            footerRow(showsImageSize: false, pickerWidth: Self.compactDisplayModePickerWidth)
+            footerRow(showsImageSize: true, showsStepButtons: true)
+            footerRow(showsImageSize: false, showsStepButtons: true)
+            footerRow(showsImageSize: false, showsStepButtons: false)
         }
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
         .clipped()
@@ -361,24 +167,22 @@ struct SnapshotImageViewer<Accessory: View>: View {
         .background(.bar)
     }
 
-    private static var displayModePickerWidth: CGFloat { 148 }
-    private static var compactDisplayModePickerWidth: CGFloat { 92 }
-
-    private func footerRow(showsImageSize: Bool, pickerWidth: CGFloat) -> some View {
+    private func footerRow(showsImageSize: Bool, showsStepButtons: Bool) -> some View {
         HStack(spacing: 10) {
-            Picker("Display Mode", selection: $displayMode) {
-                ForEach(CanvasDisplayMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
+            HStack(spacing: 4) {
+                ZoomPresetButton(title: "Fit", isOn: viewport.isFitting) {
+                    request(.fit)
                 }
-            }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .frame(width: pickerWidth)
-            .help("How the image is fitted into the pane")
+                .help("Fit the whole image in the pane, and keep it fitted as the pane changes size")
 
-            if displayMode == .free {
-                zoomControls
+                ZoomPresetButton(title: "1:1", isOn: viewport.isActualSize) {
+                    request(.actualSize)
+                }
+                .help("Show the image at the size it was recorded at. Double-click the image to switch between this and Fit")
+                .accessibilityLabel("Actual Size")
             }
+
+            zoomControls(showsStepButtons: showsStepButtons)
 
             if showsImageSize, case let .loaded(decoded) = image {
                 imageSizeLabel(decoded)
@@ -408,30 +212,22 @@ struct SnapshotImageViewer<Accessory: View>: View {
             .help("Image size in pixels")
     }
 
-    /// The zoom row, shown only in free mode: it is the only mode the numbers can move in.
-    private var zoomControls: some View {
+    private func zoomControls(showsStepButtons: Bool) -> some View {
         HStack(spacing: 6) {
-            Button {
-                resetTransform(animated: true)
-            } label: {
-                Image(systemName: "dot.scope")
+            if showsStepButtons {
+                Button {
+                    request(.zoomOut)
+                } label: {
+                    Image(systemName: "minus")
+                }
+                .buttonStyle(.borderless)
+                .help("Zoom Out")
+                .accessibilityLabel("Zoom Out")
             }
-            .buttonStyle(.borderless)
-            .help("Centre the image and reset the zoom to 1.0")
-            .accessibilityLabel("Centre and Reset Focus")
-
-            Button {
-                step(by: -Self.zoomStep)
-            } label: {
-                Image(systemName: "minus")
-            }
-            .buttonStyle(.borderless)
-            .disabled(scale <= Self.scaleRange.lowerBound)
-            .accessibilityLabel("Zoom Out")
 
             // Drawn by hand rather than with `.roundedBorder`: on the translucent bar the
             // system field's fill all but disappears, and the digits with it.
-            TextField("Scale", text: $scaleText)
+            TextField("Zoom", text: $zoomText)
                 .textFieldStyle(.plain)
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.primary)
@@ -447,61 +243,30 @@ struct SnapshotImageViewer<Accessory: View>: View {
                     RoundedRectangle(cornerRadius: 5)
                         .strokeBorder(Color(nsColor: .separatorColor))
                 )
-                .onSubmit(commitScaleText)
-                .help("Zoom factor, between 0.1 and 10.0. Scroll over the image to zoom around the pointer")
-                .accessibilityLabel("Zoom Factor")
+                .onSubmit(commitZoomText)
+                .help("Zoom, as a percentage of the image's actual size. Pinch or ⌘-scroll over the image to zoom around the pointer, and scroll or drag to move it")
+                .accessibilityLabel("Zoom")
 
-            Button {
-                step(by: Self.zoomStep)
-            } label: {
-                Image(systemName: "plus")
+            if showsStepButtons {
+                Button {
+                    request(.zoomIn)
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(.borderless)
+                .help("Zoom In")
+                .accessibilityLabel("Zoom In")
             }
-            .buttonStyle(.borderless)
-            .disabled(scale >= Self.scaleRange.upperBound)
-            .accessibilityLabel("Zoom In")
         }
     }
 
-    // MARK: - Transform
-
-    private func step(by delta: CGFloat) {
-        withAnimation(.easeOut(duration: 0.15)) {
-            scale = Self.clamped(scale + delta)
-        }
-        anchoredScale = scale
-        syncScaleText()
-    }
-
-    /// Reads the typed number back, and puts the field straight when it was not one.
-    private func commitScaleText() {
-        guard let typed = Double(scaleText.trimmingCharacters(in: .whitespaces)) else {
-            syncScaleText()
+    /// Reads the typed percentage back, and puts the field straight when it was not one.
+    private func commitZoomText() {
+        guard let typed = CanvasZoom.magnification(fromPercentText: zoomText) else {
+            zoomText = CanvasZoom.percentText(viewport.magnification)
             return
         }
-
-        withAnimation(.easeOut(duration: 0.15)) {
-            scale = Self.clamped(CGFloat(typed))
-        }
-        anchoredScale = scale
-        syncScaleText()
-    }
-
-    private func resetTransform(animated: Bool) {
-        withAnimation(animated ? .easeInOut(duration: 0.25) : nil) {
-            scale = 1.0
-            offset = .zero
-        }
-        anchoredScale = 1.0
-        anchoredOffset = .zero
-        syncScaleText()
-    }
-
-    private func syncScaleText() {
-        scaleText = String(format: "%.2f", scale)
-    }
-
-    private static func clamped(_ value: CGFloat) -> CGFloat {
-        min(max(value, scaleRange.lowerBound), scaleRange.upperBound)
+        request(.set(typed))
     }
 
     /// Identity of one load, so a refresh of the same path counts as a different read.
@@ -514,5 +279,23 @@ struct SnapshotImageViewer<Accessory: View>: View {
 extension SnapshotImageViewer where Accessory == EmptyView {
     init(fileURL: URL, reloadToken: Int, matte: Color?) {
         self.init(fileURL: fileURL, reloadToken: reloadToken, matte: matte) { EmptyView() }
+    }
+}
+
+/// Fit or 1:1 in the footer: a button, shown pressed in while the zoom stands there.
+///
+/// A toggle in button style rather than a plain button, because the state is the point — it
+/// says at a glance whether the pane is fitted. Clicking one that is already on asks again
+/// rather than turning it off: there is no "not fitted" to go to.
+private struct ZoomPresetButton: View {
+    let title: LocalizedStringKey
+    let isOn: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Toggle(title, isOn: Binding(get: { isOn }, set: { _ in action() }))
+            .toggleStyle(.button)
+            .controlSize(.small)
+            .fixedSize()
     }
 }

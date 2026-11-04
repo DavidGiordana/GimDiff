@@ -247,8 +247,8 @@ Three more rules that are easy to undo by accident:
   the URL, and GimDiff's whole job is a file whose name stays put while its contents change.
   `CanvasModel.imageReloadToken` is the counter that says the bytes moved; every view that
   decodes an image keys its `task(id:)` on it.
-- **The View menu reaches the canvas's own controls through requests.** Display mode, zoom,
-  and the onion skin's fade are each view's `@State`, so the menu posts a
+- **The View menu reaches the canvas's own controls through requests.** Each pane's zoom
+  and the onion skin's fade are each view's own state, so the menu posts a
   `CanvasViewCommand` through `CanvasModel.requestView(_:)` and every view on screen
   carries out `viewRequest`. The two canvas colours stay out of `AppState` and reach
   the menu as the `canvasBackdrop` focused scene value.
@@ -262,6 +262,17 @@ the view's, so *Copy Comparison Image* (`ComparisonImageRenderer` in `Engine/Dif
 cuts the picture where the screen does whatever the letterboxing. Which image a selected row puts on
 screen stays in `AppState.showSnapshot(_:withGitDiff:)`, because that depends on the tree, the
 test run, and the pull request; the model is handed the choice.
+
+A pane's zoom is one continuous value, not a choice of modes. `ZoomableImageView` puts the
+image in an `NSScrollView` with magnification on, so the gestures are AppKit's: scrolling
+pans, a pinch or ⌘-scroll zooms around the pointer, and a double-click (or a two-finger
+double-tap) switches between Fit and 1:1. **Fit** and **1:1** in the footer are places the
+zoom can be put, not modes. Fit stays in effect, refitting as the pane resizes, until the user
+zooms. A magnification is measured against the image's points at its recorded density
+(`CanvasZoom`), so 100% always means 1:1. Linked panes share a `PaneViewport`: its centre is
+an image point from the top-left corner, the alignment the diff mask uses. A pane only
+publishes changes the user made, never changes it made to follow the link, or two images that
+clamp differently would push each other about.
 
 `⌘R` refreshes the images on screen and `⇧⌘R` rescans the project, rather than the other way
 round: a snapshot is looked at far more often than a folder is walked again.

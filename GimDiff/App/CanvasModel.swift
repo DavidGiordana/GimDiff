@@ -337,7 +337,7 @@ final class CanvasModel {
         imageReloadToken += 1
     }
 
-    /// Whether anything on screen has the display mode and zoom the View menu drives: a
+    /// Whether anything on screen has the zoom the View menu drives: a
     /// single image, a side-by-side pair, or the diff mask. The curtain and the onion skin
     /// draw both images in one fixed frame.
     var hasZoomableImages: Bool {
